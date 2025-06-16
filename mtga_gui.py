@@ -16,6 +16,7 @@ import sys
 import subprocess
 import threading
 import tkinter as tk
+import re # 确保导入 re 模块
 from tkinter import ttk, scrolledtext
 import ctypes
 import shutil
@@ -25,6 +26,7 @@ from pathlib import Path
 import json
 import time
 from queue import Queue, Empty
+import yaml # 添加yaml导入
 
 # 获取当前脚本的绝对路径
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -34,8 +36,20 @@ OPENSSL_EXE = os.path.join(OPENSSL_DIR, "openssl.exe")
 # 虚拟环境路径
 VENV_DIR = os.path.join(SCRIPT_DIR, ".venv")
 VENV_PYTHON = os.path.join(VENV_DIR, "Scripts", "python.exe")
+
 # 其他脚本路径
+
+DOMAIN = "api.deepseek.com"
+# DOMAIN = "generativelanguage.googleapis.com"
+
 GENERATE_CERTS_PY = os.path.join(SCRIPT_DIR, "generate_certs.py")
+# GENERATE_CERTS_PY = os.path.join(SCRIPT_DIR, "generate_google_certs.py")
+
+DOMAIN_CNF = f"{DOMAIN}.crt"
+DOMAIN_KEY = f"{DOMAIN}.key"
+HOSTS_CONTENT = f"127.0.0.1 {DOMAIN}"
+
+
 TRAE_PROXY_PY = os.path.join(SCRIPT_DIR, "trae_proxy.py")
 # hosts文件路径
 HOSTS_FILE = r"C:\Windows\System32\drivers\etc\hosts" if os.name == 'nt' else "/etc/hosts"
@@ -43,7 +57,7 @@ HOSTS_FILE = r"C:\Windows\System32\drivers\etc\hosts" if os.name == 'nt' else "/
 CA_DIR = os.path.join(SCRIPT_DIR, "ca")
 
 # 定义配置文件路径
-CONFIG_FILE = os.path.join(SCRIPT_DIR, "mtga_config.json")
+CONFIG_FILE = os.path.join(SCRIPT_DIR, "mtga_config.yaml") # 修改文件名后缀
 
 # 全局变量，用于存储代理服务器进程
 proxy_process = None
@@ -331,7 +345,7 @@ def modify_hosts_file(log_func=print, action="add"):
             return False
             
     elif action == "reset":
-        # 重置hosts文件 (删除api.deepseek.com条目)
+        # 重置hosts文件 (删除 域名 条目)
         try:
             # 检测文件编码
             encoding = detect_encoding(HOSTS_FILE)
@@ -340,7 +354,7 @@ def modify_hosts_file(log_func=print, action="add"):
             with open(HOSTS_FILE, 'r', encoding=encoding, errors='replace') as f:
                 content = f.read()
                 
-            # 查找并删除包含api.deepseek.com的行
+            # 查找并删除包含 域名 的行
             lines = content.splitlines()
             new_lines = []
             skip_next = False
@@ -349,7 +363,7 @@ def modify_hosts_file(log_func=print, action="add"):
                 if "Added by MTGA GUI" in line:
                     skip_next = True
                     continue
-                if skip_next and "api.deepseek.com" in line:
+                if skip_next and DOMAIN in line:
                     skip_next = False
                     continue
                 new_lines.append(line)
@@ -358,14 +372,14 @@ def modify_hosts_file(log_func=print, action="add"):
             with open(HOSTS_FILE, 'w', encoding=encoding) as f:
                 f.write('\n'.join(new_lines))
                 
-            log_func("hosts文件已重置，删除了api.deepseek.com条目")
+            log_func("hosts文件已重置，删除了 域名 条目")
             return True
         except Exception as e:
             log_func(f"重置hosts文件失败: {e}")
             return False
             
     else:  # action == "add"
-        # 添加api.deepseek.com条目
+        # 添加 域名 条目
         try:
             # 先备份
             if not os.path.exists(backup_file):
@@ -380,14 +394,14 @@ def modify_hosts_file(log_func=print, action="add"):
             with open(HOSTS_FILE, 'r', encoding=encoding, errors='replace') as f:
                 content = f.read()
             
-            # 检查是否已经包含api.deepseek.com
-            if "127.0.0.1 api.deepseek.com" in content:
-                log_func("hosts文件已包含api.deepseek.com条目，无需修改")
+            # 检查是否已经包含 域名 
+            if HOSTS_CONTENT in content:
+                log_func("hosts文件已包含 域名 条目，无需修改")
                 return True
             
-            # 添加api.deepseek.com条目
+            # 添加 域名 条目
             with open(HOSTS_FILE, 'a', encoding=encoding) as f:
-                f.write("\n# Added by MTGA GUI\n127.0.0.1 api.deepseek.com\n")
+                f.write(f"\n# Added by MTGA GUI\n{HOSTS_CONTENT}\n")
             log_func("hosts文件修改成功！")
             return True
         except Exception as e:
@@ -397,35 +411,66 @@ def modify_hosts_file(log_func=print, action="add"):
 # 保存配置
 def save_config(api_url=None, model_id=None, log_func=print):
     """
-    保存配置到配置文件
-    
+    保存配置到配置文件，通过逐行检查和更新的方式保留注释和格式。
+    如果文件不存在，则创建新文件。
+
     参数:
-    - api_url: API基础URL
-    - model_id: 模型ID
+    - api_url: API基础URL (可选)
+    - model_id: 模型ID (可选)
     - log_func: 日志记录函数
-    
+
     返回值:
     - 成功返回True，失败返回False
     """
     try:
-        # 读取现有配置（如果存在）
-        config = {}
-        if os.path.exists(CONFIG_FILE):
+        new_lines = []
+        api_url_found = False
+        model_id_found = False
+        config_file_exists = os.path.exists(CONFIG_FILE)
+
+        if config_file_exists:
             with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-                try:
-                    config = json.load(f)
-                except json.JSONDecodeError:
-                    log_func("警告: 配置文件格式错误，将创建新的配置文件")
+                lines = f.readlines()
+            
+            for line in lines:
+                stripped_line = line.strip()
+                # 检查并更新 api_url
+                if api_url is not None and re.match(r'^api_url\s*:', stripped_line):
+                    new_lines.append(f"api_url: {api_url}\n")
+                    api_url_found = True
+                    log_func(f"配置文件中找到并更新 api_url: {api_url}")
+                # 检查并更新 model_id
+                elif model_id is not None and re.match(r'^model_id\s*:', stripped_line):
+                    new_lines.append(f"model_id: {model_id}\n")
+                    model_id_found = True
+                    log_func(f"配置文件中找到并更新 model_id: {model_id}")
+                else:
+                    new_lines.append(line)
         
-        # 更新配置
-        if api_url is not None:
-            config['api_url'] = api_url
-        if model_id is not None:
-            config['model_id'] = model_id
-        
-        # 保存配置
+        # 如果提供了值但在文件中未找到，则追加
+        if api_url is not None and not api_url_found:
+            new_lines.append(f"api_url: {api_url}\n")
+            log_func(f"配置文件中未找到 api_url，追加新行: {api_url}")
+        if model_id is not None and not model_id_found:
+            new_lines.append(f"model_id: {model_id}\n")
+            log_func(f"配置文件中未找到 model_id，追加新行: {model_id}")
+            
+        # 如果文件最初不存在，且提供了值，则添加
+        if not config_file_exists:
+            if api_url is not None:
+                 if not any(line.startswith('api_url:') for line in new_lines):
+                     new_lines.append(f"api_url: {api_url}\n")
+                     log_func(f"创建新配置文件并添加 api_url: {api_url}")
+            if model_id is not None:
+                if not any(line.startswith('model_id:') for line in new_lines):
+                    new_lines.append(f"model_id: {model_id}\n")
+                    log_func(f"创建新配置文件并添加 model_id: {model_id}")
+
+        # 确保目录存在
+        os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
+        # 写入更新后的内容
         with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-            json.dump(config, f, indent=4, ensure_ascii=False)
+            f.writelines(new_lines)
         
         log_func(f"配置已保存到: {CONFIG_FILE}")
         return True
@@ -447,18 +492,21 @@ def load_config(log_func=print):
     try:
         if os.path.exists(CONFIG_FILE):
             with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-                config = json.load(f)
+                config = yaml.safe_load(f) # 使用 yaml.safe_load
                 log_func(f"已加载配置: {CONFIG_FILE}")
-                return config
+                return config if config else {} # 返回空字典如果文件为空
         else:
             log_func(f"配置文件不存在: {CONFIG_FILE}，将使用默认配置")
             return {}
+    except yaml.YAMLError as e: # 捕获YAML解析错误
+        log_func(f"加载配置失败: YAML格式错误 - {e}")
+        return {}
     except Exception as e:
         log_func(f"加载配置失败: {e}")
         return {}
 
 # 启动代理服务器
-def start_proxy_server(log_func=print, api_url=None, model_id=None):
+def start_proxy_server(log_func=print, api_url=None, model_id=None, debug_mode=False):
     """
     启动代理服务器
     
@@ -466,6 +514,7 @@ def start_proxy_server(log_func=print, api_url=None, model_id=None):
     - log_func: 日志记录函数
     - api_url: API基础URL，如果为None则使用配置文件中的值
     - model_id: 模型ID，如果为None则使用配置文件中的值
+    - debug_mode: 是否开启调试模式 (布尔值)
     
     返回值:
     - 成功返回进程对象，失败返回None
@@ -487,11 +536,11 @@ def start_proxy_server(log_func=print, api_url=None, model_id=None):
     
     # 检查证书文件
     possible_cert_files = [
-        os.path.join(CA_DIR, "api.deepseek.com.crt"),
+        os.path.join(CA_DIR, DOMAIN_CNF),
         os.path.join(CA_DIR, "server.crt")
     ]
     possible_key_files = [
-        os.path.join(CA_DIR, "api.deepseek.com.key"),
+        os.path.join(CA_DIR, DOMAIN_KEY),
         os.path.join(CA_DIR, "server.key")
     ]
     
@@ -527,15 +576,15 @@ def start_proxy_server(log_func=print, api_url=None, model_id=None):
             content = f.read()
         
         # 修改证书文件路径
-        if os.path.basename(cert_file) != "api.deepseek.com.crt":
+        if os.path.basename(cert_file) != DOMAIN_CNF:
             content = content.replace(
-                "CERT_FILE = os.path.join(CERT_DIR, 'api.deepseek.com.crt')",
+                f"CERT_FILE = os.path.join(CERT_DIR, {DOMAIN_CNF})",
                 f"CERT_FILE = os.path.join(CERT_DIR, '{os.path.basename(cert_file)}')"
             )
         
-        if os.path.basename(key_file) != "api.deepseek.com.key":
+        if os.path.basename(key_file) != DOMAIN_KEY:
             content = content.replace(
-                "KEY_FILE = os.path.join(CERT_DIR, 'api.deepseek.com.key')",
+                f"KEY_FILE = os.path.join(CERT_DIR, {DOMAIN_KEY})",
                 f"KEY_FILE = os.path.join(CERT_DIR, '{os.path.basename(key_file)}')"
             )
         
@@ -544,7 +593,6 @@ def start_proxy_server(log_func=print, api_url=None, model_id=None):
             # 替换常见的API URL模式
             patterns = [
                 'TARGET_API_BASE_URL = "YOUR_REVERSE_ENGINEERED_API_ENDPOINT_BASE_URL"',
-                'TARGET_API_BASE_URL = "https://new-api.bifangfang.top/v1"',
                 'TARGET_API_BASE_URL = "https://api.example.com/v1"'
             ]
             
@@ -618,10 +666,16 @@ def start_proxy_server(log_func=print, api_url=None, model_id=None):
         # 设置环境变量，确保子进程使用UTF-8编码
         env = os.environ.copy()
         env["PYTHONIOENCODING"] = "utf-8"
+
+        # 构建启动命令
+        cmd = [VENV_PYTHON, temp_proxy_file]
+        if debug_mode:
+            cmd.append("--debug")
+            log_func("调试模式已启用")
         
         # 创建子进程
         process = subprocess.Popen(
-            [VENV_PYTHON, temp_proxy_file],
+            cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             bufsize=1,
@@ -772,6 +826,11 @@ def create_main_window():
         ).start()
     )
     save_config_button.pack(fill=tk.X, padx=5, pady=5)
+
+    # 添加调试模式复选框
+    debug_mode_var = tk.BooleanVar(value=False) # 默认为关闭
+    debug_mode_check = ttk.Checkbutton(config_frame, text="开启调试模式", variable=debug_mode_var)
+    debug_mode_check.pack(fill=tk.X, padx=5, pady=2)
     
     # 创建标签页控件
     notebook = ttk.Notebook(main_frame)
@@ -845,7 +904,8 @@ def create_main_window():
             target=lambda: start_proxy_server(
                 log, 
                 api_url=api_url_var.get() if api_url_var.get() and api_url_var.get() != "YOUR_REVERSE_ENGINEERED_API_ENDPOINT_BASE_URL" else None,
-                model_id=model_id_var.get() if model_id_var.get() and model_id_var.get() != "CUSTOM_MODEL_ID" else None
+                model_id=model_id_var.get() if model_id_var.get() and model_id_var.get() != "CUSTOM_MODEL_ID" else None,
+                debug_mode=debug_mode_var.get() # 传递调试模式状态
             )
         ).start()
     )
@@ -971,4 +1031,4 @@ def main():
     root.mainloop()
 
 if __name__ == "__main__":
-    main() 
+    main()

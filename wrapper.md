@@ -1,0 +1,1 @@
+`pyinstaller --onefile --windowed --icon=icon.ico --name=run_mtga_gui_wrapped .\_run_wrapper.py`

@@ -3,8 +3,16 @@ import requests
 import ssl
 import os
 import logging
+import argparse # 导入 argparse
 
 app = Flask(__name__)
+
+# --- 参数解析 START ---
+parser = argparse.ArgumentParser(description='Trae Proxy Server with Debug Mode')
+parser.add_argument('--debug', action='store_true', help='Enable debug mode for detailed logging')
+args = parser.parse_args()
+DEBUG_MODE = args.debug
+# --- 参数解析 END ---
 
 # --- 用户配置 START ---
 # 你实际的目标 OpenAI 格式 API 的基础 URL
@@ -70,7 +78,26 @@ def chat_completions():
     支持流式和非流式响应。
     """
     app.logger.info(f"Received request for /chat/completions")
-    app.logger.debug(f"Request headers: {request.headers}")
+    if DEBUG_MODE:
+        import datetime
+        # 调试模式下记录请求头和请求体，同时追加写入日志文件
+        headers_str = "\n".join(f"{k}: {v}" for k, v in request.headers.items())
+        log_message = f"--- Request Headers (Debug Mode) ---\n{headers_str}\n--------------------------------------"
+        try:
+            body_str = request.get_data(as_text=True)
+            log_message += f"--- Request Body (Debug Mode) ---\n{body_str}\n--------------------------------------"
+        except Exception as body_exc:
+            error_msg = f"读取请求体数据时出错: {body_exc}\n"
+            app.logger.error(error_msg)
+            log_message += error_msg
+        app.logger.info(log_message + "--------------------------------------")
+        try:
+            with open("debug_request.log", "a", encoding="utf-8") as log_file:
+                log_file.write(f"[{datetime.datetime.now().isoformat()}] {log_message}--------------------------------------\n")
+        except Exception as file_exc:
+            app.logger.error(f"写入日志文件时出错: {file_exc}")
+    else:
+        app.logger.debug(f"Request headers: {request.headers}")
 
     # 尝试获取 JSON 数据
     # request.get_json(silent=True) 会在 mimetype 不正确或 JSON 解析失败时返回 None
@@ -121,12 +148,52 @@ def chat_completions():
         if is_stream:
             app.logger.info("Streaming response back to client.")
             def generate_stream():
+                full_response_content = b'' # 用于累积响应内容
+                import time, datetime # 导入时间和日期模块
+                last_log_time = time.time() # 记录上次日志写入时间
+
                 for chunk in response_from_target.iter_content(chunk_size=None): # 直接透传原始字节块
+                    if DEBUG_MODE:
+                        full_response_content += chunk
+                        current_time = time.time()
+                        # 每半秒更新一次日志
+                        if current_time - last_log_time >= 0.5:
+                            try:
+                                decoded_content = full_response_content.decode('utf-8', errors='replace')
+                                with open("debug_request.log", "a", encoding="utf-8") as log_file:
+                                    log_file.write(f"[{datetime.datetime.now().isoformat()}] --- Streamed Response Update (Debug Mode) ---\n{decoded_content}\n-------------------------------------------\n")
+                                last_log_time = current_time
+                            except Exception as log_e:
+                                app.logger.error(f"Error decoding/logging streamed response update: {log_e}")
+
                     yield chunk
+
+                if DEBUG_MODE:
+                    # 流式响应结束时，记录完整的响应体
+                    try:
+                        # 尝试解码并记录完整的流式响应体
+                        decoded_content = full_response_content.decode('utf-8', errors='replace')
+                        app.logger.info(f"--- Full Streamed Response Body (Debug Mode) ---\n{decoded_content}\n-------------------------------------------")
+                        with open("debug_request.log", "a", encoding="utf-8") as log_file:
+                            log_file.write(f"[{datetime.datetime.now().isoformat()}] --- Full Streamed Response Body (Debug Mode) ---\n{decoded_content}\n-------------------------------------------\n")
+                    except Exception as log_e:
+                        app.logger.error(f"Error decoding/logging full streamed response: {log_e}")
             return Response(generate_stream(), content_type=response_from_target.headers.get('content-type', 'text/event-stream'))
         else:
-            app.logger.info("Returning non-streamed JSON response.")
-            return jsonify(response_from_target.json()), response_from_target.status_code
+            response_json = response_from_target.json()
+            if DEBUG_MODE:
+                # 调试模式下记录完整的非流式响应体并追加写入日志文件
+                import json, datetime
+                response_str = json.dumps(response_json, indent=2, ensure_ascii=False)
+                app.logger.info(f"--- Full Response Body (Debug Mode) ---\n{response_str}\n--------------------------------------")
+                try:
+                    with open("debug_request.log", "a", encoding="utf-8") as log_file:
+                        log_file.write(f"[{datetime.datetime.now().isoformat()}] --- Full Response Body (Debug Mode) ---\n{response_str}\n--------------------------------------\n")
+                except Exception as file_exc:
+                    app.logger.error(f"写入响应日志文件时出错: {file_exc}")
+            else:
+                app.logger.info("Returning non-streamed JSON response.")
+            return jsonify(response_json), response_from_target.status_code
 
     except requests.exceptions.HTTPError as e:
         app.logger.error(f"HTTP error from target API: {e.response.status_code} - {e.response.text}")
@@ -139,7 +206,13 @@ def chat_completions():
         return jsonify({"error": "An internal server error occurred"}), 500
 
 if __name__ == '__main__':
+    if DEBUG_MODE:
+        print("*** Debug mode enabled ***")
+        logging.getLogger().setLevel(logging.INFO) # 确保 INFO 级别的日志能输出
+        app.logger.setLevel(logging.INFO)
+
     if TARGET_API_BASE_URL == "YOUR_REVERSE_ENGINEERED_API_ENDPOINT_BASE_URL":
+
         print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         print("!!! 请务必修改脚本中的 'TARGET_API_BASE_URL' 为你实际的 API 地址 !!!")
         print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")

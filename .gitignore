@@ -16,3 +16,7 @@ ca/api.deepseek.com.subj
 temp_proxy.py
 hosts.backup
 mtga_config.json
+*副本*
+mtga_config.yaml
+ca/generativelanguage.googleapis.com.*
+debug_request.log

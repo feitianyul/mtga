@@ -12,5 +12,8 @@ charset_normalizer
 idna
 certifi
 
+# 配置解析
+PyYAML
+
 # 可选依赖（打包和高级功能）
-pyinstaller  # 仅在需要打包为可执行文件时使用
+# pyinstaller  # 仅在需要打包为可执行文件时使用
