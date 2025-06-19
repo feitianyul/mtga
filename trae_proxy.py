@@ -22,6 +22,9 @@ TARGET_API_BASE_URL = "YOUR_REVERSE_ENGINEERED_API_ENDPOINT_BASE_URL"
 # 你将在 Trae IDE 中配置的模型 ID，这个随意填，Trae 里的模型 ID 与之对应
 CUSTOM_MODEL_ID = "CUSTOM_MODEL_ID"
 
+# 实际转发请求时使用的模型 ID，替换请求体中的模型名
+TARGET_MODEL_ID = CUSTOM_MODEL_ID # 替换为上游实际接受的模型ID，例如 "gpt-3.5-turbo" 或 "gpt-4"，默认和CUSTOM_MODEL_ID相同
+
 # SSL 证书和私钥文件的路径
 # 脚本会尝试从 c:\github\mtga\misc\ca\ 读取，如果找不到，你需要将它们复制到脚本同目录
 # 或者修改这里的路径
@@ -35,6 +38,8 @@ CERT_DIR = os.path.join(SCRIPT_PARENT_DIR, "ca")
 
 CERT_FILE = os.path.join(CERT_DIR, 'api.deepseek.com.crt')
 KEY_FILE = os.path.join(CERT_DIR, 'api.deepseek.com.key')
+
+STREAM_MODE = None # None为不修改，'true'为开启流式，'false'为关闭流式
 # --- 用户配置 END ---
 
 # 设置日志记录
@@ -60,15 +65,6 @@ def get_models():
     }
     app.logger.info(f"Responding to /models with: {model_data}")
     return jsonify(model_data)
-
-
-
-
-
-# ------------------------------------------- 下面一般来说不需要修改 ---------------------------------------------------
-
-
-
 
 @app.route('/chat/completions', methods=['POST'])
 def chat_completions():
@@ -121,6 +117,29 @@ def chat_completions():
         }), 400
 
     app.logger.debug(f"Request JSON: {request_data}")
+
+    # 记录客户端请求的流模式设置
+    client_requested_stream = request_data.get('stream', False)
+    app.logger.info(f"客户端请求的流模式: {client_requested_stream}")
+
+    # 替换请求体中的模型名
+    if 'model' in request_data:
+        original_model = request_data['model']
+        app.logger.info(f"替换模型名: 原始值为 {original_model}，替换为 {TARGET_MODEL_ID}")
+        request_data['model'] = TARGET_MODEL_ID
+    else:
+        app.logger.info(f"请求中没有 model 字段，添加 model: {TARGET_MODEL_ID}")
+        request_data['model'] = TARGET_MODEL_ID
+
+    # 强制修改流模式 - 无论客户端请求什么，都设置 stream 为 STREAM_MODE
+    if STREAM_MODE is not None:
+        if 'stream' in request_data:
+            original_stream_value = request_data['stream']
+            app.logger.info(f"强制修改流模式: 原始值为 {original_stream_value}，现在设置为 {STREAM_MODE}")
+            request_data['stream'] = STREAM_MODE
+        else:
+            app.logger.info(f"请求中没有 stream 参数，默认使用 {STREAM_MODE} 模式")
+            request_data['stream'] = STREAM_MODE
 
     # 从 Trae 的请求中获取 Authorization header (通常包含 API Key)
     auth_header = request.headers.get('Authorization')
@@ -180,20 +199,87 @@ def chat_completions():
                         app.logger.error(f"Error decoding/logging full streamed response: {log_e}")
             return Response(generate_stream(), content_type=response_from_target.headers.get('content-type', 'text/event-stream'))
         else:
+            # 获取完整的非流式响应
             response_json = response_from_target.json()
-            if DEBUG_MODE:
-                # 调试模式下记录完整的非流式响应体并追加写入日志文件
-                import json, datetime
-                response_str = json.dumps(response_json, indent=2, ensure_ascii=False)
-                app.logger.info(f"--- Full Response Body (Debug Mode) ---\n{response_str}\n--------------------------------------")
-                try:
-                    with open("debug_request.log", "a", encoding="utf-8") as log_file:
-                        log_file.write(f"[{datetime.datetime.now().isoformat()}] --- Full Response Body (Debug Mode) ---\n{response_str}\n--------------------------------------\n")
-                except Exception as file_exc:
-                    app.logger.error(f"写入响应日志文件时出错: {file_exc}")
+            
+            # 如果客户端请求了流式响应但我们强制使用了非流式请求，则将完整响应转换为流式格式
+            if client_requested_stream and STREAM_MODE is False:  # 明确检查STREAM_MODE是False
+                app.logger.info("将非流式响应转换为流式格式返回给客户端")
+                
+                def simulate_stream():
+                    import json, time
+                    
+                    # 提取响应中的内容
+                    choices = response_json.get('choices', [])
+                    if not choices:
+                        app.logger.error("响应中没有找到 choices 字段")
+                        yield f"data: {json.dumps({'error': 'No choices in response'})}\n\n"
+                        return
+                    
+                    # 获取第一个 choice 的内容
+                    first_choice = choices[0]
+                    message = first_choice.get('message', {})
+                    content = message.get('content', '')
+                    
+                    if not content:
+                        app.logger.error("响应中没有找到内容")
+                        yield f"data: {json.dumps({'error': 'No content in response'})}\n\n"
+                        return
+                    
+                    # 获取模型信息和其他元数据
+                    model = response_json.get('model', '')
+                    id = response_json.get('id', '')
+                    created = response_json.get('created', 0)
+                    
+                    # 分割内容并模拟流式输出
+                    # 这里我们可以按字符、单词或句子分割
+                    # 这里简单按字符分割，每次发送少量字符
+                    chunk_size = 10  # 每个块的字符数
+                    total_chars = len(content)
+                    
+                    for i in range(0, total_chars, chunk_size):
+                        chunk = content[i:i+chunk_size]
+                        
+                        # 构建符合 OpenAI 流式格式的响应块
+                        chunk_data = {
+                            "id": id,
+                            "object": "chat.completion.chunk",
+                            "created": created,
+                            "model": model,
+                            "choices": [
+                                {
+                                    "index": 0,
+                                    "delta": {
+                                        "content": chunk
+                                    },
+                                    "finish_reason": None if i + chunk_size < total_chars else first_choice.get('finish_reason', 'stop')
+                                }
+                            ]
+                        }
+                        
+                        # 发送数据块
+                        yield f"data: {json.dumps(chunk_data)}\n\n"
+                        time.sleep(0.01)  # 添加小延迟以模拟真实的流式响应
+                    
+                    # 发送结束信号
+                    yield "data: [DONE]\n\n"
+                
+                return Response(simulate_stream(), content_type='text/event-stream')
             else:
-                app.logger.info("Returning non-streamed JSON response.")
-            return jsonify(response_json), response_from_target.status_code
+                # 正常返回非流式响应
+                if DEBUG_MODE:
+                    # 调试模式下记录完整的非流式响应体并追加写入日志文件
+                    import json, datetime
+                    response_str = json.dumps(response_json, indent=2, ensure_ascii=False)
+                    app.logger.info(f"--- Full Response Body (Debug Mode) ---\n{response_str}\n--------------------------------------")
+                    try:
+                        with open("debug_request.log", "a", encoding="utf-8") as log_file:
+                            log_file.write(f"[{datetime.datetime.now().isoformat()}] --- Full Response Body (Debug Mode) ---\n{response_str}\n--------------------------------------\n")
+                    except Exception as file_exc:
+                        app.logger.error(f"写入响应日志文件时出错: {file_exc}")
+                else:
+                    app.logger.info("Returning non-streamed JSON response.")
+                return jsonify(response_json), response_from_target.status_code
 
     except requests.exceptions.HTTPError as e:
         app.logger.error(f"HTTP error from target API: {e.response.status_code} - {e.response.text}")
@@ -232,6 +318,7 @@ if __name__ == '__main__':
     print(f"确保你的 hosts 文件已将 api.deepseek.com 指向 127.0.0.1")
     print(f"目标 LLM API 地址: {TARGET_API_BASE_URL}")
     print(f"为 Trae 配置的模型 ID: {CUSTOM_MODEL_ID}")
+    print(f"实际使用的目标模型 ID: {TARGET_MODEL_ID}")
     print("注意: 监听 443 端口通常需要管理员权限运行此脚本。")
     
     try:
