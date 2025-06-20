@@ -22,8 +22,8 @@ TARGET_API_BASE_URL = "YOUR_REVERSE_ENGINEERED_API_ENDPOINT_BASE_URL"
 # 你将在 Trae IDE 中配置的模型 ID，这个随意填，Trae 里的模型 ID 与之对应
 CUSTOM_MODEL_ID = "CUSTOM_MODEL_ID"
 
-# 实际转发请求时使用的模型 ID，替换请求体中的模型名
-TARGET_MODEL_ID = CUSTOM_MODEL_ID # 替换为上游实际接受的模型ID，例如 "gpt-3.5-turbo" 或 "gpt-4"，默认和CUSTOM_MODEL_ID相同
+# 上游实际接受的模型ID，替换请求体中的模型名，例如 "gpt-4o"
+TARGET_MODEL_ID = CUSTOM_MODEL_ID # 默认和 CUSTOM_MODEL_ID 相同
 
 # SSL 证书和私钥文件的路径
 # 脚本会尝试从 c:\github\mtga\misc\ca\ 读取，如果找不到，你需要将它们复制到脚本同目录
@@ -41,6 +41,15 @@ KEY_FILE = os.path.join(CERT_DIR, 'api.deepseek.com.key')
 
 STREAM_MODE = None # None为不修改，'true'为开启流式，'false'为关闭流式
 # --- 用户配置 END ---
+
+
+
+
+# ------------------------------------------- 下面一般来说不需要修改 ---------------------------------------------------
+
+
+
+
 
 # 设置日志记录
 logging.basicConfig(level=logging.INFO)
