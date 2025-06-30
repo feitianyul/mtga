@@ -409,7 +409,7 @@ def modify_hosts_file(log_func=print, action="add"):
             return False
 
 # 保存配置
-def save_config(api_url=None, model_id=None, log_func=print):
+def save_config(api_url=None, model_id=None, target_model_id=None, stream_mode=None, log_func=print):
     """
     保存配置到配置文件，通过逐行检查和更新的方式保留注释和格式。
     如果文件不存在，则创建新文件。
@@ -417,6 +417,8 @@ def save_config(api_url=None, model_id=None, log_func=print):
     参数:
     - api_url: API基础URL (可选)
     - model_id: 模型ID (可选)
+    - target_model_id: 实际模型ID (可选)
+    - stream_mode: 强制流模式 (可选)
     - log_func: 日志记录函数
 
     返回值:
@@ -426,6 +428,8 @@ def save_config(api_url=None, model_id=None, log_func=print):
         new_lines = []
         api_url_found = False
         model_id_found = False
+        target_model_id_found = False
+        stream_mode_found = False
         config_file_exists = os.path.exists(CONFIG_FILE)
 
         if config_file_exists:
@@ -444,6 +448,16 @@ def save_config(api_url=None, model_id=None, log_func=print):
                     new_lines.append(f"model_id: {model_id}\n")
                     model_id_found = True
                     log_func(f"配置文件中找到并更新 model_id: {model_id}")
+                # 检查并更新 target_model_id
+                elif target_model_id is not None and re.match(r'^target_model_id\s*:', stripped_line):
+                    new_lines.append(f"target_model_id: {target_model_id}\n")
+                    target_model_id_found = True
+                    log_func(f"配置文件中找到并更新 target_model_id: {target_model_id}")
+                # 检查并更新 stream_mode
+                elif stream_mode is not None and re.match(r'^stream_mode\s*:', stripped_line):
+                    new_lines.append(f"stream_mode: {stream_mode}\n")
+                    stream_mode_found = True
+                    log_func(f"配置文件中找到并更新 stream_mode: {stream_mode}")
                 else:
                     new_lines.append(line)
         
@@ -454,6 +468,12 @@ def save_config(api_url=None, model_id=None, log_func=print):
         if model_id is not None and not model_id_found:
             new_lines.append(f"model_id: {model_id}\n")
             log_func(f"配置文件中未找到 model_id，追加新行: {model_id}")
+        if target_model_id is not None and not target_model_id_found:
+            new_lines.append(f"target_model_id: {target_model_id}\n")
+            log_func(f"配置文件中未找到 target_model_id，追加新行: {target_model_id}")
+        if stream_mode is not None and not stream_mode_found:
+            new_lines.append(f"stream_mode: {stream_mode}\n")
+            log_func(f"配置文件中未找到 stream_mode，追加新行: {stream_mode}")
             
         # 如果文件最初不存在，且提供了值，则添加
         if not config_file_exists:
@@ -465,6 +485,14 @@ def save_config(api_url=None, model_id=None, log_func=print):
                 if not any(line.startswith('model_id:') for line in new_lines):
                     new_lines.append(f"model_id: {model_id}\n")
                     log_func(f"创建新配置文件并添加 model_id: {model_id}")
+            if target_model_id is not None:
+                if not any(line.startswith('target_model_id:') for line in new_lines):
+                    new_lines.append(f"target_model_id: {target_model_id}\n")
+                    log_func(f"创建新配置文件并添加 target_model_id: {target_model_id}")
+            if stream_mode is not None:
+                if not any(line.startswith('stream_mode:') for line in new_lines):
+                    new_lines.append(f"stream_mode: {stream_mode}\n")
+                    log_func(f"创建新配置文件并添加 stream_mode: {stream_mode}")
 
         # 确保目录存在
         os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
@@ -506,7 +534,7 @@ def load_config(log_func=print):
         return {}
 
 # 启动代理服务器
-def start_proxy_server(log_func=print, api_url=None, model_id=None, debug_mode=False):
+def start_proxy_server(log_func=print, api_url=None, model_id=None, target_model_id=None, stream_mode=None, debug_mode=False):
     """
     启动代理服务器
     
@@ -514,6 +542,8 @@ def start_proxy_server(log_func=print, api_url=None, model_id=None, debug_mode=F
     - log_func: 日志记录函数
     - api_url: API基础URL，如果为None则使用配置文件中的值
     - model_id: 模型ID，如果为None则使用配置文件中的值
+    - target_model_id: 实际模型ID，如果为None则不修改
+    - stream_mode: 强制流模式，如果为None则不修改
     - debug_mode: 是否开启调试模式 (布尔值)
     
     返回值:
@@ -565,8 +595,8 @@ def start_proxy_server(log_func=print, api_url=None, model_id=None, debug_mode=F
         return None
     
     # 保存配置
-    if api_url or model_id:
-        save_config(api_url, model_id, log_func)
+    if api_url or model_id or target_model_id or stream_mode:
+        save_config(api_url, model_id, target_model_id, stream_mode, log_func)
     
     # 创建临时代理脚本
     temp_proxy_file = os.path.join(SCRIPT_DIR, "temp_proxy.py")
@@ -615,6 +645,37 @@ def start_proxy_server(log_func=print, api_url=None, model_id=None, debug_mode=F
                 if pattern in content:
                     content = content.replace(pattern, f'CUSTOM_MODEL_ID = "{model_id}"')
                     log_func(f"已设置模型ID: {model_id}")
+                    break
+        
+        # 如果提供了实际模型ID，替换它
+        if target_model_id:
+            # 替换TARGET_MODEL_ID的赋值
+            patterns = [
+                'TARGET_MODEL_ID = CUSTOM_MODEL_ID # 默认和 CUSTOM_MODEL_ID 相同',
+                'TARGET_MODEL_ID = CUSTOM_MODEL_ID',
+                'TARGET_MODEL_ID = "gpt-4o"'
+            ]
+            
+            for pattern in patterns:
+                if pattern in content:
+                    content = content.replace(pattern, f'TARGET_MODEL_ID = "{target_model_id}"')
+                    log_func(f"已设置实际模型ID: {target_model_id}")
+                    break
+        
+        # 如果提供了流模式设置，替换它
+        if stream_mode:
+            # 替换STREAM_MODE的赋值
+            patterns = [
+                'STREAM_MODE = None # None为不修改，\'true\'为开启流式，\'false\'为关闭流式',
+                'STREAM_MODE = None',
+                'STREAM_MODE = \'true\'',
+                'STREAM_MODE = \'false\''
+            ]
+            
+            for pattern in patterns:
+                if pattern in content:
+                    content = content.replace(pattern, f'STREAM_MODE = \'{stream_mode}\'')
+                    log_func(f"已设置强制流模式: {stream_mode}")
                     break
         
         # 修改脚本，确保输出使用UTF-8编码
@@ -804,14 +865,33 @@ def create_main_window():
     api_url_entry = ttk.Entry(api_url_frame, textvariable=api_url_var, width=40)
     api_url_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
     
-    # 模型ID输入框
+    # Trae输入模型ID输入框
     model_id_frame = ttk.Frame(config_frame)
     model_id_frame.pack(fill=tk.X, padx=5, pady=5)
     
-    ttk.Label(model_id_frame, text="模型ID:").pack(side=tk.LEFT, padx=5)
+    ttk.Label(model_id_frame, text="Trae输入模型ID:").pack(side=tk.LEFT, padx=5)
     model_id_var = tk.StringVar(value=default_model_id)
     model_id_entry = ttk.Entry(model_id_frame, textvariable=model_id_var, width=40)
     model_id_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+    
+    # 实际模型ID输入框（带勾选框）
+    target_model_frame = ttk.Frame(config_frame)
+    target_model_frame.pack(fill=tk.X, padx=5, pady=2)
+    target_model_var = tk.BooleanVar(value=False)
+    target_model_check = ttk.Checkbutton(target_model_frame, text="修改实际模型ID:", variable=target_model_var, command=lambda: target_model_entry.config(state='normal' if target_model_var.get() else 'disabled'))
+    target_model_check.pack(side=tk.LEFT)
+    target_model_entry = ttk.Entry(target_model_frame, state='disabled')
+    target_model_entry.pack(side=tk.RIGHT, fill=tk.X, expand=True, padx=(5, 0))
+    
+    # 强制流模式下拉框（带勾选框）
+    stream_mode_frame = ttk.Frame(config_frame)
+    stream_mode_frame.pack(fill=tk.X, padx=5, pady=2)
+    stream_mode_var = tk.BooleanVar(value=False)
+    stream_mode_check = ttk.Checkbutton(stream_mode_frame, text="强制流模式:", variable=stream_mode_var, command=lambda: stream_mode_combo.config(state='readonly' if stream_mode_var.get() else 'disabled'))
+    stream_mode_check.pack(side=tk.LEFT)
+    stream_mode_combo = ttk.Combobox(stream_mode_frame, values=["true", "false"], state='disabled')
+    stream_mode_combo.pack(side=tk.RIGHT, fill=tk.X, expand=True, padx=(5, 0))
+    stream_mode_combo.set("true")  # 默认值
     
     # 添加保存配置按钮
     save_config_button = ttk.Button(
@@ -821,6 +901,8 @@ def create_main_window():
             target=lambda: save_config(
                 api_url=api_url_var.get() if api_url_var.get() else None,
                 model_id=model_id_var.get() if model_id_var.get() else None,
+                target_model_id=target_model_entry.get() if target_model_var.get() and target_model_entry.get() else None,
+                stream_mode=stream_mode_combo.get() if stream_mode_var.get() else None,
                 log_func=log
             )
         ).start()
@@ -905,6 +987,8 @@ def create_main_window():
                 log, 
                 api_url=api_url_var.get() if api_url_var.get() and api_url_var.get() != "YOUR_REVERSE_ENGINEERED_API_ENDPOINT_BASE_URL" else None,
                 model_id=model_id_var.get() if model_id_var.get() and model_id_var.get() != "CUSTOM_MODEL_ID" else None,
+                target_model_id=target_model_entry.get() if target_model_var.get() and target_model_entry.get() else None,
+                stream_mode=stream_mode_combo.get() if stream_mode_var.get() else None,
                 debug_mode=debug_mode_var.get() # 传递调试模式状态
             )
         ).start()
@@ -944,7 +1028,9 @@ def create_main_window():
             target=lambda: start_all_services(
                 log,
                 api_url=api_url_var.get() if api_url_var.get() and api_url_var.get() != "YOUR_REVERSE_ENGINEERED_API_ENDPOINT_BASE_URL" else None,
-                model_id=model_id_var.get() if model_id_var.get() and model_id_var.get() != "CUSTOM_MODEL_ID" else None
+                model_id=model_id_var.get() if model_id_var.get() and model_id_var.get() != "CUSTOM_MODEL_ID" else None,
+                target_model_id=target_model_entry.get() if target_model_var.get() and target_model_entry.get() else None,
+                stream_mode=stream_mode_combo.get() if stream_mode_var.get() else None
             )
         ).start()
     )
@@ -988,7 +1074,7 @@ def create_main_window():
     return window, log
 
 # 一键启动全部服务
-def start_all_services(log_func=print, api_url=None, model_id=None):
+def start_all_services(log_func=print, api_url=None, model_id=None, target_model_id=None, stream_mode=None):
     log_func("开始一键启动全部服务...")
     
     # 生成证书
@@ -1007,12 +1093,12 @@ def start_all_services(log_func=print, api_url=None, model_id=None):
         return False
     
     # 如果提供了API URL或模型ID，保存到配置文件
-    if api_url or model_id:
-        if not save_config(api_url, model_id, log_func):
+    if api_url or model_id or target_model_id or stream_mode:
+        if not save_config(api_url, model_id, target_model_id, stream_mode, log_func):
             log_func("保存配置失败，但将继续启动代理服务器")
     
     # 启动代理服务器
-    process = start_proxy_server(log_func, api_url, model_id)
+    process = start_proxy_server(log_func, api_url, model_id, target_model_id, stream_mode)
     if not process:
         log_func("启动代理服务器失败，无法继续！")
         return False
