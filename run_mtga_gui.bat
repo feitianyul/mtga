@@ -12,50 +12,33 @@ color 0A
 set "SCRIPT_DIR=%~dp0"
 set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
 
-:: 检查是否是重启后的进程
-if "%~1"=="/RESTARTED" goto PYTHON_INSTALLED
-
-:: 检查Python是否已安装
-where python >nul 2>nul
+:: 检查uv是否已安装
+where uv >nul 2>nul
 if %ERRORLEVEL% neq 0 (
-    echo Python未安装，开始自动安装Python 3.13...
-    
-    :: 检查安装包是否存在
-    set "PYTHON_INSTALLER=%SCRIPT_DIR%\python-3.13.3-amd64.exe"
-    if not exist "!PYTHON_INSTALLER!" (
-        echo 错误: Python安装包不存在: !PYTHON_INSTALLER!
-        echo 请下载Python 3.13安装包到程序目录。
-        pause
-        exit /b 1
-    )
-    
-    :: 静默安装Python
-    echo 正在静默安装Python 3.13，请稍候...
-    "!PYTHON_INSTALLER!" /quiet InstallAllUsers=1 PrependPath=1 Include_test=0
+    echo uv未安装，开始自动安装uv...
+    echo 正在通过PowerShell安装uv，请稍候...
+    powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
     if %ERRORLEVEL% neq 0 (
-        echo Python安装失败，错误代码: %ERRORLEVEL%
+        echo uv安装失败，错误代码: %ERRORLEVEL%
         pause
         exit /b 1
     )
+    echo uv安装成功！
     
-    echo Python 3.13已安装成功，正在重启批处理文件以加载新的环境变量...
+    :: 刷新环境变量
+    call refreshenv >nul 2>nul
     
-    :: 创建一个临时重启脚本
-    set "RESTART_SCRIPT=%TEMP%\restart_mtga.bat"
-    echo @echo off > "!RESTART_SCRIPT!"
-    echo timeout /t 1 >> "!RESTART_SCRIPT!"
-    echo start "" "%~f0" /RESTARTED >> "!RESTART_SCRIPT!"
-    echo exit >> "!RESTART_SCRIPT!"
-    
-    :: 启动重启脚本并退出当前脚本
-    start "" "!RESTART_SCRIPT!"
-    exit /b 0
+    :: 再次检查uv是否可用
+    where uv >nul 2>nul
+    if %ERRORLEVEL% neq 0 (
+        echo 警告: uv安装后仍无法找到，请重新启动命令行窗口
+        echo 或手动将uv添加到PATH环境变量中
+        pause
+        exit /b 1
+    )
 )
 
-:PYTHON_INSTALLED
-:: 检查Python版本
-for /f "tokens=2" %%a in ('python -c "import sys; print(sys.version.split()[0])"') do set "PYTHON_VERSION=%%a"
-echo 检测到Python版本: !PYTHON_VERSION!
+echo 检测到uv已安装
 
 :: 设置Python虚拟环境路径
 set "VENV_DIR=%SCRIPT_DIR%\.venv"
@@ -69,36 +52,29 @@ set "OPENSSL_DIR=%SCRIPT_DIR%\openssl"
 if not exist "%VENV_PYTHON%" (
     echo 虚拟环境不存在，开始创建...
     
-    :: 检查uv是否已安装
-    where uv >nul 2>nul
+    :: 使用uv安装Python 3.13
+    echo 正在安装Python 3.13...
+    uv python install 3.13
     if %ERRORLEVEL% neq 0 (
-        echo 正在安装uv...
-        pip install uv
-        if %ERRORLEVEL% neq 0 (
-            echo 安装uv失败，请手动安装：pip install uv
-            pause
-            exit /b 1
-        )
+        echo Python 3.13安装失败
+        pause
+        exit /b 1
     )
     
     :: 创建虚拟环境
     echo 正在创建虚拟环境...
-    uv venv
+    uv venv --python 3.13
     if %ERRORLEVEL% neq 0 (
         echo 创建虚拟环境失败
         pause
         exit /b 1
     )
     
-    :: 激活虚拟环境
-    echo 正在激活虚拟环境...
-    call "%VENV_ACTIVATE%"
-    
-    :: 安装依赖
-    echo 正在安装依赖...
-    uv pip install -r "%SCRIPT_DIR%\requirements.txt"
+    :: 同步依赖
+    echo 正在同步依赖...
+    uv sync
     if %ERRORLEVEL% neq 0 (
-        echo 安装依赖失败
+        echo 依赖同步失败
         pause
         exit /b 1
     )
@@ -131,8 +107,8 @@ echo MTGA GUI 启动器
 echo ====================================
 echo 正在启动程序，请稍候...
 
-:: 使用虚拟环境中的Python启动程序
-"%VENV_PYTHON%" "%SCRIPT_DIR%\mtga_gui.py"
+:: 使用uv运行程序（自动使用虚拟环境）
+uv run python "%SCRIPT_DIR%\mtga_gui.py"
 
 :: 如果程序异常退出，暂停显示错误信息
 if %ERRORLEVEL% neq 0 (
@@ -141,4 +117,4 @@ if %ERRORLEVEL% neq 0 (
     pause
 )
 
-endlocal 
+endlocal

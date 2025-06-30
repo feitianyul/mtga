@@ -1,0 +1,57 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mtga-gui"
+version = "1.0.0"
+description = "MTGA GUI 代理工具"
+readme = "README.md"
+requires-python = ">=3.13"
+authors = [
+    {name = "MTGA GUI Team"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+]
+
+dependencies = [
+    "flask",
+    "requests",
+    "werkzeug",
+    "jinja2",
+    "itsdangerous",
+    "click",
+    "urllib3",
+    "charset_normalizer",
+    "idna",
+    "certifi",
+    "PyYAML",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pyinstaller",  # 用于打包为可执行文件
+]
+
+[project.scripts]
+mtga-gui = "mtga_gui:main"
+
+[tool.uv]
+dev-dependencies = [
+    "pyinstaller",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/README.md",
+    "/requirements.txt",
+]
