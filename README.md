@@ -18,7 +18,8 @@
 ## 重大更新
 
 * 代理的默认服务商从 DeepSeek 变更为 OpenAI
-* ds 相关文件重命名为 `*_ds.*` 格式存档，如有需要可以手动从脚本启动，或自行打包。 
+* ds 相关文件重命名为 `*_ds.*` 格式存档，如有需要可以手动从脚本启动，或自行打包。
+* 接受的 API URL 从 `https://your-api.example.com/v1` 变更为 `https://your-api.example.com`
 
 ---
 
@@ -77,16 +78,16 @@ cd "mtga/ca"
 *   其他字段（如 State, Locality, Organization, Common Name for CA）可以按需填写或留空，建议填`X`。Common Name 可以填 `MyLocalCA` 之类的。邮箱可以留空。
 
 ```bash
-# 2. 生成 api.deepseek.com 的服务器证书 (api.deepseek.com.crt 和 api.deepseek.com.key)
-# 这个脚本会使用同目录下的 api.deepseek.com.subj 和 api.deepseek.com.cnf 配置文件
-./gencrt.sh api.deepseek.com
+# 2. 生成 api.openai.com 的服务器证书 (api.openai.com.crt 和 api.openai.com.key)
+# 这个脚本会使用同目录下的 api.openai.com.subj 和 api.openai.com.cnf 配置文件
+./gencrt.sh api.openai.com
 ```
 
 执行完毕后，在 `mtga\ca` 目录下你会找到以下重要文件：
 *   `ca.crt` (你的自定义 CA 证书)
 *   `ca.key` (你的自定义 CA 私钥 - **请勿泄露**)
-*   `api.deepseek.com.crt` (用于本地代理服务器的 SSL 证书)
-*   `api.deepseek.com.key` (用于本地代理服务器的 SSL 私钥 - **请勿泄露**)
+*   `api.openai.com.crt` (用于本地代理服务器的 SSL 证书)
+*   `api.openai.com.key` (用于本地代理服务器的 SSL 私钥 - **请勿泄露**)
 
 ### 第 2 步：让 Windows 信任你的 CA 证书
 
@@ -100,15 +101,15 @@ cd "mtga/ca"
 
 ### 第 3 步：修改 Hosts 文件
 
-**⚠️警告：执行这一步之后，你将无法访问原来的 deepseek 的api。网页使用不影响。**
+**⚠️警告：执行这一步之后，你将无法访问原来的 openai 的api。网页使用不影响。**
 
-你需要用管理员权限修改 Hosts 文件，将 `api.deepseek.com` 指向你的本地机器。
+你需要用管理员权限修改 Hosts 文件，将 `api.openai.com` 指向你的本地机器。
 
 1.  Hosts 文件路径: `C:\Windows\System32\drivers\etc\hosts`
 2.  以管理员身份，使用记事本（或其他文本编辑器）打开此文件。
 3.  在文件末尾添加一行：
     ```
-    127.0.0.1 api.deepseek.com
+    127.0.0.1 api.openai.com
     ```
 4.  保存文件。  
 
@@ -122,8 +123,8 @@ cd "mtga/ca"
     ```
 2.  **配置脚本**:
     *   打开 `trae_proxy.py` 文件。
-    *   **修改 `TARGET_API_BASE_URL`**: 将其替换为你实际要连接的那个站点的 OpenAI 格式 API 的基础 URL (例如: `"https://your-api.example.com/v1"`)。
-    *   **确认证书路径**: 脚本默认会从 `mtga\ca` 读取 `api.deepseek.com.crt` 和 `api.deepseek.com.key`。如果你的证书不在此路径，请修改 `CERT_FILE` 和 `KEY_FILE` 的值，或者将这两个文件复制到脚本指定的 `CERT_DIR`。
+    *   **修改 `TARGET_API_BASE_URL`**: 将其替换为你实际要连接的那个站点的 OpenAI 格式 API 的基础 URL (例如: `"https://your-api.example.com"`)。
+    *   **确认证书路径**: 脚本默认会从 `mtga\ca` 读取 `api.openai.com.crt` 和 `api.openai.com.key`。如果你的证书不在此路径，请修改 `CERT_FILE` 和 `KEY_FILE` 的值，或者将这两个文件复制到脚本指定的 `CERT_DIR`。
 
 **运行代理服务器：**
 
@@ -139,12 +140,12 @@ python trae_proxy.py
 
 1.  打开并登录 Trae IDE。
 2.  在 AI 对话框中，点击右下角的模型图标，选择末尾的"添加模型"。
-3.  **服务商**：选择 `DeepSeek`。
+3.  **服务商**：选择 `OpenAI`。
 4.  **模型**：选择"自定义模型"。
 5.  **模型 ID**：填写你在 Python 脚本中 `CUSTOM_MODEL_ID` 定义的值 (例如: `my-custom-local-model`)。
 6.  **API 密钥**：
     *   如果你的目标 API 需要 API 密钥，并且 Trae 会将其通过 `Authorization: Bearer <key>` 传递，那么这里填写的密钥会被 Python 代理转发。
-    *   Trae 配置 DeepSeek 时，API 密钥与 `remove_reasoning_content` 配置相关。我们的 Python 代理不处理这个逻辑，它只是简单地转发 Authorization 头部。你可以尝试填写你的目标 API 所需的密钥，或者一个任意的 `sk-xxxx` 格式的密钥。
+    *   Trae 配置 OpenAI 时，API 密钥与 `remove_reasoning_content` 配置相关。我们的 Python 代理不处理这个逻辑，它只是简单地转发 Authorization 头部。你可以尝试填写你的目标 API 所需的密钥，或者一个任意的 `sk-xxxx` 格式的密钥。
 
 7.  点击"添加模型"。
 8.  回到 AI 聊天框，右下角选择你刚刚添加的自定义模型。
@@ -152,9 +153,9 @@ python trae_proxy.py
 现在，当你通过 Trae 与这个自定义模型交互时，请求应该会经过你的本地 Python 代理，并被转发到你配置的 `TARGET_API_BASE_URL`。
 
 **故障排除提示：**
-*   **端口冲突**：如果 443 端口已被占用 (例如被 IIS、Skype 或其他服务占用)，Python 脚本会启动失败。你需要停止占用该端口的服务，或者修改 Python 脚本和 Nginx (如果使用) 监听其他端口 (但这会更复杂，因为 Trae 硬编码访问 `https://api.deepseek.com` 的 443 端口)。
+*   **端口冲突**：如果 443 端口已被占用 (例如被 IIS、Skype 或其他服务占用)，Python 脚本会启动失败。你需要停止占用该端口的服务，或者修改 Python 脚本和 Nginx (如果使用) 监听其他端口 (但这会更复杂，因为 Trae 硬编码访问 `https://api.openai.com` 的 443 端口)。
 *   **防火墙**：确保 Windows 防火墙允许 Python 监听 443 端口的入站连接 (尽管是本地连接 `127.0.0.1`，通常不需要特别配置防火墙，但值得检查)。
-*   **证书问题**：如果 Trae 报错 SSL/TLS 相关错误，请仔细检查 CA 证书是否已正确安装到"受信任的根证书颁发机构"，以及 Python 代理是否正确加载了 `api.deepseek.com.crt` 和 `.key`。
+*   **证书问题**：如果 Trae 报错 SSL/TLS 相关错误，请仔细检查 CA 证书是否已正确安装到"受信任的根证书颁发机构"，以及 Python 代理是否正确加载了 `api.openai.com.crt` 和 `.key`。
 *   **代理日志**：Python 脚本会打印一些日志，可以帮助你诊断问题。
 
 这个方案比直接使用 vproxy + nginx 的方式更集成一些，将 TLS 终止和代理逻辑都放在了一个 Python 脚本中，更适合快速在 Windows 上进行原型验证。
