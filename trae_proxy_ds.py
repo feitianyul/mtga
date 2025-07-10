@@ -16,7 +16,7 @@ DEBUG_MODE = args.debug
 
 # --- 用户配置 START ---
 # 你实际的目标 OpenAI 格式 API 的基础 URL
-# 例如: "https://your-reverse-api.com"，只需域名
+# 例如: "https://your-reverse-api.com/v1"
 TARGET_API_BASE_URL = "YOUR_REVERSE_ENGINEERED_API_ENDPOINT_BASE_URL"
 
 # 你将在 Trae IDE 中配置的模型 ID，这个随意填，Trae 里的模型 ID 与之对应
@@ -36,8 +36,8 @@ SCRIPT_PARENT_DIR = os.path.dirname(SCRIPT_FILE_PATH)
 # 定义 ca 目录的路径，使其相对于脚本文件位置 (假设 ca 目录与脚本在同一目录下)
 CERT_DIR = os.path.join(SCRIPT_PARENT_DIR, "ca")
 
-CERT_FILE = os.path.join(CERT_DIR, 'api.openai.com.crt')
-KEY_FILE = os.path.join(CERT_DIR, 'api.openai.com.key')
+CERT_FILE = os.path.join(CERT_DIR, 'api.deepseek.com.crt')
+KEY_FILE = os.path.join(CERT_DIR, 'api.deepseek.com.key')
 
 STREAM_MODE = None # None为不修改，'true'为开启流式，'false'为关闭流式
 # --- 用户配置 END ---
@@ -54,13 +54,13 @@ STREAM_MODE = None # None为不修改，'true'为开启流式，'false'为关闭
 # 设置日志记录
 logging.basicConfig(level=logging.INFO)
 
-@app.route('/v1/models', methods=['GET'])
+@app.route('/models', methods=['GET'])
 def get_models():
     """
-    处理到 /v1/models 的 GET 请求，返回 Trae IDE 期望的模型列表格式。
+    处理到 /models 的 GET 请求，返回 Trae IDE 期望的模型列表格式。
     这里我们只返回一个自定义模型。
     """
-    app.logger.info(f"Received request for /v1/models")
+    app.logger.info(f"Received request for /models")
     # Trae 会检查这些字段，特别是 'id' 和 'owned_by'
     model_data = {
         "object": "list",
@@ -68,21 +68,21 @@ def get_models():
             {
                 "id": CUSTOM_MODEL_ID, # 使用 CUSTOM_MODEL_ID 变量
                 "object": "model",
-                "owned_by": "openai", # 模型所有者，确保这个字段存在
+                "owned_by": "deepseek", # 模型所有者，确保这个字段存在
             }
         ]
     }
     app.logger.info(f"Responding to /models with: {model_data}")
     return jsonify(model_data)
 
-@app.route('/v1/chat/completions', methods=['POST'])
+@app.route('/chat/completions', methods=['POST'])
 def chat_completions():
     """
-    处理到 /v1/chat/completions 的 POST 请求。
+    处理到 /chat/completions 的 POST 请求。
     它会验证请求是否为有效的 JSON，然后将请求转发到配置的目标 API 地址。
     支持流式和非流式响应。
     """
-    app.logger.info(f"Received request for /v1/chat/completions")
+    app.logger.info(f"Received request for /chat/completions")
     if DEBUG_MODE:
         import datetime
         # 调试模式下记录请求头和请求体，同时追加写入日志文件
@@ -157,7 +157,7 @@ def chat_completions():
         forward_headers['Authorization'] = auth_header
 
     try:
-        target_url = f"{TARGET_API_BASE_URL.rstrip('/')}/v1/chat/completions"
+        target_url = f"{TARGET_API_BASE_URL.rstrip('/')}/chat/completions"
         app.logger.info(f"Forwarding request to: {target_url}")
 
         # 从解析后的 request_data 中获取 stream 参数
@@ -324,7 +324,7 @@ if __name__ == '__main__':
     ssl_context.load_cert_chain(CERT_FILE, KEY_FILE)
 
     print(f"启动代理服务器，监听 https://0.0.0.0:443")
-    print(f"确保你的 hosts 文件已将 api.openai.com 指向 127.0.0.1")
+    print(f"确保你的 hosts 文件已将 api.deepseek.com 指向 127.0.0.1")
     print(f"目标 LLM API 地址: {TARGET_API_BASE_URL}")
     print(f"为 Trae 配置的模型 ID: {CUSTOM_MODEL_ID}")
     print(f"实际使用的目标模型 ID: {TARGET_MODEL_ID}")

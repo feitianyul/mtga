@@ -15,6 +15,11 @@
   <p>MTGA 即 Make T Great Again !</p>
  </details>
 
+## 重大更新
+
+* 代理的默认服务商从 DeepSeek 变更为 OpenAI
+* ds 相关文件重命名为 `*_ds.*` 格式存档，如有需要可以手动从脚本启动，或自行打包。 
+
 ---
 
 **目录**
