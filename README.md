@@ -41,6 +41,8 @@
 
 1. 双击运行 `MTGA_GUI.exe`（需要管理员权限）
 2. 在打开的图形界面中，填写 API URL 和模型 ID
+   - **注意区分好模型名，不要和内置模型名冲突：**
+   - <img width="249" height="67" alt="image" src="https://github.com/user-attachments/assets/1cc01214-083b-473e-b6d7-9cd33e78d181" />
 3. 点击"一键启动全部服务"按钮
 4. 等待程序自动完成以下操作：
    - 生成并安装证书
