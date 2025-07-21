@@ -34,17 +34,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = [
-    "pyinstaller",  # 用于打包为可执行文件
+dev = [ # 用于打包为可执行文件
 ]
 
 [project.scripts]
 mtga-gui = "mtga_gui:main"
 
 [tool.uv]
-dev-dependencies = [
-    "pyinstaller",
-]
+dev-dependencies = []
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]

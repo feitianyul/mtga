@@ -533,6 +533,84 @@ def load_config(log_func=print):
         log_func(f"加载配置失败: {e}")
         return {}
 
+# 配置组管理函数
+def load_config_groups(log_func=print):
+    """
+    从配置文件加载配置组
+    
+    参数:
+    - log_func: 日志记录函数
+    
+    返回值:
+    - 成功返回(配置组列表, 当前选中索引)，失败返回([], 0)
+    """
+    try:
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                config = yaml.safe_load(f)
+                if config and 'config_groups' in config:
+                    config_groups = config['config_groups']
+                    current_index = config.get('current_config_index', 0)
+                    log_func(f"已加载 {len(config_groups)} 个配置组")
+                    return config_groups, current_index
+                else:
+                    log_func("配置文件格式不正确，使用默认配置")
+                    return [], 0
+        else:
+            log_func(f"配置文件不存在: {CONFIG_FILE}，将使用默认配置")
+            return [], 0
+    except yaml.YAMLError as e:
+        log_func(f"加载配置失败: YAML格式错误 - {e}")
+        return [], 0
+    except Exception as e:
+        log_func(f"加载配置失败: {e}")
+        return [], 0
+
+def save_config_groups(config_groups, current_index=0, log_func=print):
+    """
+    保存配置组到配置文件
+    
+    参数:
+    - config_groups: 配置组列表
+    - current_index: 当前选中的配置组索引
+    - log_func: 日志记录函数
+    
+    返回值:
+    - 成功返回True，失败返回False
+    """
+    try:
+        config_data = {
+            'config_groups': config_groups,
+            'current_config_index': current_index
+        }
+        
+        # 确保目录存在
+        os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
+        
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            yaml.dump(config_data, f, default_flow_style=False, allow_unicode=True, indent=2)
+        
+        log_func(f"配置组已保存到: {CONFIG_FILE}")
+        return True
+    except Exception as e:
+        log_func(f"保存配置组失败: {e}")
+        return False
+
+def get_current_config(log_func=print):
+    """
+    获取当前选中的配置
+    
+    参数:
+    - log_func: 日志记录函数
+    
+    返回值:
+    - 成功返回配置字典，失败返回空字典
+    """
+    config_groups, current_index = load_config_groups(log_func)
+    if config_groups and 0 <= current_index < len(config_groups):
+        return config_groups[current_index]
+    return {}
+
 # 启动代理服务器
 def start_proxy_server(log_func=print, api_url=None, model_id=None, target_model_id=None, stream_mode=None, debug_mode=False):
     """
@@ -814,7 +892,7 @@ def check_and_install_dependencies(log_func=print):
 def create_main_window():
     window = tk.Tk()
     window.title("MTGA GUI")
-    window.geometry("650x700")  # 调整窗口高度
+    window.geometry("1250x700")  # 将宽度从1000增加五分之一到1200像素
     window.resizable(True, True)
     
     # 设置窗口图标
@@ -837,9 +915,34 @@ def create_main_window():
     )
     title_label.pack(pady=10)
     
-    # 创建日志文本框 - 先创建但放在底部
-    log_frame = ttk.LabelFrame(main_frame, text="日志")
+    # 创建左右分栏的主容器
+    main_paned = ttk.PanedWindow(main_frame, orient=tk.HORIZONTAL)
+    main_paned.pack(fill=tk.BOTH, expand=True, pady=5)
+    
+    # 左侧功能区域
+    left_frame = ttk.Frame(main_paned)
+    main_paned.add(left_frame, weight=1000)
+    
+    # 右侧日志区域
+    right_frame = ttk.Frame(main_paned)
+    main_paned.add(right_frame, weight=1)
+    
+    # 设置初始sash位置，确保左侧占大部分空间（75%）
+    def set_sash_position():
+        """设置分栏位置为左侧75%，右侧25%"""
+        window.update_idletasks()  # 确保窗口已完全渲染
+        total_width = main_paned.winfo_width()
+        if total_width > 1:  # 确保窗口已经有实际宽度
+            left_width = int(total_width * 0.5)  # 左侧占75%
+            main_paned.sashpos(0, left_width)
+    
+    window.after(100, set_sash_position)
+    
+    # 创建日志文本框 - 放在右侧独占整个高度
+    log_frame = ttk.LabelFrame(right_frame, text="日志")
+    log_frame.pack(fill=tk.BOTH, expand=True)
     log_text = scrolledtext.ScrolledText(log_frame, height=10)
+    log_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
     
     # 自定义日志函数
     def log(message):
@@ -847,44 +950,362 @@ def create_main_window():
         log_text.see(tk.END)
         print(message)
     
-    # 加载配置
-    config = load_config(log)
-    default_api_url = config.get('api_url', "YOUR_REVERSE_ENGINEERED_API_ENDPOINT_BASE_URL")
-    default_model_id = config.get('model_id', "CUSTOM_MODEL_ID")
+    # 加载配置组
+    config_groups, current_config_index = load_config_groups(log)
     
-    # 添加API URL和模型ID输入框 - 移到标签页上方
-    config_frame = ttk.LabelFrame(main_frame, text="代理服务器配置")
-    config_frame.pack(fill=tk.X, pady=5)
+    # 配置组管理界面 - 放在左侧框架中
+    config_frame = ttk.LabelFrame(left_frame, text="代理服务器配置组")
+    config_frame.pack(fill=tk.BOTH, expand=True, pady=5)
     
-    # API URL输入框
-    api_url_frame = ttk.Frame(config_frame)
-    api_url_frame.pack(fill=tk.X, padx=5, pady=5)
+    # 创建左右分栏
+    config_paned = ttk.PanedWindow(config_frame, orient=tk.HORIZONTAL)
+    config_paned.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
     
-    ttk.Label(api_url_frame, text="API URL:").pack(side=tk.LEFT, padx=5)
-    api_url_var = tk.StringVar(value=default_api_url)
-    api_url_entry = ttk.Entry(api_url_frame, textvariable=api_url_var, width=40)
-    api_url_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+    # 左侧配置组列表
+    config_list_frame = ttk.Frame(config_paned)
+    config_paned.add(config_list_frame, weight=3)
     
-    # Trae输入模型ID输入框
-    model_id_frame = ttk.Frame(config_frame)
-    model_id_frame.pack(fill=tk.X, padx=5, pady=5)
+    ttk.Label(config_list_frame, text="配置组列表:").pack(anchor=tk.W, padx=5, pady=(5, 0))
     
-    ttk.Label(model_id_frame, text="Trae输入模型ID:").pack(side=tk.LEFT, padx=5)
-    model_id_var = tk.StringVar(value=default_model_id)
-    model_id_entry = ttk.Entry(model_id_frame, textvariable=model_id_var, width=40)
-    model_id_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+    # 创建Treeview显示配置组，并添加滚动条
+    tree_frame = ttk.Frame(config_list_frame)
+    tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
     
-    # 实际模型ID输入框（带勾选框）
-    target_model_frame = ttk.Frame(config_frame)
-    target_model_frame.pack(fill=tk.X, padx=5, pady=2)
-    target_model_var = tk.BooleanVar(value=False)
-    target_model_check = ttk.Checkbutton(target_model_frame, text="修改实际模型ID:", variable=target_model_var, command=lambda: target_model_entry.config(state='normal' if target_model_var.get() else 'disabled'))
-    target_model_check.pack(side=tk.LEFT)
-    target_model_entry = ttk.Entry(target_model_frame, state='disabled')
-    target_model_entry.pack(side=tk.RIGHT, fill=tk.X, expand=True, padx=(5, 0))
+    columns = ('序号', 'API URL', '模型ID', '实际模型ID')
+    config_tree = ttk.Treeview(tree_frame, columns=columns, show='headings', height=6)
     
-    # 强制流模式下拉框（带勾选框）
-    stream_mode_frame = ttk.Frame(config_frame)
+    # 创建垂直滚动条
+    v_scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=config_tree.yview)
+    config_tree.configure(yscrollcommand=v_scrollbar.set)
+    
+    # 创建水平滚动条
+    h_scrollbar = ttk.Scrollbar(tree_frame, orient=tk.HORIZONTAL, command=config_tree.xview)
+    config_tree.configure(xscrollcommand=h_scrollbar.set)
+    
+    # 设置列标题
+    config_tree.heading('序号', text='序号')
+    config_tree.heading('API URL', text='API URL')
+    config_tree.heading('模型ID', text='模型ID')
+    config_tree.heading('实际模型ID', text='实际模型ID')
+    
+    # 设置列宽
+    config_tree.column('序号', width=30, anchor=tk.CENTER)
+    config_tree.column('API URL', width=200)
+    config_tree.column('模型ID', width=120)
+    config_tree.column('实际模型ID', width=120)
+    
+    # 布局Treeview和滚动条
+    config_tree.grid(row=0, column=0, sticky='nsew')
+    v_scrollbar.grid(row=0, column=1, sticky='ns')
+    h_scrollbar.grid(row=1, column=0, sticky='ew')
+    
+    # 配置grid权重
+    tree_frame.grid_rowconfigure(0, weight=1)
+    tree_frame.grid_columnconfigure(0, weight=1)
+    
+    # 右侧按钮区域
+    config_buttons_frame = ttk.Frame(config_paned)
+    config_paned.add(config_buttons_frame, weight=1)
+    
+    ttk.Label(config_buttons_frame, text="操作:").pack(anchor=tk.W, padx=5, pady=(5, 0))
+    
+    # 配置组操作函数
+    def refresh_config_list():
+        """刷新配置组列表显示"""
+        nonlocal config_groups, current_config_index
+        config_groups, current_config_index = load_config_groups(log)
+        
+        # 清空现有项目
+        for item in config_tree.get_children():
+            config_tree.delete(item)
+        
+        # 添加配置组到列表
+        for i, group in enumerate(config_groups):
+            target_model = group.get('target_model_id', '') or '(无)'
+            config_tree.insert('', 'end', values=(
+                i + 1,
+                group.get('api_url', ''),
+                group.get('model_id', ''),
+                target_model
+            ))
+        
+        # 选中当前配置组
+        if config_groups and 0 <= current_config_index < len(config_groups):
+            children = config_tree.get_children()
+            if current_config_index < len(children):
+                config_tree.selection_set(children[current_config_index])
+                config_tree.focus(children[current_config_index])
+    
+    def get_selected_index():
+        """获取当前选中的配置组索引"""
+        selection = config_tree.selection()
+        if selection:
+            item = selection[0]
+            return config_tree.index(item)
+        return -1
+    
+    def on_config_select(event):
+        """配置组选择事件处理"""
+        nonlocal current_config_index
+        selected_index = get_selected_index()
+        if selected_index >= 0:
+            current_config_index = selected_index
+            # 保存当前选中的配置组索引
+            save_config_groups(config_groups, current_config_index, log)
+    
+    def add_config_group():
+        """新增配置组"""
+        def save_new_config():
+            name = name_var.get().strip()
+            api_url = api_url_var.get().strip()
+            model_id = model_id_var.get().strip()
+            target_model_id = target_model_var.get().strip()
+            
+            if not api_url or not model_id:
+                log("错误: API URL和模型ID不能为空")
+                return
+            
+            new_group = {
+                'name': name,
+                'api_url': api_url,
+                'model_id': model_id,
+                'target_model_id': target_model_id
+            }
+            
+            config_groups.append(new_group)
+            if save_config_groups(config_groups, current_config_index, log):
+                log(f"已添加配置组: {name}")
+                refresh_config_list()
+                add_window.destroy()
+            else:
+                log("保存配置组失败")
+        
+        # 创建新增窗口
+        add_window = tk.Toplevel(window)
+        add_window.title("新增配置组")
+        add_window.geometry("400x250")
+        add_window.resizable(False, False)
+        add_window.transient(window)
+        add_window.grab_set()
+        
+        # 居中显示
+        add_window.update_idletasks()
+        x = (add_window.winfo_screenwidth() // 2) - (add_window.winfo_width() // 2)
+        y = (add_window.winfo_screenheight() // 2) - (add_window.winfo_height() // 2)
+        add_window.geometry(f"+{x}+{y}")
+        
+        main_frame = ttk.Frame(add_window, padding=10)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # 配置组名称
+        ttk.Label(main_frame, text="配置组名称:").grid(row=0, column=0, sticky=tk.W, pady=5)
+        name_var = tk.StringVar()
+        name_entry = ttk.Entry(main_frame, textvariable=name_var, width=30)
+        name_entry.grid(row=0, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
+        
+        # API URL
+        ttk.Label(main_frame, text="API URL:").grid(row=1, column=0, sticky=tk.W, pady=5)
+        api_url_var = tk.StringVar()
+        api_url_entry = ttk.Entry(main_frame, textvariable=api_url_var, width=30)
+        api_url_entry.grid(row=1, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
+        
+        # 模型ID
+        ttk.Label(main_frame, text="模型ID:").grid(row=2, column=0, sticky=tk.W, pady=5)
+        model_id_var = tk.StringVar()
+        model_id_entry = ttk.Entry(main_frame, textvariable=model_id_var, width=30)
+        model_id_entry.grid(row=2, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
+        
+        # 实际模型ID（可选）
+        ttk.Label(main_frame, text="实际模型ID (可选):").grid(row=3, column=0, sticky=tk.W, pady=5)
+        target_model_var = tk.StringVar()
+        target_model_entry = ttk.Entry(main_frame, textvariable=target_model_var, width=30)
+        target_model_entry.grid(row=3, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
+        
+        # 按钮
+        button_frame = ttk.Frame(main_frame)
+        button_frame.grid(row=4, column=0, columnspan=2, pady=20)
+        
+        ttk.Button(button_frame, text="保存", command=save_new_config).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="取消", command=add_window.destroy).pack(side=tk.LEFT, padx=5)
+        
+        main_frame.columnconfigure(1, weight=1)
+        name_entry.focus()
+    
+    def edit_config_group():
+        """修改配置组"""
+        selected_index = get_selected_index()
+        if selected_index < 0:
+            log("请先选择要修改的配置组")
+            return
+        
+        current_group = config_groups[selected_index]
+        
+        def save_edited_config():
+            name = name_var.get().strip()
+            api_url = api_url_var.get().strip()
+            model_id = model_id_var.get().strip()
+            target_model_id = target_model_var.get().strip()
+            
+            if not api_url or not model_id:
+                log("错误: API URL和模型ID不能为空")
+                return
+            
+            # 更新配置组
+            config_groups[selected_index] = {
+                'name': name,
+                'api_url': api_url,
+                'model_id': model_id,
+                'target_model_id': target_model_id
+            }
+            
+            if save_config_groups(config_groups, current_config_index, log):
+                log(f"已修改配置组: {name}")
+                refresh_config_list()
+                edit_window.destroy()
+            else:
+                log("保存配置组失败")
+        
+        # 创建修改窗口
+        edit_window = tk.Toplevel(window)
+        edit_window.title("修改配置组")
+        edit_window.geometry("400x250")
+        edit_window.resizable(False, False)
+        edit_window.transient(window)
+        edit_window.grab_set()
+        
+        # 居中显示
+        edit_window.update_idletasks()
+        x = (edit_window.winfo_screenwidth() // 2) - (edit_window.winfo_width() // 2)
+        y = (edit_window.winfo_screenheight() // 2) - (edit_window.winfo_height() // 2)
+        edit_window.geometry(f"+{x}+{y}")
+        
+        main_frame = ttk.Frame(edit_window, padding=10)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # 配置组名称
+        ttk.Label(main_frame, text="配置组名称:").grid(row=0, column=0, sticky=tk.W, pady=5)
+        name_var = tk.StringVar(value=current_group.get('name', ''))
+        name_entry = ttk.Entry(main_frame, textvariable=name_var, width=30)
+        name_entry.grid(row=0, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
+        
+        # API URL
+        ttk.Label(main_frame, text="API URL:").grid(row=1, column=0, sticky=tk.W, pady=5)
+        api_url_var = tk.StringVar(value=current_group.get('api_url', ''))
+        api_url_entry = ttk.Entry(main_frame, textvariable=api_url_var, width=30)
+        api_url_entry.grid(row=1, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
+        
+        # 模型ID
+        ttk.Label(main_frame, text="模型ID:").grid(row=2, column=0, sticky=tk.W, pady=5)
+        model_id_var = tk.StringVar(value=current_group.get('model_id', ''))
+        model_id_entry = ttk.Entry(main_frame, textvariable=model_id_var, width=30)
+        model_id_entry.grid(row=2, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
+        
+        # 实际模型ID（可选）
+        ttk.Label(main_frame, text="实际模型ID (可选):").grid(row=3, column=0, sticky=tk.W, pady=5)
+        target_model_var = tk.StringVar(value=current_group.get('target_model_id', ''))
+        target_model_entry = ttk.Entry(main_frame, textvariable=target_model_var, width=30)
+        target_model_entry.grid(row=3, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
+        
+        # 按钮
+        button_frame = ttk.Frame(main_frame)
+        button_frame.grid(row=4, column=0, columnspan=2, pady=20)
+        
+        ttk.Button(button_frame, text="保存", command=save_edited_config).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="取消", command=edit_window.destroy).pack(side=tk.LEFT, padx=5)
+        
+        main_frame.columnconfigure(1, weight=1)
+        name_entry.focus()
+    
+    def delete_config_group():
+        """删除配置组"""
+        selected_index = get_selected_index()
+        if selected_index < 0:
+            log("请先选择要删除的配置组")
+            return
+        
+        if len(config_groups) <= 1:
+            log("至少需要保留一个配置组")
+            return
+        
+        group_name = config_groups[selected_index].get('name', f'配置组{selected_index + 1}')
+        
+        # 确认删除
+        import tkinter.messagebox as msgbox
+        if msgbox.askyesno("确认删除", f"确定要删除配置组 '{group_name}' 吗？"):
+            del config_groups[selected_index]
+            
+            # 调整当前选中索引
+            nonlocal current_config_index
+            if current_config_index >= len(config_groups):
+                current_config_index = len(config_groups) - 1
+            elif current_config_index > selected_index:
+                current_config_index -= 1
+            
+            if save_config_groups(config_groups, current_config_index, log):
+                log(f"已删除配置组: {group_name}")
+                refresh_config_list()
+            else:
+                log("保存配置组失败")
+    
+    def move_config_up():
+        """上移配置组"""
+        selected_index = get_selected_index()
+        if selected_index <= 0:
+            return
+        
+        # 交换位置
+        config_groups[selected_index], config_groups[selected_index - 1] = \
+            config_groups[selected_index - 1], config_groups[selected_index]
+        
+        # 更新当前选中索引
+        nonlocal current_config_index
+        if current_config_index == selected_index:
+            current_config_index = selected_index - 1
+        elif current_config_index == selected_index - 1:
+            current_config_index = selected_index
+        
+        if save_config_groups(config_groups, current_config_index, log):
+            refresh_config_list()
+        else:
+            log("保存配置组失败")
+    
+    def move_config_down():
+        """下移配置组"""
+        selected_index = get_selected_index()
+        if selected_index < 0 or selected_index >= len(config_groups) - 1:
+            return
+        
+        # 交换位置
+        config_groups[selected_index], config_groups[selected_index + 1] = \
+            config_groups[selected_index + 1], config_groups[selected_index]
+        
+        # 更新当前选中索引
+        nonlocal current_config_index
+        if current_config_index == selected_index:
+            current_config_index = selected_index + 1
+        elif current_config_index == selected_index + 1:
+            current_config_index = selected_index
+        
+        if save_config_groups(config_groups, current_config_index, log):
+            refresh_config_list()
+        else:
+            log("保存配置组失败")
+    
+    # 绑定选择事件
+    config_tree.bind('<<TreeviewSelect>>', on_config_select)
+    
+    # 操作按钮
+    ttk.Button(config_buttons_frame, text="新增", command=add_config_group).pack(fill=tk.X, padx=5, pady=2)
+    ttk.Button(config_buttons_frame, text="修改", command=edit_config_group).pack(fill=tk.X, padx=5, pady=2)
+    ttk.Button(config_buttons_frame, text="删除", command=delete_config_group).pack(fill=tk.X, padx=5, pady=2)
+    ttk.Button(config_buttons_frame, text="上移", command=move_config_up).pack(fill=tk.X, padx=5, pady=2)
+    ttk.Button(config_buttons_frame, text="下移", command=move_config_down).pack(fill=tk.X, padx=5, pady=2)
+    
+    # 初始化配置组列表
+    refresh_config_list()
+    
+    # 强制流模式下拉框（带勾选框）- 放在left_frame中
+    stream_mode_frame = ttk.Frame(left_frame)
     stream_mode_frame.pack(fill=tk.X, padx=5, pady=2)
     stream_mode_var = tk.BooleanVar(value=False)
     stream_mode_check = ttk.Checkbutton(stream_mode_frame, text="强制流模式:", variable=stream_mode_var, command=lambda: stream_mode_combo.config(state='readonly' if stream_mode_var.get() else 'disabled'))
@@ -892,31 +1313,15 @@ def create_main_window():
     stream_mode_combo = ttk.Combobox(stream_mode_frame, values=["true", "false"], state='disabled')
     stream_mode_combo.pack(side=tk.RIGHT, fill=tk.X, expand=True, padx=(5, 0))
     stream_mode_combo.set("true")  # 默认值
-    
-    # 添加保存配置按钮
-    save_config_button = ttk.Button(
-        config_frame,
-        text="保存配置",
-        command=lambda: threading.Thread(
-            target=lambda: save_config(
-                api_url=api_url_var.get() if api_url_var.get() else None,
-                model_id=model_id_var.get() if model_id_var.get() else None,
-                target_model_id=target_model_entry.get() if target_model_var.get() and target_model_entry.get() else None,
-                stream_mode=stream_mode_combo.get() if stream_mode_var.get() else None,
-                log_func=log
-            )
-        ).start()
-    )
-    save_config_button.pack(fill=tk.X, padx=5, pady=5)
 
-    # 添加调试模式复选框
+    # 添加调试模式复选框 - 放在left_frame中
     debug_mode_var = tk.BooleanVar(value=False) # 默认为关闭
-    debug_mode_check = ttk.Checkbutton(config_frame, text="开启调试模式", variable=debug_mode_var)
+    debug_mode_check = ttk.Checkbutton(left_frame, text="开启调试模式", variable=debug_mode_var)
     debug_mode_check.pack(fill=tk.X, padx=5, pady=2)
     
-    # 创建标签页控件
-    notebook = ttk.Notebook(main_frame)
-    notebook.pack(fill=tk.BOTH, expand=False, pady=5)
+    # 创建标签页控件 - 放在左侧框架中
+    notebook = ttk.Notebook(left_frame)
+    notebook.pack(fill=tk.BOTH, expand=True, pady=5)
     
     # --------- 标签页1: 证书管理 ---------
     cert_tab = ttk.Frame(notebook)
@@ -979,19 +1384,26 @@ def create_main_window():
     notebook.add(proxy_tab, text="代理服务器操作")
     
     # 创建代理服务器按钮
+    def start_proxy_with_current_config():
+        """使用当前选中的配置组启动代理服务器"""
+        current_config = get_current_config()
+        if not current_config:
+            log("错误: 没有可用的配置组")
+            return
+        
+        start_proxy_server(
+            log, 
+            api_url=current_config.get('api_url'),
+            model_id=current_config.get('model_id'),
+            target_model_id=current_config.get('target_model_id') if current_config.get('target_model_id') else None,
+            stream_mode=stream_mode_combo.get() if stream_mode_var.get() else None,
+            debug_mode=debug_mode_var.get()
+        )
+    
     proxy_button = ttk.Button(
         proxy_tab, 
         text="启动代理服务器", 
-        command=lambda: threading.Thread(
-            target=lambda: start_proxy_server(
-                log, 
-                api_url=api_url_var.get() if api_url_var.get() and api_url_var.get() != "YOUR_REVERSE_ENGINEERED_API_ENDPOINT_BASE_URL" else None,
-                model_id=model_id_var.get() if model_id_var.get() and model_id_var.get() != "CUSTOM_MODEL_ID" else None,
-                target_model_id=target_model_entry.get() if target_model_var.get() and target_model_entry.get() else None,
-                stream_mode=stream_mode_combo.get() if stream_mode_var.get() else None,
-                debug_mode=debug_mode_var.get() # 传递调试模式状态
-            )
-        ).start()
+        command=lambda: threading.Thread(target=start_proxy_with_current_config).start()
     )
     proxy_button.pack(fill=tk.X, padx=5, pady=5)
     
@@ -1021,24 +1433,27 @@ def create_main_window():
     about_label.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
     
     # 创建一键启动按钮（放在标签页外面）
+    def start_all_with_current_config():
+        """使用当前选中的配置组一键启动全部服务"""
+        current_config = get_current_config()
+        if not current_config:
+            log("错误: 没有可用的配置组")
+            return
+        
+        start_all_services(
+            log,
+            api_url=current_config.get('api_url'),
+            model_id=current_config.get('model_id'),
+            target_model_id=current_config.get('target_model_id') if current_config.get('target_model_id') else None,
+            stream_mode=stream_mode_combo.get() if stream_mode_var.get() else None
+        )
+    
     start_button = ttk.Button(
-        main_frame, 
+        left_frame, 
         text="一键启动全部服务", 
-        command=lambda: threading.Thread(
-            target=lambda: start_all_services(
-                log,
-                api_url=api_url_var.get() if api_url_var.get() and api_url_var.get() != "YOUR_REVERSE_ENGINEERED_API_ENDPOINT_BASE_URL" else None,
-                model_id=model_id_var.get() if model_id_var.get() and model_id_var.get() != "CUSTOM_MODEL_ID" else None,
-                target_model_id=target_model_entry.get() if target_model_var.get() and target_model_entry.get() else None,
-                stream_mode=stream_mode_combo.get() if stream_mode_var.get() else None
-            )
-        ).start()
+        command=lambda: threading.Thread(target=start_all_with_current_config).start()
     )
     start_button.pack(fill=tk.X, pady=10)
-    
-    # 现在将日志框放在最下方
-    log_frame.pack(fill=tk.BOTH, expand=True, pady=5)
-    log_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
     
     # 停止代理服务器函数
     def stop_proxy_server(log_func=print):

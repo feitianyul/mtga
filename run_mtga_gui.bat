@@ -2,8 +2,16 @@
 chcp 65001
 setlocal enabledelayedexpansion
 
+:: 检查管理员权限并自动提权
+net session >nul 2>&1
+if %ERRORLEVEL% neq 0 (
+    echo 需要管理员权限，正在自动提权...
+    powershell -Command "Start-Process '%~f0' -Verb RunAs"
+    exit /b
+)
+
 :: 设置标题
-title MTGA GUI 启动器
+title MTGA GUI 启动器 (管理员)
 
 :: 设置颜色
 color 0A
@@ -51,6 +59,9 @@ set "OPENSSL_DIR=%SCRIPT_DIR%\openssl"
 :: 检查虚拟环境是否存在
 if not exist "%VENV_PYTHON%" (
     echo 虚拟环境不存在，开始创建...
+    
+    :: 切换到脚本目录
+    cd /d "%SCRIPT_DIR%"
     
     :: 使用uv安装Python 3.13
     echo 正在安装Python 3.13...
@@ -107,7 +118,8 @@ echo MTGA GUI 启动器
 echo ====================================
 echo 正在启动程序，请稍候...
 
-:: 使用uv运行程序（自动使用虚拟环境）
+:: 切换到脚本目录并使用uv运行程序（自动使用虚拟环境）
+cd /d "%SCRIPT_DIR%"
 uv run python "%SCRIPT_DIR%\mtga_gui.py"
 
 :: 如果程序异常退出，暂停显示错误信息
