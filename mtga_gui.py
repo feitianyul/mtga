@@ -411,7 +411,7 @@ def modify_hosts_file(log_func=print, action="add"):
 # 保存配置
 def save_config(api_url=None, model_id=None, target_model_id=None, stream_mode=None, log_func=print):
     """
-    保存配置到配置文件，通过逐行检查和更新的方式保留注释和格式。
+    保存配置到配置文件，兼容配置组格式。
     如果文件不存在，则创建新文件。
 
     参数:
@@ -425,85 +425,68 @@ def save_config(api_url=None, model_id=None, target_model_id=None, stream_mode=N
     - 成功返回True，失败返回False
     """
     try:
-        new_lines = []
-        api_url_found = False
-        model_id_found = False
-        target_model_id_found = False
-        stream_mode_found = False
-        config_file_exists = os.path.exists(CONFIG_FILE)
-
-        if config_file_exists:
-            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-                lines = f.readlines()
-            
-            for line in lines:
-                stripped_line = line.strip()
-                # 检查并更新 api_url
-                if api_url is not None and re.match(r'^api_url\s*:', stripped_line):
-                    new_lines.append(f"api_url: {api_url}\n")
-                    api_url_found = True
-                    log_func(f"配置文件中找到并更新 api_url: {api_url}")
-                # 检查并更新 model_id
-                elif model_id is not None and re.match(r'^model_id\s*:', stripped_line):
-                    new_lines.append(f"model_id: {model_id}\n")
-                    model_id_found = True
-                    log_func(f"配置文件中找到并更新 model_id: {model_id}")
-                # 检查并更新 target_model_id
-                elif target_model_id is not None and re.match(r'^target_model_id\s*:', stripped_line):
-                    new_lines.append(f"target_model_id: {target_model_id}\n")
-                    target_model_id_found = True
-                    log_func(f"配置文件中找到并更新 target_model_id: {target_model_id}")
-                # 检查并更新 stream_mode
-                elif stream_mode is not None and re.match(r'^stream_mode\s*:', stripped_line):
-                    new_lines.append(f"stream_mode: {stream_mode}\n")
-                    stream_mode_found = True
-                    log_func(f"配置文件中找到并更新 stream_mode: {stream_mode}")
-                else:
-                    new_lines.append(line)
-        
-        # 如果提供了值但在文件中未找到，则追加
-        if api_url is not None and not api_url_found:
-            new_lines.append(f"api_url: {api_url}\n")
-            log_func(f"配置文件中未找到 api_url，追加新行: {api_url}")
-        if model_id is not None and not model_id_found:
-            new_lines.append(f"model_id: {model_id}\n")
-            log_func(f"配置文件中未找到 model_id，追加新行: {model_id}")
-        if target_model_id is not None and not target_model_id_found:
-            new_lines.append(f"target_model_id: {target_model_id}\n")
-            log_func(f"配置文件中未找到 target_model_id，追加新行: {target_model_id}")
-        if stream_mode is not None and not stream_mode_found:
-            new_lines.append(f"stream_mode: {stream_mode}\n")
-            log_func(f"配置文件中未找到 stream_mode，追加新行: {stream_mode}")
-            
-        # 如果文件最初不存在，且提供了值，则添加
-        if not config_file_exists:
-            if api_url is not None:
-                 if not any(line.startswith('api_url:') for line in new_lines):
-                     new_lines.append(f"api_url: {api_url}\n")
-                     log_func(f"创建新配置文件并添加 api_url: {api_url}")
-            if model_id is not None:
-                if not any(line.startswith('model_id:') for line in new_lines):
-                    new_lines.append(f"model_id: {model_id}\n")
-                    log_func(f"创建新配置文件并添加 model_id: {model_id}")
-            if target_model_id is not None:
-                if not any(line.startswith('target_model_id:') for line in new_lines):
-                    new_lines.append(f"target_model_id: {target_model_id}\n")
-                    log_func(f"创建新配置文件并添加 target_model_id: {target_model_id}")
-            if stream_mode is not None:
-                if not any(line.startswith('stream_mode:') for line in new_lines):
-                    new_lines.append(f"stream_mode: {stream_mode}\n")
-                    log_func(f"创建新配置文件并添加 stream_mode: {stream_mode}")
-
         # 确保目录存在
         os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
-        # 写入更新后的内容
-        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-            f.writelines(new_lines)
+        
+        # 尝试加载现有配置
+        config_data = {}
+        if os.path.exists(CONFIG_FILE):
+            try:
+                with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                    config_data = yaml.safe_load(f) or {}
+            except yaml.YAMLError as e:
+                log_func(f"YAML格式错误，将重新创建配置文件: {e}")
+                config_data = {}
+            except Exception as e:
+                log_func(f"读取配置文件失败，将重新创建: {e}")
+                config_data = {}
+        
+        # 更新配置值
+        if api_url is not None:
+            config_data['api_url'] = api_url
+            log_func(f"已设置 api_url: {api_url}")
+        if model_id is not None:
+            config_data['model_id'] = model_id
+            log_func(f"已设置 model_id: {model_id}")
+        if target_model_id is not None:
+            config_data['target_model_id'] = target_model_id
+            log_func(f"已设置 target_model_id: {target_model_id}")
+        if stream_mode is not None:
+            config_data['stream_mode'] = stream_mode
+            log_func(f"已设置 stream_mode: {stream_mode}")
+        
+        # 创建临时文件，避免在写入过程中损坏原文件
+        temp_config_file = CONFIG_FILE + '.tmp'
+        
+        with open(temp_config_file, 'w', encoding='utf-8') as f:
+            # 使用与save_config_groups相同的YAML格式设置
+            yaml.dump(config_data, f, 
+                     default_flow_style=False, 
+                     allow_unicode=True, 
+                     indent=2,
+                     sort_keys=False,
+                     width=float('inf'),  # 避免自动换行
+                     default_style=None,
+                     line_break=None,  # 使用系统默认换行符
+                     encoding='utf-8')
+        
+        # 原子性替换：只有在临时文件写入成功后才替换原文件
+        if os.path.exists(temp_config_file):
+            if os.path.exists(CONFIG_FILE):
+                os.remove(CONFIG_FILE)
+            os.rename(temp_config_file, CONFIG_FILE)
         
         log_func(f"配置已保存到: {CONFIG_FILE}")
         return True
     except Exception as e:
         log_func(f"保存配置失败: {e}")
+        # 清理临时文件
+        temp_config_file = CONFIG_FILE + '.tmp'
+        if os.path.exists(temp_config_file):
+            try:
+                os.remove(temp_config_file)
+            except:
+                pass
         return False
 
 # 加载配置
@@ -587,13 +570,38 @@ def save_config_groups(config_groups, current_index=0, log_func=print):
         # 确保目录存在
         os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
         
-        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-            yaml.dump(config_data, f, default_flow_style=False, allow_unicode=True, indent=2)
+        # 创建临时文件，避免在写入过程中损坏原文件
+        temp_config_file = CONFIG_FILE + '.tmp'
+        
+        with open(temp_config_file, 'w', encoding='utf-8') as f:
+            # 使用更保守的YAML格式设置，确保格式稳定
+            yaml.dump(config_data, f, 
+                     default_flow_style=False, 
+                     allow_unicode=True, 
+                     indent=2,
+                     sort_keys=False,
+                     width=float('inf'),  # 避免自动换行
+                     default_style=None,
+                     line_break=None,  # 使用系统默认换行符
+                     encoding='utf-8')
+        
+        # 原子性替换：只有在临时文件写入成功后才替换原文件
+        if os.path.exists(temp_config_file):
+            if os.path.exists(CONFIG_FILE):
+                os.remove(CONFIG_FILE)
+            os.rename(temp_config_file, CONFIG_FILE)
         
         log_func(f"配置组已保存到: {CONFIG_FILE}")
         return True
     except Exception as e:
         log_func(f"保存配置组失败: {e}")
+        # 清理临时文件
+        temp_config_file = CONFIG_FILE + '.tmp'
+        if os.path.exists(temp_config_file):
+            try:
+                os.remove(temp_config_file)
+            except:
+                pass
         return False
 
 def get_current_config(log_func=print):
@@ -672,9 +680,8 @@ def start_proxy_server(log_func=print, api_url=None, model_id=None, target_model
         log_func(f"已检查的密钥文件: {', '.join(possible_key_files)}")
         return None
     
-    # 保存配置
-    if api_url or model_id or target_model_id or stream_mode:
-        save_config(api_url, model_id, target_model_id, stream_mode, log_func)
+    # 注意：不再在启动代理服务器时保存配置到文件，避免与配置组格式冲突
+    # 配置参数仅用于临时修改代理脚本，不会持久化到配置文件
     
     # 创建临时代理脚本
     temp_proxy_file = os.path.join(SCRIPT_DIR, "temp_proxy.py")
@@ -950,10 +957,10 @@ def create_main_window():
         log_text.see(tk.END)
         print(message)
     
-    # 加载配置组
-    config_groups, current_config_index = load_config_groups(log)
-    
     # 配置组管理界面 - 放在左侧框架中
+    # 注意：配置组将在refresh_config_list()中加载，避免重复加载
+    config_groups = []
+    current_config_index = 0
     config_frame = ttk.LabelFrame(left_frame, text="代理服务器配置组")
     config_frame.pack(fill=tk.BOTH, expand=True, pady=5)
     
