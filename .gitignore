@@ -20,3 +20,4 @@ mtga_config.json
 mtga_config.yaml
 ca/generativelanguage.googleapis.com.*
 debug_request.log
+.DS_Store

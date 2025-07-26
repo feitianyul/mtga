@@ -35,7 +35,11 @@ OPENSSL_DIR = os.path.join(SCRIPT_DIR, "openssl")
 OPENSSL_EXE = os.path.join(OPENSSL_DIR, "openssl.exe")
 # 虚拟环境路径
 VENV_DIR = os.path.join(SCRIPT_DIR, ".venv")
-VENV_PYTHON = os.path.join(VENV_DIR, "Scripts", "python.exe")
+# 根据操作系统选择正确的Python可执行文件路径
+if os.name == 'nt':  # Windows
+    VENV_PYTHON = os.path.join(VENV_DIR, "Scripts", "python.exe")
+else:  # Unix/Linux/macOS
+    VENV_PYTHON = os.path.join(VENV_DIR, "bin", "python")
 
 # 其他脚本路径
 
@@ -238,6 +242,18 @@ def install_ca_cert(log_func=print):
             if return_code != 0:
                 log_func(f"证书安装失败，返回码: {return_code}")
                 return False
+        # Mac系统 - 需要优先于posix检查，因为macOS也是posix系统
+        elif sys.platform == 'darwin':
+            cmd = f'sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "{ca_cert_file}"'
+            log_func(f"执行命令: {cmd}")
+            return_code, stdout, stderr = run_command(cmd, shell=True)
+            log_func(stdout)
+            if stderr:
+                log_func(stderr)
+            
+            if return_code != 0:
+                log_func(f"证书安装失败，返回码: {return_code}")
+                return False
         # Linux系统
         elif os.name == 'posix':
             # 复制证书到系统目录
@@ -262,18 +278,6 @@ def install_ca_cert(log_func=print):
             
             if return_code != 0:
                 log_func(f"更新证书失败，返回码: {return_code}")
-                return False
-        # Mac系统
-        elif sys.platform == 'darwin':
-            cmd = f'sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "{ca_cert_file}"'
-            log_func(f"执行命令: {cmd}")
-            return_code, stdout, stderr = run_command(cmd, shell=True)
-            log_func(stdout)
-            if stderr:
-                log_func(stderr)
-            
-            if return_code != 0:
-                log_func(f"证书安装失败，返回码: {return_code}")
                 return False
         else:
             log_func("错误: 不支持的操作系统")

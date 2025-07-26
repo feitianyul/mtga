@@ -35,7 +35,11 @@ OPENSSL_DIR = os.path.join(SCRIPT_DIR, "openssl")
 OPENSSL_EXE = os.path.join(OPENSSL_DIR, "openssl.exe")
 # 虚拟环境路径
 VENV_DIR = os.path.join(SCRIPT_DIR, ".venv")
-VENV_PYTHON = os.path.join(VENV_DIR, "Scripts", "python.exe")
+# 根据操作系统选择正确的Python可执行文件路径
+if os.name == 'nt':  # Windows
+    VENV_PYTHON = os.path.join(VENV_DIR, "Scripts", "python.exe")
+else:  # Unix/Linux/macOS
+    VENV_PYTHON = os.path.join(VENV_DIR, "bin", "python")
 
 # 其他脚本路径
 
@@ -65,18 +69,33 @@ proxy_process = None
 # 检查是否具有管理员权限
 def is_admin():
     try:
-        return ctypes.windll.shell32.IsUserAnAdmin()
+        if os.name == 'nt':  # Windows
+            return ctypes.windll.shell32.IsUserAnAdmin()
+        elif os.name == 'posix':  # Unix/Linux/macOS
+            return os.geteuid() == 0
+        else:
+            return False
     except:
         return False
 
 # 请求管理员权限并重启脚本
 def run_as_admin():
     if not is_admin():
-        # 使用 sys.executable 获取当前 Python 解释器的路径
-        ctypes.windll.shell32.ShellExecuteW(
-            None, "runas", sys.executable, " ".join(sys.argv), None, 1
-        )
-        sys.exit(0)
+        if os.name == 'nt':  # Windows
+            # 使用 sys.executable 获取当前 Python 解释器的路径
+            ctypes.windll.shell32.ShellExecuteW(
+                None, "runas", sys.executable, " ".join(sys.argv), None, 1
+            )
+            sys.exit(0)
+        elif os.name == 'posix':  # Unix/Linux/macOS
+            # 在 Unix/Linux/macOS 上，提示用户使用 sudo 运行
+            print("此程序需要管理员权限才能运行。")
+            print(f"请使用以下命令重新运行：")
+            print(f"sudo {sys.executable} {' '.join(sys.argv)}")
+            sys.exit(1)
+        else:
+            print("不支持的操作系统")
+            sys.exit(1)
 
 # 捕获输出的上下文管理器
 @contextlib.contextmanager
@@ -136,7 +155,12 @@ def generate_certificates(log_func=print):
     env["PATH"] = OPENSSL_DIR + os.pathsep + env["PATH"]
     
     # 运行证书生成脚本
-    cmd = [VENV_PYTHON, GENERATE_CERTS_PY]
+    if os.name == 'nt':  # Windows
+        cmd = [VENV_PYTHON, GENERATE_CERTS_PY]
+    elif os.name == 'posix':  # Unix/Linux/macOS
+        cmd = ['/bin/zsh', '-c', f'source {VENV_DIR}/bin/activate && python {GENERATE_CERTS_PY}']
+    else:  # Linux
+        print("不支持的操作系统")
     log_func(f"执行命令: {' '.join(cmd)}")
     
     try:
@@ -238,6 +262,18 @@ def install_ca_cert(log_func=print):
             if return_code != 0:
                 log_func(f"证书安装失败，返回码: {return_code}")
                 return False
+        # Mac系统 - 需要优先于posix检查，因为macOS也是posix系统
+        elif sys.platform == 'darwin':
+            cmd = f'sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "{ca_cert_file}"'
+            log_func(f"执行命令: {cmd}")
+            return_code, stdout, stderr = run_command(cmd, shell=True)
+            log_func(stdout)
+            if stderr:
+                log_func(stderr)
+            
+            if return_code != 0:
+                log_func(f"证书安装失败，返回码: {return_code}")
+                return False
         # Linux系统
         elif os.name == 'posix':
             # 复制证书到系统目录
@@ -262,18 +298,6 @@ def install_ca_cert(log_func=print):
             
             if return_code != 0:
                 log_func(f"更新证书失败，返回码: {return_code}")
-                return False
-        # Mac系统
-        elif sys.platform == 'darwin':
-            cmd = f'sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "{ca_cert_file}"'
-            log_func(f"执行命令: {cmd}")
-            return_code, stdout, stderr = run_command(cmd, shell=True)
-            log_func(stdout)
-            if stderr:
-                log_func(stderr)
-            
-            if return_code != 0:
-                log_func(f"证书安装失败，返回码: {return_code}")
                 return False
         else:
             log_func("错误: 不支持的操作系统")
@@ -588,7 +612,14 @@ def save_config_groups(config_groups, current_index=0, log_func=print):
         os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
         
         with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-            yaml.dump(config_data, f, default_flow_style=False, allow_unicode=True, indent=2)
+            # 使用更好的YAML格式设置，保持简洁的格式
+            yaml.dump(config_data, f, 
+                     default_flow_style=False, 
+                     allow_unicode=True, 
+                     indent=2,
+                     sort_keys=False,
+                     width=1000,  # 避免过早换行
+                     default_style=None)
         
         log_func(f"配置组已保存到: {CONFIG_FILE}")
         return True
