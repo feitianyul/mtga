@@ -1,6 +1,6 @@
 # MTGA
 <picture>
-    <img alt="MTGA" src="https://github.com/user-attachments/assets/420a736a-7812-4821-847d-63dc8995c476">
+    <img alt="MTGA" src="https://github.com/BiFangKNT/mtga/blob/gui/icons/hero-img_f0bb32.png?raw=true">
 </picture>
 
 ## 简介
@@ -28,7 +28,7 @@
 
 * [快速开始](#快速开始)
   * [Windows 用户（GUI一键启动方式）](#windows-用户gui一键启动方式)
-  * [macOS 用户](#macos-用户)
+  * [macOS 用户（应用程序安装）](#macos-用户应用程序安装)
 * [从脚本启动](#从脚本启动)
   * [第 0 步：环境准备](#第-0-步环境准备)
     * [Windows](#windows)
