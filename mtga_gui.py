@@ -35,7 +35,11 @@ OPENSSL_DIR = os.path.join(SCRIPT_DIR, "openssl")
 OPENSSL_EXE = os.path.join(OPENSSL_DIR, "openssl.exe")
 # 虚拟环境路径
 VENV_DIR = os.path.join(SCRIPT_DIR, ".venv")
-VENV_PYTHON = os.path.join(VENV_DIR, "Scripts", "python.exe")
+# 根据操作系统选择正确的Python可执行文件路径
+if os.name == 'nt':  # Windows
+    VENV_PYTHON = os.path.join(VENV_DIR, "Scripts", "python.exe")
+else:  # Unix/Linux/macOS
+    VENV_PYTHON = os.path.join(VENV_DIR, "bin", "python")
 
 # 其他脚本路径
 
@@ -65,18 +69,33 @@ proxy_process = None
 # 检查是否具有管理员权限
 def is_admin():
     try:
-        return ctypes.windll.shell32.IsUserAnAdmin()
+        if os.name == 'nt':  # Windows
+            return ctypes.windll.shell32.IsUserAnAdmin()
+        elif os.name == 'posix':  # Unix/Linux/macOS
+            return os.geteuid() == 0
+        else:
+            return False
     except:
         return False
 
 # 请求管理员权限并重启脚本
 def run_as_admin():
     if not is_admin():
-        # 使用 sys.executable 获取当前 Python 解释器的路径
-        ctypes.windll.shell32.ShellExecuteW(
-            None, "runas", sys.executable, " ".join(sys.argv), None, 1
-        )
-        sys.exit(0)
+        if os.name == 'nt':  # Windows
+            # 使用 sys.executable 获取当前 Python 解释器的路径
+            ctypes.windll.shell32.ShellExecuteW(
+                None, "runas", sys.executable, " ".join(sys.argv), None, 1
+            )
+            sys.exit(0)
+        elif os.name == 'posix':  # Unix/Linux/macOS
+            # 在 Unix/Linux/macOS 上，提示用户使用 sudo 运行
+            print("此程序需要管理员权限才能运行。")
+            print(f"请使用以下命令重新运行：")
+            print(f"sudo {sys.executable} {' '.join(sys.argv)}")
+            sys.exit(1)
+        else:
+            print("不支持的操作系统")
+            sys.exit(1)
 
 # 捕获输出的上下文管理器
 @contextlib.contextmanager
@@ -136,7 +155,12 @@ def generate_certificates(log_func=print):
     env["PATH"] = OPENSSL_DIR + os.pathsep + env["PATH"]
     
     # 运行证书生成脚本
-    cmd = [VENV_PYTHON, GENERATE_CERTS_PY]
+    if os.name == 'nt':  # Windows
+        cmd = [VENV_PYTHON, GENERATE_CERTS_PY]
+    elif os.name == 'posix':  # Unix/Linux/macOS
+        cmd = ['/bin/zsh', '-c', f'source {VENV_DIR}/bin/activate && python {GENERATE_CERTS_PY}']
+    else:  # Linux
+        print("不支持的操作系统")
     log_func(f"执行命令: {' '.join(cmd)}")
     
     try:
@@ -238,6 +262,153 @@ def install_ca_cert(log_func=print):
             if return_code != 0:
                 log_func(f"证书安装失败，返回码: {return_code}")
                 return False
+        # Mac系统 - 需要优先于posix检查，因为macOS也是posix系统
+        elif sys.platform == 'darwin':
+            # 检查是否在AppleScript环境下运行（通过检查环境变量和进程树）
+            is_applescript_env = False
+            
+            # 调试信息
+            log_func("开始检测AppleScript环境...")
+            log_func(f"当前用户ID: {os.geteuid()}")
+            log_func(f"是否有TTY: {os.isatty(0)}")
+            log_func(f"环境变量_: {os.environ.get('_', 'None')}")
+            
+            # 方法1：检查环境变量
+            if os.environ.get('_') and 'osascript' in os.environ.get('_', ''):
+                is_applescript_env = True
+                log_func("通过环境变量检测到AppleScript环境")
+            
+            # 方法2：检查进程树中是否有osascript
+            if not is_applescript_env:
+                try:
+                    # 获取当前进程的完整进程树
+                    current_pid = os.getpid()
+                    ps_output = subprocess.check_output(['ps', '-eo', 'pid,ppid,comm'], text=True)
+                    log_func(f"当前进程ID: {current_pid}")
+                    
+                    # 构建进程树
+                    processes = {}
+                    for line in ps_output.strip().split('\n')[1:]:  # 跳过标题行
+                        parts = line.strip().split(None, 2)
+                        if len(parts) >= 3:
+                            pid, ppid, comm = parts[0], parts[1], parts[2]
+                            processes[pid] = {'ppid': ppid, 'comm': comm}
+                    
+                    # 向上遍历进程树查找osascript
+                    pid = str(current_pid)
+                    process_chain = []
+                    while pid in processes and pid != '1':
+                        process_info = processes[pid]
+                        process_chain.append(f"{pid}:{process_info['comm']}")
+                        if 'osascript' in processes[pid]['comm']:
+                            is_applescript_env = True
+                            log_func(f"通过进程树检测到AppleScript环境: {' -> '.join(process_chain)}")
+                            break
+                        pid = processes[pid]['ppid']
+                    
+                    if not is_applescript_env:
+                        log_func(f"进程链: {' -> '.join(process_chain)}")
+                except Exception as e:
+                    log_func(f"进程树检测失败: {str(e)}")
+            
+            # 方法3：检查是否通过sudo运行且没有TTY（AppleScript特征）
+            if not is_applescript_env:
+                try:
+                    if os.geteuid() == 0 and not os.isatty(0):  # root用户且没有终端
+                        is_applescript_env = True
+                        log_func("通过sudo+无TTY检测到AppleScript环境")
+                except Exception as e:
+                    log_func(f"sudo+TTY检测失败: {str(e)}")
+            
+            log_func(f"AppleScript环境检测结果: {is_applescript_env}")
+            
+            if is_applescript_env:
+                # 在AppleScript环境下，尝试自动安装并设置信任
+                log_func("检测到AppleScript环境，尝试自动安装并设置证书信任...")
+                
+                # 在AppleScript环境下，先尝试简单添加证书到登录钥匙串
+                try:
+                    # 使用security命令添加证书到登录钥匙串（不设置信任级别）
+                    cmd = f'security add-certificates -k ~/Library/Keychains/login.keychain-db "{ca_cert_file}"'
+                    log_func(f"执行命令: {cmd}")
+                    return_code, stdout, stderr = run_command(cmd, shell=True)
+                    
+                    if return_code == 0:
+                        log_func("✅ 证书已成功添加到登录钥匙串")
+                    elif "already in" in stderr:
+                        log_func("✅ 证书已存在于钥匙串中，需要手动设置信任级别")
+                    else:
+                        log_func(f"添加证书失败 (返回码: {return_code})")
+                        if stderr:
+                            log_func(f"错误信息: {stderr}")
+                        # 如果添加失败，提供手动安装指导
+                        raise Exception("添加证书失败，转为手动安装")
+                    
+                    # 如果到这里，说明需要手动设置信任
+                    log_func("")
+                    log_func("=== 设置证书信任（重要步骤）===")
+                    log_func("1. 打开钥匙串访问应用")
+                    log_func("2. 选择'登录'钥匙串")
+                    log_func("3. 找到证书（名为'MTGA CA'）")
+                    log_func("4. 双击证书打开详情窗口")
+                    log_func("5. 展开'信任'设置")
+                    log_func("6. 将'使用此证书时'设置为'始终信任'")
+                    log_func("7. 输入密码确认更改")
+                    log_func("✅ 完成后证书将被完全信任")
+                    
+                    # 尝试打开钥匙串访问应用
+                    try:
+                        subprocess.run(['open', '-a', 'Keychain Access'], check=False)
+                        log_func("已尝试自动打开钥匙串访问应用")
+                    except:
+                        log_func("无法自动打开钥匙串访问应用，请手动打开")
+                    
+                    return True
+                        
+                except Exception as e:
+                    log_func(f"自动安装证书失败: {str(e)}")
+                    log_func("转为手动安装模式...")
+                    
+                    # 提供详细的手动安装指导
+                    log_func("")
+                    log_func("=== CA证书手动安装步骤 ===")
+                    log_func(f"1. 证书文件位置: {ca_cert_file}")
+                    log_func("2. 双击证书文件，系统会自动打开钥匙串访问应用")
+                    log_func("3. 证书会被添加到'登录'钥匙串中（此时显示为不被信任）")
+                    log_func("")
+                    log_func("=== 设置证书信任（重要步骤）===")
+                    log_func("4. 在钥匙串访问中，确保选择了'登录'钥匙串")
+                    log_func("5. 在'种类'中选择'证书'")
+                    log_func("6. 找到刚添加的证书（通常名为'MTGA CA'或类似名称）")
+                    log_func("7. 双击该证书打开详情窗口")
+                    log_func("8. 点击'信任'旁边的三角形展开信任设置")
+                    log_func("9. 在'使用此证书时'下拉菜单中选择'始终信任'")
+                    log_func("10. 关闭证书窗口，系统会提示输入密码")
+                    log_func("11. 输入您的macOS登录密码确认更改")
+                    log_func("")
+                    log_func("✅ 完成后，证书图标会显示蓝色加号，表示已被信任")
+                    log_func("✅ 此时HTTPS代理将能够正常工作，浏览器不会显示安全警告")
+                    
+                    # 尝试使用open命令打开证书文件
+                    try:
+                        subprocess.run(['open', ca_cert_file], check=False)
+                        log_func(f"已尝试自动打开证书文件: {ca_cert_file}")
+                    except:
+                        log_func("无法自动打开证书文件，请手动打开")
+                    
+                    return True
+            else:
+                # 在终端环境下，使用传统的sudo方法
+                cmd = f'sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "{ca_cert_file}"'
+                log_func(f"执行命令: {cmd}")
+                return_code, stdout, stderr = run_command(cmd, shell=True)
+                log_func(stdout)
+                if stderr:
+                    log_func(stderr)
+                
+                if return_code != 0:
+                    log_func(f"证书安装失败，返回码: {return_code}")
+                    return False
         # Linux系统
         elif os.name == 'posix':
             # 复制证书到系统目录
@@ -262,18 +433,6 @@ def install_ca_cert(log_func=print):
             
             if return_code != 0:
                 log_func(f"更新证书失败，返回码: {return_code}")
-                return False
-        # Mac系统
-        elif sys.platform == 'darwin':
-            cmd = f'sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "{ca_cert_file}"'
-            log_func(f"执行命令: {cmd}")
-            return_code, stdout, stderr = run_command(cmd, shell=True)
-            log_func(stdout)
-            if stderr:
-                log_func(stderr)
-            
-            if return_code != 0:
-                log_func(f"证书安装失败，返回码: {return_code}")
                 return False
         else:
             log_func("错误: 不支持的操作系统")
@@ -904,10 +1063,18 @@ def create_main_window():
     
     # 设置窗口图标
     try:
-        icon_path = os.path.join(SCRIPT_DIR, "icon.ico")
-        if os.path.exists(icon_path):
-            window.iconbitmap(icon_path)
-    except Exception:
+        if os.name == 'nt':  # Windows
+            icon_path = os.path.join(SCRIPT_DIR, "icon.ico")
+            if os.path.exists(icon_path):
+                window.iconbitmap(icon_path)
+        else:  # macOS/Linux
+            icon_path = os.path.join(SCRIPT_DIR, "icon.png")
+            if os.path.exists(icon_path):
+                # 在macOS和Linux上使用PhotoImage
+                icon_image = tk.PhotoImage(file=icon_path)
+                window.iconphoto(True, icon_image)
+    except Exception as e:
+        print(f"设置图标失败: {e}")
         pass
     
     # 创建主框架
@@ -956,6 +1123,22 @@ def create_main_window():
         log_text.insert(tk.END, f"{message}\n")
         log_text.see(tk.END)
         print(message)
+    
+    # 加载启动日志文件（如果存在）
+    startup_log_file = os.path.join(SCRIPT_DIR, "startup.log")
+    if os.path.exists(startup_log_file):
+        try:
+            with open(startup_log_file, 'r', encoding='utf-8') as f:
+                startup_content = f.read().strip()
+                if startup_content:
+                    log("=== 启动日志 ===")
+                    for line in startup_content.split('\n'):
+                        if line.strip():
+                            log_text.insert(tk.END, f"{line}\n")
+                    log("=== 启动日志结束 ===")
+                    log_text.see(tk.END)
+        except Exception as e:
+            log(f"读取启动日志失败: {e}")
     
     # 配置组管理界面 - 放在左侧框架中
     # 注意：配置组将在refresh_config_list()中加载，避免重复加载
@@ -1386,6 +1569,40 @@ def create_main_window():
     )
     hosts_reset_button.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=2)
     
+    # 添加打开hosts文件按钮
+    def open_hosts_file():
+        """根据平台打开hosts文件"""
+        try:
+            if os.name == 'nt':  # Windows
+                # Windows使用notepad打开
+                subprocess.run(['notepad', HOSTS_FILE], check=True)
+                log("已使用记事本打开hosts文件")
+            elif sys.platform == 'darwin':  # macOS
+                # macOS使用默认文本编辑器打开
+                subprocess.run(['open', '-t', HOSTS_FILE], check=True)
+                log("已使用默认文本编辑器打开hosts文件")
+            else:  # Linux
+                # Linux尝试使用常见的文本编辑器
+                editors = ['gedit', 'nano', 'vim']
+                for editor in editors:
+                    try:
+                        subprocess.run([editor, HOSTS_FILE], check=True)
+                        log(f"已使用{editor}打开hosts文件")
+                        break
+                    except (subprocess.CalledProcessError, FileNotFoundError):
+                        continue
+                else:
+                    log("未找到合适的文本编辑器")
+        except Exception as e:
+            log(f"打开hosts文件失败: {e}")
+    
+    hosts_open_button = ttk.Button(
+        hosts_tab, 
+        text="打开hosts文件", 
+        command=lambda: threading.Thread(target=open_hosts_file).start()
+    )
+    hosts_open_button.pack(fill=tk.X, padx=5, pady=5)
+    
     # --------- 标签页3: 代理服务器操作 ---------
     proxy_tab = ttk.Frame(notebook)
     notebook.add(proxy_tab, text="代理服务器操作")
@@ -1519,6 +1736,30 @@ def start_all_services(log_func=print, api_url=None, model_id=None, target_model
         if not save_config(api_url, model_id, target_model_id, stream_mode, log_func):
             log_func("保存配置失败，但将继续启动代理服务器")
     
+    # macOS平台特殊处理：在证书安装后停止，不启动代理服务器
+    if sys.platform == 'darwin':
+        log_func("")
+        log_func("=" * 60)
+        log_func("🍎 macOS 平台检测到")
+        log_func("=" * 60)
+        log_func("")
+        log_func("✅ 证书生成和安装已完成")
+        log_func("✅ hosts文件修改已完成")
+        log_func("✅ 配置文件保存已完成")
+        log_func("")
+        log_func("⚠️  由于macOS系统的安全机制，证书安装后需要用户手动确认信任设置。")
+        log_func("⚠️  请确保上面的证书信任设置已完成，再启动代理服务器。")
+        log_func("")
+        log_func("📋  证书信任设置完成后，点击下方的 '启动代理服务器' 按钮")
+        log_func("")
+        log_func("💡 提示：如果找不到证书，请重新运行一键启动")
+        log_func("")
+        log_func("=" * 60)
+        log_func("🔧 准备工作已完成，等待用户手动启动代理服务器")
+        log_func("=" * 60)
+        return True
+    
+    # 非macOS平台继续原有流程
     # 启动代理服务器
     process = start_proxy_server(log_func, api_url, model_id, target_model_id, stream_mode)
     if not process:

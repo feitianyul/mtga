@@ -36,6 +36,9 @@ dependencies = [
 [project.optional-dependencies]
 dev = [ # 用于打包为可执行文件
 ]
+build = [ # 用于构建DMG等打包工具
+    "dmgbuild",
+]
 
 [project.scripts]
 mtga-gui = "mtga_gui:main"
