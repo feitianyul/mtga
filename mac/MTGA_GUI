@@ -18,14 +18,17 @@ fi
 # 2. do shell script "命令" with administrator privileges 表示需要管理员权限
 # 3. with prompt "提示信息" 用于显示认证对话框的提示文本
 # 4. 命令需要用引号包裹,特殊字符需要转义
-# 5. 使用临时文件存储命令输出的方法:
-#    - mktemp 创建临时文件
+# 5. 使用固定文件存储命令输出的方法:
+#    - 使用项目内固定位置的日志文件
 #    - > 重定向标准输出
 #    - 2>&1 重定向标准错误到标准输出
-OUTPUT_FILE=$(mktemp)
-osascript -e "do shell script \"'$TARGET_SCRIPT' > '$OUTPUT_FILE' 2>&1\" with administrator privileges with prompt \"MTGA GUI 需要管理员权限来执行操作\""
+#    - 使用后台运行避免在dock显示
+OUTPUT_FILE="$SCRIPT_DIR/../Resources/mtga_project/startup.log"
+# 在后台运行目标脚本，避免启动脚本在dock中显示
+osascript -e "do shell script \"'$TARGET_SCRIPT' > '$OUTPUT_FILE' 2>&1 &\" with administrator privileges with prompt \"MTGA GUI 需要管理员权限来执行操作\""
+# 等待一下让日志文件生成
+sleep 2
 cat "$OUTPUT_FILE"
-rm "$OUTPUT_FILE"
 
 # 检查执行结果
 if [ $? -eq 0 ]; then

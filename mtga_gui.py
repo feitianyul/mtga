@@ -1063,10 +1063,18 @@ def create_main_window():
     
     # 设置窗口图标
     try:
-        icon_path = os.path.join(SCRIPT_DIR, "icon.ico")
-        if os.path.exists(icon_path):
-            window.iconbitmap(icon_path)
-    except Exception:
+        if os.name == 'nt':  # Windows
+            icon_path = os.path.join(SCRIPT_DIR, "icon.ico")
+            if os.path.exists(icon_path):
+                window.iconbitmap(icon_path)
+        else:  # macOS/Linux
+            icon_path = os.path.join(SCRIPT_DIR, "icon.png")
+            if os.path.exists(icon_path):
+                # 在macOS和Linux上使用PhotoImage
+                icon_image = tk.PhotoImage(file=icon_path)
+                window.iconphoto(True, icon_image)
+    except Exception as e:
+        print(f"设置图标失败: {e}")
         pass
     
     # 创建主框架
@@ -1115,6 +1123,22 @@ def create_main_window():
         log_text.insert(tk.END, f"{message}\n")
         log_text.see(tk.END)
         print(message)
+    
+    # 加载启动日志文件（如果存在）
+    startup_log_file = os.path.join(SCRIPT_DIR, "startup.log")
+    if os.path.exists(startup_log_file):
+        try:
+            with open(startup_log_file, 'r', encoding='utf-8') as f:
+                startup_content = f.read().strip()
+                if startup_content:
+                    log("=== 启动日志 ===")
+                    for line in startup_content.split('\n'):
+                        if line.strip():
+                            log_text.insert(tk.END, f"{line}\n")
+                    log("=== 启动日志结束 ===")
+                    log_text.see(tk.END)
+        except Exception as e:
+            log(f"读取启动日志失败: {e}")
     
     # 配置组管理界面 - 放在左侧框架中
     # 注意：配置组将在refresh_config_list()中加载，避免重复加载
