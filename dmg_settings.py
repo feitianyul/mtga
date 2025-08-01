@@ -50,7 +50,7 @@ icon_size = 96
 
 # Background image
 # Use the dmg_background.png file in the current directory
-background = 'dmg_background.png'
+background = './mac/dmg_background.png'
 
 # Include icon view settings
 include_icon_view_settings = True

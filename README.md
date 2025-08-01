@@ -200,7 +200,7 @@ python trae_proxy.py
 
 #### macOS
 
--> [Mac OS 脚本启动方法](https://github.com/BiFangKNT/mtga/blob/gui/README_macOS_cli.md)
+-> [Mac OS 脚本启动方法](https://github.com/BiFangKNT/mtga/blob/gui/docs/README_macOS_cli.md)
 
 ---
 
