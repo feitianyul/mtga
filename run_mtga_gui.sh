@@ -213,6 +213,21 @@ main() {
     # 设置环境变量
     export PYTHONPATH="$SCRIPT_DIR:$PYTHONPATH"
     
+    # 设置TCL/TK库路径（修复AppleScript环境下的tkinter问题）
+    PYTHON_EXECUTABLE="$SCRIPT_DIR/.venv/bin/python"
+    if [[ -L "$PYTHON_EXECUTABLE" ]]; then
+        # 获取Python可执行文件的真实路径
+        REAL_PYTHON=$(readlink "$PYTHON_EXECUTABLE")
+        if [[ "$REAL_PYTHON" == *"uv/python"* ]]; then
+            # 这是uv下载的独立Python，设置TCL/TK库路径
+            PYTHON_BASE=$(dirname "$(dirname "$REAL_PYTHON")")
+            export TCL_LIBRARY="$PYTHON_BASE/lib/tcl8.6"
+            export TK_LIBRARY="$PYTHON_BASE/lib/tk8.6"
+            print_info "设置TCL库路径: $TCL_LIBRARY"
+            print_info "设置TK库路径: $TK_LIBRARY"
+        fi
+    fi
+    
     print_info "正在启动程序，请稍候..."
     
     # 切换到脚本目录并使用uv运行程序（自动使用虚拟环境）
@@ -220,7 +235,7 @@ main() {
     
     # 运行程序（需要sudo权限）
     print_info "程序需要管理员权限来修改网络设置，将提示输入密码..."
-    if sudo uv run python "$SCRIPT_DIR/mtga_gui.py"; then
+    if sudo TCL_LIBRARY="$TCL_LIBRARY" TK_LIBRARY="$TK_LIBRARY" uv run python "$SCRIPT_DIR/mtga_gui.py"; then
         print_success "程序正常退出"
     else
         exit_code=$?

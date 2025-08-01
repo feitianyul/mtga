@@ -21,3 +21,5 @@ mtga_config.yaml
 ca/generativelanguage.googleapis.com.*
 debug_request.log
 .DS_Store
+*.log
+MTGA_GUI.app
