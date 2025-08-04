@@ -47,7 +47,7 @@ print_info "检查必要文件..."
 required_files=(
     "$SCRIPT_DIR/mac/Info.plist"
     "$SCRIPT_DIR/mac/MTGA_GUI"
-    "$SCRIPT_DIR/icon.png"
+    "$SCRIPT_DIR/icons/f0bb32_bg-black.png"
     "$SCRIPT_DIR/generate_certs.py"
     "$SCRIPT_DIR/mtga_gui.py"
     "$SCRIPT_DIR/pyproject.toml"
@@ -132,7 +132,7 @@ fi
 
 # 复制 icon.png 到 Resources 目录
 print_info "复制应用程序图标..."
-cp "$SCRIPT_DIR/icon.png" "$RESOURCES_DIR/"
+cp "$SCRIPT_DIR/mac/icon.png" "$RESOURCES_DIR/"
 if [[ $? -eq 0 ]]; then
     print_success "应用程序图标复制成功"
 else

@@ -5,21 +5,46 @@
 ## 文件说明
 
 ### 核心脚本
-- `create_mac_app.sh` - 创建 macOS 应用程序包（.app）
-- `dmg_settings.py` - dmgbuild 配置文件，定义 DMG 的外观和布局
+- `mac/create_mac_app.sh` - 创建 macOS 应用程序包（.app）
+- `mac/dmg_settings.py` - dmgbuild 配置文件，定义 DMG 的外观和布局
 
 ### 资源文件
-- `dmg_background.svg` - DMG 安装界面的背景图（SVG 格式）
-- `dmg_background.png` - 从 SVG 转换的背景图（PNG 格式）
-- `icon.png` - 应用程序图标
+- `mac/dmg_background.svg` - DMG 安装界面的背景图（SVG 格式）
+- `mac/dmg_background.png` - 从 SVG 转换的背景图（PNG 格式）
+- `mac/icon.png` - 应用程序图标
 - `mac/Info.plist` - macOS 应用程序信息配置
 - `mac/MTGA_GUI` - macOS 启动脚本
 
 ## 使用步骤
 
+### 0. 生成 Mac 风格图标
+
+**目前的圆角矩形风格为使用 Inkscape 进行的纯 svg 手k，下面流程仅作归档。**
+
+检查 `mac/icon.png` 是否存在，如果不存在，执行以下步骤：
+
+检查 ImageMagick 是否安装：
+```bash
+magick -version
+```
+
+如果未安装，使用 Homebrew 安装：
+```bash
+brew install imagemagick
+```
+
+生成图标：
+```bash
+# 使用 ImageMagick 将原始图标转换为 Mac 风格的圆角矩形图标
+# 根据苹果官方设计规范，图标内容应该居中并留有适当边距以避免被圆角遮罩截断
+# 1024x1024 图标的圆角半径为 228px，对于 128x128 图标，圆角半径应为 28.5px
+# 添加 10% 的边距（约 13px）确保内容不会被圆角截断
+magick icons/f0bb32_bg-black.png -resize 102x102 -alpha set -background none -compose copy -gravity center -extent 128x128 \( +clone -threshold -1 -negate -fill white -draw 'roundrectangle 0,0 127,127 28.5,28.5' \) -alpha off -compose copy_opacity -composite mac/icon.png
+```
+
 ### 1. 构建应用程序包
 ```bash
-sudo ./create_mac_app.sh
+mac/create_mac_app.sh
 ```
 
 这将创建 `MTGA_GUI.app` 应用程序包，包含：
@@ -37,10 +62,10 @@ sudo ./create_mac_app.sh
 uv sync --extra build
 
 # 构建 DMG
-sudo uv run dmgbuild -s dmg_settings.py "MTGA GUI Installer" MTGA_GUI_Installer.dmg
+uv run dmgbuild -s mac/dmg_settings.py "MTGA GUI Installer" MTGA_GUI-v1.x.x-aarch64.dmg
 ```
 
-这将创建 `MTGA_GUI_Installer.dmg` 文件，具有以下特性：
+这将创建 `MTGA_GUI-v1.x.x-aarch64.dmg` 文件，具有以下特性：
 - 专业的安装界面
 - 拖拽安装指导
 - 自定义背景图
@@ -115,6 +140,16 @@ sudo uv run dmgbuild -s dmg_settings.py "MTGA GUI Installer" MTGA_GUI_Installer.
 - `uv` - Python 包管理器
 - `dmgbuild` - 现代 DMG 构建工具
 - `ds-store` 和 `mac-alias` - dmgbuild 的依赖库
+
+### 配置特性
+- 基于 Python 配置文件，易于版本控制
+- 支持精确的图标位置控制
+- 无需 GUI 环境，适合 CI/CD
+- 可重现的构建结果
+
+---
+
+**注意**：所有修改应在项目根目录和 `mac/` 目录中进行，因为 `create_mac_app.sh` 会覆盖应用程序包中的文件。`ds-store` 和 `mac-alias` - dmgbuild 的依赖库
 
 ### 配置特性
 - 基于 Python 配置文件，易于版本控制
