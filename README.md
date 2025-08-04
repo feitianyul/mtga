@@ -17,7 +17,7 @@
 
 ## 重大更新
 
-* **适配 Mac OS 端 -> [快速开始 - MacOS](#macos-用户)**
+* **适配 Mac OS 端 -> [快速开始 - MacOS](#macos-用户应用程序安装)**
 * 代理的默认服务商从 DeepSeek 变更为 OpenAI
 * ds 相关文件重命名为 `*_ds.*` 格式存档，如有需要可以手动从脚本启动，或自行打包。
 * 接受的 API URL 从 `https://your-api.example.com/v1` 变更为 `https://your-api.example.com`
