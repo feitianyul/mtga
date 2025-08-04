@@ -27,8 +27,8 @@ print_error() {
     echo -e "${RED}[错误]${NC} $1"
 }
 
-# 获取脚本所在目录（项目根目录）
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# 获取脚本所在目录的上一级目录（项目根目录）
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 print_info "项目根目录: $SCRIPT_DIR"
 
 # 定义应用程序包路径

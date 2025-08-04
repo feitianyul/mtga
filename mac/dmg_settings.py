@@ -6,7 +6,7 @@
 import os.path
 
 # Application path
-application = 'MTGA_GUI.app'
+application = '../MTGA_GUI.app'
 appname = os.path.basename(application)
 
 # Volume settings
@@ -50,7 +50,7 @@ icon_size = 96
 
 # Background image
 # Use the dmg_background.png file in the current directory
-background = './mac/dmg_background.png'
+background = './dmg_background.png'
 
 # Include icon view settings
 include_icon_view_settings = True
