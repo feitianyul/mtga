@@ -16,17 +16,30 @@ import sys
 import subprocess
 import threading
 import tkinter as tk
-import re # 确保导入 re 模块
 from tkinter import ttk, scrolledtext
 import ctypes
 import shutil
 import io
 import contextlib
 from pathlib import Path
-import json
 import time
 from queue import Queue, Empty
 import yaml # 添加yaml导入
+
+# 检测是否在打包环境中运行
+def is_packaged(log_func=print):
+    """检测是否在打包环境中运行 (Nuitka 编译后的程序)"""
+    # Nuitka 编译后，当前模块名变为 __main__
+    # 需要检查 __main__ 模块是否具有 __compiled__ 属性
+    main_module = sys.modules.get('__main__')
+    if main_module is not None:
+        log_func(f"__main__ module: {main_module}")
+        log_func(f"__main__ module file: {getattr(main_module, '__file__', 'N/A')}")
+        has_compiled = hasattr(main_module, '__compiled__')
+        log_func(f"__main__ module has __compiled__: {has_compiled}")
+        return has_compiled
+    
+    return False
 
 # 获取当前脚本的绝对路径
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
