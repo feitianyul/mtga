@@ -1,8 +1,8 @@
 @echo off
 chcp 65001
 
-echo 正在使用 Nuitka 构建独立版本...
-echo 这可能需要较长时间（约30分钟），请耐心等待...
+echo 正在使用 Nuitka 构建单文件版本...
+echo 这可能需要较长时间（约40分钟），请耐心等待...
 echo.
 
 REM 检查虚拟环境是否存在
@@ -24,18 +24,18 @@ if not exist "%VS2022DIR%" (
 )
 
 REM 创建输出目录
-if not exist "dist" mkdir dist
+if not exist "dist-onefile" mkdir dist-onefile
 
-echo 正在构建独立版本 (mtga_gui_v2.py)...
+echo 正在构建单文件版本 (mtga_gui.py)...
 
-REM 使用 uv 运行 Nuitka 构建独立版本
+REM 使用 uv 运行 Nuitka 构建单文件版本
 uv run --python .venv\Scripts\python.exe nuitka ^
-    --standalone ^
+    --onefile ^
     --msvc=latest ^
     --show-progress ^
     --show-memory ^
-    --output-dir=dist ^
-    --output-filename=MTGA_GUI_v2.exe ^
+    --output-dir=dist-onefile ^
+    --output-filename=MTGA_GUI_Single.exe ^
     --include-data-files=ca/README.md=ca/README.md ^
     --include-data-files=ca/api.openai.com.cnf=ca/api.openai.com.cnf ^
     --include-data-files=ca/api.openai.com.subj=ca/api.openai.com.subj ^
@@ -56,22 +56,22 @@ uv run --python .venv\Scripts\python.exe nuitka ^
     --windows-icon-from-ico=icons/f0bb32_bg-black.ico ^
     --enable-plugin=tk-inter ^
     --remove-output ^
-    --windows-console-mode=attach ^
+    --windows-console-mode=disable ^
     --include-package=modules ^
     --windows-uac-admin ^
-    mtga_gui_v2.py
+    mtga_gui.py
 
 echo.
 if %ERRORLEVEL% equ 0 (
-    echo ✅ 独立版本构建完成！
-    echo 可执行文件位于：dist\mtga_gui_v2.dist\MTGA_GUI_v2.exe
+    echo ✅ 单文件版本构建完成！
+    echo 可执行文件位于：dist-onefile\MTGA_GUI_Single.exe
     echo.
-    echo 主要改进:
-    echo • ✅ 解决了多进程架构问题
-    echo • ✅ 消除了虚拟环境依赖
-    echo • ✅ 统一了资源路径管理
-    echo • ✅ 代理服务器使用线程模式
-    echo • ✅ 支持 Nuitka 打包环境检测
+    echo 单文件版本特点:
+    echo • ✅ 仅一个 .exe 文件，便于分发
+    echo • ✅ 启动时自动解压到临时目录
+    echo • ✅ 包含所有依赖，无需额外文件
+    echo • ✅ 自动请求管理员权限
+    echo • ⚠️  首次运行较慢（需要解压）
     echo.
 ) else (
     echo ❌ 构建失败，返回码: %ERRORLEVEL%

@@ -21,8 +21,29 @@ def is_packaged():
 def get_base_path():
     """获取程序基础路径"""
     if is_packaged():
-        # Nuitka 打包后使用可执行文件目录
-        return os.path.dirname(sys.executable)
+        # Nuitka 单文件模式会将资源解压到一个临时目录
+        # 尝试多种方式获取正确的资源路径
+        
+        # 方式1：检查是否有 Nuitka 的临时解压目录
+        main_module = sys.modules.get('__main__')
+        if main_module and hasattr(main_module, '__file__') and main_module.__file__:
+            # 单文件模式下，__main__.__file__ 指向临时解压目录
+            main_dir = os.path.dirname(main_module.__file__)
+            if os.path.exists(main_dir):
+                return main_dir
+        
+        # 方式2：检查可执行文件同目录（独立模式）
+        exe_dir = os.path.dirname(sys.executable)
+        if os.path.exists(os.path.join(exe_dir, 'ca')) or os.path.exists(os.path.join(exe_dir, 'openssl')):
+            return exe_dir
+        
+        # 方式3：检查当前工作目录
+        cwd = os.getcwd()
+        if os.path.exists(os.path.join(cwd, 'ca')) or os.path.exists(os.path.join(cwd, 'openssl')):
+            return cwd
+        
+        # 默认返回可执行文件目录
+        return exe_dir
     else:
         # 开发环境使用项目根目录
         return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -103,6 +124,27 @@ class ResourceManager:
     def check_resources(self):
         """检查必要资源是否存在"""
         missing_resources = []
+        
+        # 添加调试信息
+        debug_info = []
+        debug_info.append(f"当前工作目录: {os.getcwd()}")
+        debug_info.append(f"基础路径: {self.base_path}")
+        debug_info.append(f"CA路径: {self.ca_path}")
+        debug_info.append(f"OpenSSL路径: {self.openssl_path}")
+        debug_info.append(f"是否打包环境: {is_packaged()}")
+        
+        # 如果是打包环境，显示额外的调试信息
+        if is_packaged():
+            debug_info.append(f"可执行文件路径: {sys.executable}")
+            main_module = sys.modules.get('__main__')
+            if main_module and hasattr(main_module, '__file__'):
+                debug_info.append(f"主模块文件路径: {main_module.__file__}")
+        
+        # 打印调试信息
+        print("=== 资源路径调试信息 ===")
+        for info in debug_info:
+            print(info)
+        print("=" * 30)
         
         # 检查 CA 目录
         if not os.path.exists(self.ca_path):

@@ -9,7 +9,7 @@ ca/ca.srl
 MTGA.Gui
 __pycache__
 build
-dist
+dist*
 *copy*
 ca/api.deepseek.com.cnf
 ca/api.deepseek.com.subj
