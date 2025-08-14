@@ -15,7 +15,7 @@ import os
 import sys
 import threading
 import tkinter as tk
-from tkinter import ttk, scrolledtext
+from tkinter import ttk, scrolledtext, messagebox
 import ctypes
 import time
 from pathlib import Path
@@ -23,7 +23,7 @@ import yaml
 
 # 导入自定义模块
 try:
-    from modules.resource_manager import ResourceManager, is_packaged
+    from modules.resource_manager import ResourceManager, is_packaged, get_user_data_dir
     from modules.cert_generator import generate_certificates
     from modules.cert_installer import install_ca_cert
     from modules.hosts_manager import modify_hosts_file, open_hosts_file
@@ -81,8 +81,8 @@ def check_environment():
     return True, "环境检查通过"
 
 
-# 配置文件路径
-CONFIG_FILE = os.path.join(resource_manager.base_path, "mtga_config.yaml")
+# 配置文件路径（持久化到用户数据目录）
+CONFIG_FILE = resource_manager.get_user_config_file()
 
 
 def load_config_groups():
@@ -139,7 +139,7 @@ def create_main_window():
     # 设置窗口图标
     try:
         if os.name == 'nt':
-            icon_path = os.path.join(resource_manager.base_path, "icons", "f0bb32_bg-black.ico")
+            icon_path = resource_manager.get_icon_file("f0bb32_bg-black.ico")
             if os.path.exists(icon_path):
                 window.iconbitmap(icon_path)
     except Exception:
@@ -208,7 +208,43 @@ def create_main_window():
     config_list_frame = ttk.Frame(config_paned)
     config_paned.add(config_list_frame, weight=3)
     
-    ttk.Label(config_list_frame, text="配置组列表:").pack(anchor=tk.W, padx=5, pady=(5, 0))
+    # 配置组列表标题和刷新按钮
+    list_header_frame = ttk.Frame(config_list_frame)
+    list_header_frame.pack(fill=tk.X, padx=5, pady=(5, 0))
+    
+    ttk.Label(list_header_frame, text="配置组列表:").pack(side=tk.LEFT)
+    
+    def refresh_config_list():
+        """刷新配置组列表"""
+        refresh_config_tree()
+        log("已刷新配置组列表")
+    
+    refresh_btn = ttk.Button(list_header_frame, text="刷新", command=refresh_config_list, width=6)
+    refresh_btn.pack(side=tk.RIGHT, padx=16)
+    
+    # 为刷新按钮添加提示（修复 tooltip 属性问题）
+    def create_tooltip_for_refresh():
+        tooltip_window = None
+        
+        def on_enter(event):
+            nonlocal tooltip_window
+            tooltip_window = tk.Toplevel()
+            tooltip_window.wm_overrideredirect(True)
+            tooltip_window.wm_geometry(f"+{event.x_root+10}+{event.y_root+10}")
+            tooltip_window.configure(bg='lightyellow', relief='solid', bd=1)
+            label = tk.Label(tooltip_window, text="重新加载配置文件中的配置组\n用于同步外部修改或恢复意外更改", bg='lightyellow', font=('Arial', 9), wraplength=250)
+            label.pack()
+        
+        def on_leave(event):
+            nonlocal tooltip_window
+            if tooltip_window:
+                tooltip_window.destroy()
+                tooltip_window = None
+        
+        refresh_btn.bind('<Enter>', on_enter)
+        refresh_btn.bind('<Leave>', on_leave)
+    
+    create_tooltip_for_refresh()
     
     tree_frame = ttk.Frame(config_list_frame)
     tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
@@ -246,7 +282,7 @@ def create_main_window():
     
     ttk.Label(config_buttons_frame, text="操作:").pack(anchor=tk.W, padx=5, pady=(5, 0))
     
-    def refresh_config_list():
+    def refresh_config_tree():
         """刷新配置组列表"""
         nonlocal config_groups, current_config_index
         config_groups, current_config_index = load_config_groups()
@@ -690,6 +726,217 @@ def create_main_window():
     
     ttk.Button(proxy_tab, text="启动代理服务器", command=start_proxy_task).pack(fill=tk.X, padx=5, pady=5)
     ttk.Button(proxy_tab, text="停止代理服务器", command=stop_proxy_task).pack(fill=tk.X, padx=5, pady=5)
+    
+    # 用户数据管理标签页（仅在单文件模式下显示）
+    if is_packaged():
+        data_mgmt_tab = ttk.Frame(notebook)
+        notebook.add(data_mgmt_tab, text="用户数据管理")
+        
+        def open_user_data_directory():
+            """打开用户数据目录"""
+            try:
+                user_data_dir = get_user_data_dir()
+                if os.name == 'nt':  # Windows
+                    os.startfile(user_data_dir)
+                elif sys.platform == 'darwin':  # macOS
+                    os.system(f'open "{user_data_dir}"')
+                else:  # Linux
+                    os.system(f'xdg-open "{user_data_dir}"')
+                log(f"已打开用户数据目录: {user_data_dir}")
+            except Exception as e:
+                log(f"打开用户数据目录失败: {e}")
+        
+        def backup_user_data():
+            """备份用户数据"""
+            try:
+                import shutil
+                from datetime import datetime
+                
+                user_data_dir = get_user_data_dir()
+                backup_base_dir = os.path.join(user_data_dir, 'backups')
+                
+                # 创建备份基础目录
+                os.makedirs(backup_base_dir, exist_ok=True)
+                
+                # 生成时间戳文件夹名
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                backup_dir = os.path.join(backup_base_dir, f'backup_{timestamp}')
+                
+                # 复制除备份文件夹外的所有文件和文件夹
+                items_to_backup = []
+                for item in os.listdir(user_data_dir):
+                    item_path = os.path.join(user_data_dir, item)
+                    if item != 'backups':  # 排除备份文件夹本身
+                        items_to_backup.append((item, item_path))
+                
+                if items_to_backup:
+                    os.makedirs(backup_dir, exist_ok=True)
+                    
+                    for item_name, item_path in items_to_backup:
+                        dest_path = os.path.join(backup_dir, item_name)
+                        if os.path.isfile(item_path):
+                            shutil.copy2(item_path, dest_path)
+                        elif os.path.isdir(item_path):
+                            shutil.copytree(item_path, dest_path)
+                    
+                    log(f"✅ 用户数据备份成功: {backup_dir}")
+                    log(f"备份了 {len(items_to_backup)} 个项目")
+                else:
+                    log("没有需要备份的用户数据")
+                    
+            except Exception as e:
+                log(f"❌ 备份用户数据失败: {e}")
+        
+        def clear_user_data():
+            """清除用户数据（保留备份文件夹）"""
+            try:
+                import shutil
+                
+                # 确认对话框
+                result = messagebox.askyesno(
+                    "确认清除",
+                    "此操作将删除所有用户数据（配置文件、证书等），但保留备份文件夹。\n\n确定要继续吗？",
+                    icon='warning'
+                )
+                
+                if not result:
+                    log("用户取消了清除操作")
+                    return
+                
+                user_data_dir = get_user_data_dir()
+                
+                # 删除除备份文件夹外的所有文件和文件夹
+                items_to_remove = []
+                for item in os.listdir(user_data_dir):
+                    if item != 'backups':  # 保留备份文件夹
+                        item_path = os.path.join(user_data_dir, item)
+                        items_to_remove.append((item, item_path))
+                
+                if items_to_remove:
+                    for item_name, item_path in items_to_remove:
+                        if os.path.isfile(item_path):
+                            os.remove(item_path)
+                        elif os.path.isdir(item_path):
+                            shutil.rmtree(item_path)
+                    
+                    log(f"✅ 用户数据清除成功，删除了 {len(items_to_remove)} 个项目")
+                    log("备份文件夹已保留")
+                else:
+                    log("没有需要清除的用户数据")
+                    
+            except Exception as e:
+                log(f"❌ 清除用户数据失败: {e}")
+        
+        def restore_user_data():
+            """从最新备份还原用户数据"""
+            try:
+                import shutil
+                import glob
+                
+                user_data_dir = get_user_data_dir()
+                backup_base_dir = os.path.join(user_data_dir, 'backups')
+                
+                # 检查是否存在备份
+                if not os.path.exists(backup_base_dir):
+                    log("❌ 没有找到备份文件夹")
+                    messagebox.showwarning("无备份", "没有找到备份文件夹，无法执行还原操作。")
+                    return
+                
+                # 查找所有备份文件夹
+                backup_pattern = os.path.join(backup_base_dir, 'backup_*')
+                backup_folders = glob.glob(backup_pattern)
+                
+                if not backup_folders:
+                    log("❌ 没有找到任何备份")
+                    messagebox.showwarning("无备份", "没有找到任何备份文件，无法执行还原操作。")
+                    return
+                
+                # 找到最新的备份（按文件夹名排序，时间戳格式保证了字典序就是时间序）
+                latest_backup = max(backup_folders, key=lambda x: os.path.basename(x))
+                backup_name = os.path.basename(latest_backup)
+                
+                # 确认对话框
+                result = messagebox.askyesno(
+                    "确认还原",
+                    f"将从最新备份还原数据：\n{backup_name}\n\n此操作将覆盖当前的配置文件、证书等数据。\n\n确定要继续吗？",
+                    icon='question'
+                )
+                
+                if not result:
+                    log("用户取消了还原操作")
+                    return
+                
+                # 执行还原操作
+                restored_count = 0
+                for item in os.listdir(latest_backup):
+                    src_path = os.path.join(latest_backup, item)
+                    dest_path = os.path.join(user_data_dir, item)
+                    
+                    # 如果目标已存在，先删除
+                    if os.path.exists(dest_path):
+                        if os.path.isfile(dest_path):
+                            os.remove(dest_path)
+                        elif os.path.isdir(dest_path):
+                            shutil.rmtree(dest_path)
+                    
+                    # 复制文件或目录
+                    if os.path.isfile(src_path):
+                        shutil.copy2(src_path, dest_path)
+                    elif os.path.isdir(src_path):
+                        shutil.copytree(src_path, dest_path)
+                    
+                    restored_count += 1
+                
+                log(f"✅ 数据还原成功，从备份 {backup_name} 还原了 {restored_count} 个项目")
+                messagebox.showinfo("还原成功", f"数据还原完成！\n\n从备份：{backup_name}\n还原项目：{restored_count} 个")
+                
+            except Exception as e:
+                log(f"❌ 还原用户数据失败: {e}")
+                messagebox.showerror("还原失败", f"还原操作失败：\n{e}")
+        
+        # 按钮区域（仅包含按钮）
+        button_frame = ttk.Frame(data_mgmt_tab)
+        button_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        # 创建带提示的按钮（修复 tooltip 属性问题）
+        def create_tooltip(widget, text):
+            """为控件创建悬浮提示"""
+            tooltip_window = None
+            
+            def on_enter(event):
+                nonlocal tooltip_window
+                tooltip_window = tk.Toplevel()
+                tooltip_window.wm_overrideredirect(True)
+                tooltip_window.wm_geometry(f"+{event.x_root+10}+{event.y_root+10}")
+                tooltip_window.configure(bg='lightyellow', relief='solid', bd=1)
+                label = tk.Label(tooltip_window, text=text, bg='lightyellow', font=('Arial', 9), wraplength=300)
+                label.pack()
+            
+            def on_leave(event):
+                nonlocal tooltip_window
+                if tooltip_window:
+                    tooltip_window.destroy()
+                    tooltip_window = None
+            
+            widget.bind('<Enter>', on_enter)
+            widget.bind('<Leave>', on_leave)
+        
+        # 创建按钮并添加提示
+        btn_open = ttk.Button(button_frame, text="打开目录", command=open_user_data_directory)
+        btn_open.pack(fill=tk.X, pady=2)
+        create_tooltip(btn_open, "使用系统文件管理器打开用户数据目录\nWindows: %APPDATA%\\MTGA\\\nmacOS/Linux: ~/.mtga/")
+        
+        btn_backup = ttk.Button(button_frame, text="备份数据", command=backup_user_data)
+        btn_backup.pack(fill=tk.X, pady=2)
+        create_tooltip(btn_backup, "创建带时间戳的完整数据备份\n备份内容：配置文件、SSL证书、hosts备份\n备份位置：用户数据目录/backups/backup_时间戳/")
+        
+        btn_restore = ttk.Button(button_frame, text="还原数据", command=restore_user_data)
+        btn_restore.pack(fill=tk.X, pady=2)
+        create_tooltip(btn_restore, "从最新备份恢复用户数据（覆盖现有数据）\n自动选择最新时间戳的备份进行还原\n注意：此操作会覆盖当前的配置和证书")
+        
+        btn_clear = ttk.Button(button_frame, text="清除数据", command=clear_user_data)
+        btn_clear.pack(fill=tk.X, pady=2)
+        create_tooltip(btn_clear, "删除所有用户数据（保留历史备份）\n清除内容：配置文件、SSL证书、hosts备份\n保留内容：backups文件夹及其历史备份")
     
     # 关于标签页
     about_tab = ttk.Frame(notebook)

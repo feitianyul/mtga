@@ -1,6 +1,10 @@
 @echo off
 chcp 65001
 
+REM ========== 版本配置 ==========
+set "VERSION=1.1.0"
+REM ================================
+
 echo 正在使用 Nuitka 构建单文件版本...
 echo 这可能需要较长时间（约40分钟），请耐心等待...
 echo.
@@ -35,7 +39,6 @@ uv run --python .venv\Scripts\python.exe nuitka ^
     --show-progress ^
     --show-memory ^
     --output-dir=dist-onefile ^
-    --output-filename=MTGA_GUI_Single.exe ^
     --include-data-files=ca/README.md=ca/README.md ^
     --include-data-files=ca/api.openai.com.cnf=ca/api.openai.com.cnf ^
     --include-data-files=ca/api.openai.com.subj=ca/api.openai.com.subj ^
@@ -53,12 +56,14 @@ uv run --python .venv\Scripts\python.exe nuitka ^
     --include-data-files=openssl/openssl.exe=openssl/openssl.exe ^
     --include-data-files=openssl/libcrypto-3-x64.dll=openssl/libcrypto-3-x64.dll ^
     --include-data-files=openssl/libssl-3-x64.dll=openssl/libssl-3-x64.dll ^
+    --include-data-files=icons/f0bb32_bg-black.ico=icons/f0bb32_bg-black.ico ^
     --windows-icon-from-ico=icons/f0bb32_bg-black.ico ^
     --enable-plugin=tk-inter ^
     --remove-output ^
     --windows-console-mode=disable ^
     --include-package=modules ^
     --windows-uac-admin ^
+    --output-filename=MTGA_GUI-v%VERSION%-x64.exe ^
     mtga_gui.py
 
 echo.

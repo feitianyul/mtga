@@ -8,7 +8,7 @@ import os
 import sys
 import shutil
 import subprocess
-from .resource_manager import get_base_path
+from .resource_manager import get_base_path, ResourceManager
 
 
 def get_hosts_file_path():
@@ -20,8 +20,9 @@ def get_hosts_file_path():
 
 
 def get_backup_file_path():
-    """获取备份文件路径"""
-    return os.path.join(get_base_path(), "hosts.backup")
+    """获取备份文件路径（持久化到用户数据目录）"""
+    resource_manager = ResourceManager()
+    return resource_manager.get_hosts_backup_file()
 
 
 def detect_file_encoding(file_path):
