@@ -139,7 +139,7 @@ def add_hosts_entry(domain, ip="127.0.0.1", log_func=print):
         
         # 添加条目
         with open(hosts_file, 'a', encoding=encoding) as f:
-            f.write(f"\\n# Added by MTGA GUI\\n{hosts_entry}\\n")
+            f.write(f"\n# Added by MTGA GUI\n{hosts_entry}\n")
         
         log_func("hosts 文件修改成功！")
         return True
@@ -195,7 +195,7 @@ def remove_hosts_entry(domain, log_func=print):
         if removed_count > 0:
             # 写回文件
             with open(hosts_file, 'w', encoding=encoding) as f:
-                f.write('\\n'.join(new_lines))
+                f.write('\n'.join(new_lines))
             
             log_func(f"hosts 文件已重置，删除了 {removed_count} 个 {domain} 条目")
         else:

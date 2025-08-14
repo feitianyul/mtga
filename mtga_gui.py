@@ -942,7 +942,7 @@ def create_main_window():
     about_tab = ttk.Frame(notebook)
     notebook.add(about_tab, text="关于")
     
-    about_text = "MTGA GUI v1.1.0 - 重构版\n\n"
+    about_text = "MTGA GUI v1.1.1 - 重构版\n\n"
     about_text += "本版本采用单进程模块化架构，解决了 Nuitka 打包兼容性问题。\n\n"
     about_text += "主要改进：\n"
     about_text += "• 消除了多进程架构导致的打包问题\n"
