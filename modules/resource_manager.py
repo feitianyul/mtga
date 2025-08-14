@@ -1,0 +1,263 @@
+# -*- coding: utf-8 -*-
+"""
+资源路径管理模块
+处理开发环境和打包环境的资源路径问题
+支持单文件模式的用户数据持久化
+"""
+
+import os
+import sys
+import tempfile
+from pathlib import Path
+
+
+def is_packaged():
+    """检测是否在 Nuitka 打包环境中运行"""
+    main_module = sys.modules.get('__main__')
+    if main_module is not None:
+        return hasattr(main_module, '__compiled__')
+    return False
+
+
+def get_user_data_dir():
+    """获取用户数据目录，用于持久化存储"""
+    if os.name == 'nt':  # Windows
+        # 使用 %APPDATA%\MTGA
+        appdata = os.environ.get('APPDATA')
+        if appdata:
+            user_dir = os.path.join(appdata, 'MTGA')
+        else:
+            user_dir = os.path.join(os.path.expanduser('~'), 'AppData', 'Roaming', 'MTGA')
+    else:  # Unix/Linux/macOS
+        # 使用 ~/.mtga
+        user_dir = os.path.join(os.path.expanduser('~'), '.mtga')
+    
+    # 确保目录存在
+    os.makedirs(user_dir, exist_ok=True)
+    return user_dir
+
+
+def get_program_resource_dir():
+    """获取程序资源目录（临时目录，包含配置模板等）"""
+    if is_packaged():
+        # Nuitka 单文件模式会将资源解压到一个临时目录
+        # 尝试多种方式获取正确的资源路径
+        
+        # 方式1：检查是否有 Nuitka 的临时解压目录
+        main_module = sys.modules.get('__main__')
+        if main_module and hasattr(main_module, '__file__') and main_module.__file__:
+            # 单文件模式下，__main__.__file__ 指向临时解压目录
+            main_dir = os.path.dirname(main_module.__file__)
+            if os.path.exists(main_dir):
+                return main_dir
+        
+        # 方式2：检查可执行文件同目录（独立模式）
+        exe_dir = os.path.dirname(sys.executable)
+        if os.path.exists(os.path.join(exe_dir, 'ca')) or os.path.exists(os.path.join(exe_dir, 'openssl')):
+            return exe_dir
+        
+        # 方式3：检查当前工作目录
+        cwd = os.getcwd()
+        if os.path.exists(os.path.join(cwd, 'ca')) or os.path.exists(os.path.join(cwd, 'openssl')):
+            return cwd
+        
+        # 默认返回可执行文件目录
+        return exe_dir
+    else:
+        # 开发环境使用项目根目录
+        return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def get_base_path():
+    """获取程序基础路径（兼容旧接口）"""
+    return get_program_resource_dir()
+
+
+def get_resource_path(relative_path):
+    """
+    获取程序资源文件的绝对路径（配置模板等）
+    
+    参数:
+        relative_path: 相对于程序资源目录的路径
+        
+    返回:
+        绝对路径字符串
+    """
+    base_path = get_program_resource_dir()
+    return os.path.join(base_path, relative_path)
+
+
+def get_user_data_path(relative_path):
+    """
+    获取用户数据文件的绝对路径（配置、证书、备份等）
+    
+    参数:
+        relative_path: 相对于用户数据目录的路径
+        
+    返回:
+        绝对路径字符串
+    """
+    user_dir = get_user_data_dir()
+    return os.path.join(user_dir, relative_path)
+
+
+def get_ca_path():
+    """获取 CA 目录路径（用户数据目录）"""
+    return get_user_data_path("ca")
+
+
+def get_ca_template_path():
+    """获取 CA 配置模板目录路径（程序资源目录）"""
+    return get_resource_path("ca")
+
+
+def get_openssl_path():
+    """获取 OpenSSL 可执行文件路径"""
+    if os.name == 'nt':  # Windows
+        return get_resource_path("openssl/openssl.exe")
+    else:
+        # Unix/Linux/macOS 使用系统 OpenSSL
+        return "openssl"
+
+
+def get_openssl_dir():
+    """获取 OpenSSL 目录路径"""
+    return get_resource_path("openssl")
+
+
+def get_temp_dir():
+    """获取临时文件目录"""
+    return tempfile.gettempdir()
+
+
+def ensure_directory_exists(path):
+    """确保目录存在，如果不存在则创建"""
+    os.makedirs(path, exist_ok=True)
+
+
+def copy_template_files():
+    """将配置模板文件复制到用户数据目录"""
+    template_ca_dir = get_ca_template_path()
+    user_ca_dir = get_ca_path()
+    
+    # 确保用户CA目录存在
+    ensure_directory_exists(user_ca_dir)
+    
+    # 需要复制的模板文件
+    template_files = [
+        "README.md", "api.openai.com.cnf", "api.openai.com.subj",
+        "genca.sh", "gencrt.sh", "google.cnf", "google.subj",
+        "openssl.cnf", "pixiv.cnf", "pixiv.subj", "v3_ca.cnf", 
+        "v3_req.cnf", "youtube.cnf", "youtube.subj"
+    ]
+    
+    copied_files = []
+    for filename in template_files:
+        src_path = os.path.join(template_ca_dir, filename)
+        dst_path = os.path.join(user_ca_dir, filename)
+        
+        # 只在目标文件不存在时复制
+        if os.path.exists(src_path) and not os.path.exists(dst_path):
+            try:
+                import shutil
+                shutil.copy2(src_path, dst_path)
+                copied_files.append(filename)
+            except Exception:
+                pass
+    
+    return copied_files
+
+
+class ResourceManager:
+    """资源管理器类，提供统一的资源访问接口"""
+    
+    def __init__(self):
+        self.program_resource_dir = get_program_resource_dir()
+        self.user_data_dir = get_user_data_dir()
+        self.ca_path = get_ca_path()
+        self.ca_template_path = get_ca_template_path()
+        self.openssl_path = get_openssl_path()
+        self.openssl_dir = get_openssl_dir()
+        
+        # 初始化时复制模板文件
+        self._ensure_user_data_setup()
+    
+    def _ensure_user_data_setup(self):
+        """确保用户数据目录设置正确"""
+        # 复制配置模板文件到用户目录
+        copied_files = copy_template_files()
+        if copied_files:
+            print(f"已复制模板文件到用户目录: {', '.join(copied_files)}")
+    
+    @property
+    def base_path(self):
+        """基础路径（兼容旧接口）"""
+        return self.program_resource_dir
+    
+    def get_cert_file(self, domain="api.openai.com"):
+        """获取证书文件路径（用户数据目录）"""
+        return os.path.join(self.ca_path, f"{domain}.crt")
+    
+    def get_key_file(self, domain="api.openai.com"):
+        """获取私钥文件路径（用户数据目录）"""
+        return os.path.join(self.ca_path, f"{domain}.key")
+    
+    def get_ca_cert_file(self):
+        """获取 CA 证书文件路径（用户数据目录）"""
+        return os.path.join(self.ca_path, "ca.crt")
+    
+    def get_ca_key_file(self):
+        """获取 CA 私钥文件路径（用户数据目录）"""
+        return os.path.join(self.ca_path, "ca.key")
+    
+    def get_config_file(self, filename):
+        """获取配置文件路径（用户数据目录）"""
+        return os.path.join(self.ca_path, filename)
+    
+    def get_icon_file(self, filename):
+        """获取图标文件路径（程序资源目录）"""
+        return os.path.join(self.program_resource_dir, "icons", filename)
+    
+    def get_user_config_file(self):
+        """获取用户配置文件路径"""
+        return get_user_data_path("mtga_config.yaml")
+    
+    def get_hosts_backup_file(self):
+        """获取 hosts 备份文件路径"""
+        return get_user_data_path("hosts.backup")
+    
+    def check_resources(self):
+        """检查必要资源是否存在"""
+        missing_resources = []
+        
+        # 添加调试信息
+        debug_info = []
+        debug_info.append(f"当前工作目录: {os.getcwd()}")
+        debug_info.append(f"程序资源目录: {self.program_resource_dir}")
+        debug_info.append(f"用户数据目录: {self.user_data_dir}")
+        debug_info.append(f"CA目录: {self.ca_path}")
+        debug_info.append(f"OpenSSL路径: {self.openssl_path}")
+        debug_info.append(f"是否打包环境: {is_packaged()}")
+        
+        # 如果是打包环境，显示额外的调试信息
+        if is_packaged():
+            debug_info.append(f"可执行文件路径: {sys.executable}")
+            main_module = sys.modules.get('__main__')
+            if main_module and hasattr(main_module, '__file__'):
+                debug_info.append(f"主模块文件路径: {main_module.__file__}")
+        
+        # 打印调试信息
+        print("=== 资源路径调试信息 ===")
+        for info in debug_info:
+            print(info)
+        print("=" * 30)
+        
+        # 检查 CA 目录（用户数据目录）
+        if not os.path.exists(self.ca_path):
+            missing_resources.append(f"CA目录: {self.ca_path}")
+        
+        # 检查 OpenSSL（程序资源目录）
+        if os.name == 'nt' and not os.path.exists(self.openssl_path):
+            missing_resources.append(f"OpenSSL可执行文件: {self.openssl_path}")
+        
+        return missing_resources

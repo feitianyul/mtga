@@ -15,17 +15,9 @@
   <p>MTGA 即 Make T Great Again !</p>
  </details>
 
-## 重大更新
-
-* **适配 Mac OS 端 -> [快速开始 - MacOS](#macos-用户应用程序安装)**
-* 代理的默认服务商从 DeepSeek 变更为 OpenAI
-* ds 相关文件重命名为 `*_ds.*` 格式存档，如有需要可以手动从脚本启动，或自行打包。
-* 接受的 API URL 从 `https://your-api.example.com/v1` 变更为 `https://your-api.example.com`
-
----
-
 ## 目录
 
+* [更新日志](#更新日志)
 * [快速开始](#快速开始)
   * [Windows 用户（GUI一键启动方式）](#windows-用户gui一键启动方式)
   * [macOS 用户（应用程序安装）](#macos-用户应用程序安装)
@@ -42,28 +34,50 @@
 
 ---
 
+## 更新日志
+
+### v1.1.0 (Latest)
+- ✨ **新增用户数据管理功能** - 单文件版本支持用户数据持久化存储
+  - 数据存储位置：Windows `%APPDATA%\MTGA\`，macOS/Linux `~/.mtga/`
+  - 支持备份、还原、清除用户数据
+  - 配置文件、SSL证书、hosts备份自动持久化
+- 🔧 **优化单文件构建** - 改进 `build_onefile.bat`，支持版本号变量化
+- 🎯 **改进用户界面** - 添加配置组列表刷新按钮，优化界面布局
+- 📖 **完善文档** - 新增单文件构建指南，更新项目文档
+
+### v1.0.0
+- ✅ **适配 Mac OS 端** - 支持 macOS 应用程序安装方式
+- 🔄 **默认服务商变更** - 从 DeepSeek 变更为 OpenAI
+- 📦 **文件重构** - ds 相关文件重命名为 `*_ds.*` 格式存档
+- 🌐 **API URL 格式变更** - 从 `https://your-api.example.com/v1` 变更为 `https://your-api.example.com`
+
+---
+
 ## 快速开始
 
 ### Windows 用户（GUI一键启动方式）
 
-1. 双击运行 `MTGA_GUI.exe`（需要管理员权限）
-2. 在打开的图形界面中，填写 API URL 和模型 ID
+1. 从 [GitHub Releases](https://github.com/BiFangKNT/mtga/releases) 下载最新版本的 `MTGA_GUI-v{版本号}-x64.exe`
+2. 双击运行下载的 exe 文件（需要管理员权限）
+3. 在打开的图形界面中，填写 API URL 和模型 ID
    - **注意区分好模型名，不要和内置模型名冲突：**
-   - <img width="249" height="67" alt="image" src="https://github.com/user-attachments/assets/1cc01214-083b-473e-b6d7-9cd33e78d181" />
-3. 点击"一键启动全部服务"按钮
-4. 等待程序自动完成以下操作：
+   - <img width="249" height="67" alt="differentiate model name" src="https://github.com/BiFangKNT/mtga/blob/gui/images/differentiate-model_name.png?raw=true" />
+4. 点击"一键启动全部服务"按钮
+5. 等待程序自动完成以下操作：
    - 生成并安装证书
    - 修改hosts文件
    - 启动代理服务器
-5. 完成后，按照[第 5 步：配置 Trae IDE](#第-5-步配置-trae-ide)进行IDE配置
+6. 完成后，按照[第 5 步：配置 Trae IDE](#第-5-步配置-trae-ide)进行IDE配置
 
-> 注意：首次运行可能需要允许防火墙访问权限
+> **注意：**
+> - 首次运行可能需要允许防火墙访问权限
+> - 单文件版本支持用户数据持久化存储，配置和证书会自动保存
 
 ### macOS 用户（应用程序安装）
 
 #### 安装方式
 
-1. 从 [GitHub Releases](https://github.com/BiFangKNT/mtga/releases) 下载最新版本的 `MTGA_GUI_Installer.dmg`
+1. 从 [GitHub Releases](https://github.com/BiFangKNT/mtga/releases) 下载最新版本的 `MTGA_GUI-v{版本号}-aarch64.dmg`
 2. 双击 DMG 文件，系统会自动挂载安装包
 3. 将 `MTGA_GUI.app` 拖拽到 `Applications` 文件夹
 4. 从启动台或 Applications 文件夹启动应用程序
@@ -209,7 +223,7 @@ python trae_proxy.py
 
 点击仓库右上角 Star 和 Watch 按钮，获取最新动态。
 
-![star gif](https://github.com/user-attachments/assets/6aa3ae41-1a78-40e9-b2b2-6392cbb75b0b)
+![star to keep latest](https://github.com/BiFangKNT/mtga/blob/gui/images/star-to-keep-latest.gif?raw=true)
 
 ---
 
