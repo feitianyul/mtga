@@ -7,8 +7,6 @@
 
  MTGA 是一个基于本地代理的 IDE 固定模型服务商解决方案，适用于 Windows 和 macOS。
 
-1) clone，2) 运行！
-
  <details>
   <summary>你什么也看不见~~</summary>
   <br>
