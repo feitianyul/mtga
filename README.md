@@ -7,6 +7,10 @@
 
  MTGA 是一个基于本地代理的 IDE 固定模型服务商解决方案，适用于 Windows 和 macOS。
 
+ **注意：本项目目前只支持 openai 格式的 api ，请确认。其他格式可以转为 openai 格式后再使用。**
+
+
+
  <details>
   <summary>你什么也看不见~~</summary>
   <br>
