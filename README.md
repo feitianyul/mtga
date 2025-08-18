@@ -61,6 +61,7 @@
 1. 从 [GitHub Releases](https://github.com/BiFangKNT/mtga/releases) 下载最新版本的 `MTGA_GUI-v{版本号}-x64.exe`
 2. 双击运行下载的 exe 文件（需要管理员权限）
 3. 在打开的图形界面中，填写 API URL 和模型 ID
+   - **API URL 只需要填域名（端口号可选，不懂的就不要填），不需要填后面的路由，例如：`https://your-api.example.com`**
    - **注意区分好模型名，不要和内置模型名冲突：**
    - <img width="249" height="67" alt="differentiate model name" src="https://github.com/BiFangKNT/mtga/blob/gui/images/differentiate-model_name.png?raw=true" />
 4. 点击"一键启动全部服务"按钮
