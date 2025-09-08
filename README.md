@@ -68,8 +68,9 @@
 2. 双击运行下载的 exe 文件（需要管理员权限）
 3. 在打开的图形界面中，填写 API URL 和模型 ID
    - **API URL 只需要填域名（端口号可选，不懂的就不要填），不需要填后面的路由，例如：`https://your-api.example.com`**
-   - **注意区分好模型名，不要和内置模型名冲突：**
-   - <img width="249" height="67" alt="differentiate model name" src="https://github.com/BiFangKNT/mtga/blob/gui/images/differentiate-model_name.png?raw=true" />
+   - **如果希望启用多模态能力，可以将模型名映射到内置多模态模型名上：**
+   - <img width="247" height="76" alt="model mapping" src="./images/model-mapping.png?raw=true" />
+   - <img width="380" height="141" alt="model mapping effects" src="./images/model-mapping-effects.png?raw=true" />
 4. 点击"一键启动全部服务"按钮
 5. 等待程序自动完成以下操作：
    - 生成并安装证书
@@ -95,7 +96,9 @@
 1. 启动 `MTGA_GUI.app`（首次运行可能需要在系统偏好设置中允许运行）
 2. 在图形界面中填写：
    - **API URL**：你的 API 服务地址（例如：`https://your-api.example.com`）
-   - **模型 ID**：自定义模型名称（避免与内置模型冲突）
+   - **如果希望启用多模态能力，可以将模型名映射到内置多模态模型名上：**
+   - <img width="247" height="76" alt="model mapping" src="./images/model-mapping.png?raw=true" />
+   - <img width="380" height="141" alt="model mapping effects" src="./images/model-mapping-effects.png?raw=true" />
 3. 点击"一键启动全部服务"按钮
 4. 程序会自动完成：
    - 生成并安装 SSL 证书到系统钥匙串
