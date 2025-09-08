@@ -70,8 +70,9 @@ MTGA は、Windows と macOS 向けのローカルプロキシベースの IDE �
 2. ダウンロードした exe ファイルをダブルクリックで実行（管理者権限が必要）
 3. 開いたグラフィカルインターフェースで、API URL とモデル ID を入力
    - **API URL はドメインのみ入力（ポート番号は任意、分からない場合は入力不要）、後続のルーティングは不要です。例：`https://your-api.example.com`**
-   - **モデル名の区別に注意し、組み込みモデル名と衝突しないようにしてください：**
-   - <img width="249" height="67" alt="differentiate model name" src="https://github.com/BiFangKNT/mtga/blob/gui/images/differentiate-model_name.png?raw=true" />
+   - **マルチモーダル機能を有効にしたい場合、モデル名を内蔵マルチモーダルモデル名にマッピングできます：**
+   - <img width="247" height="76" alt="model mapping" src="../images/model-mapping.png?raw=true" />
+   - <img width="380" height="141" alt="model mapping effects" src="../images/model-mapping-effects.png?raw=true" />
 4. 「ワンクリックですべてのサービスを起動」ボタンをクリック
 5. プログラムが自動的に以下の操作を完了するのを待機：
    - 証明書の生成とインストール
@@ -97,7 +98,9 @@ MTGA は、Windows と macOS 向けのローカルプロキシベースの IDE �
 1. `MTGA_GUI.app`を起動（初回実行時はシステム環境設定で実行を許可する必要がある場合があります）
 2. グラフィカルインターフェースで以下を入力：
    - **API URL**：あなたのAPIサービスアドレス（例：`https://your-api.example.com`）
-   - **モデル ID**：カスタムモデル名（組み込みモデルとの衝突を避ける）
+   - **マルチモーダル機能を有効にしたい場合、モデル名を内蔵マルチモーダルモデル名にマッピングできます：**
+   - <img width="247" height="76" alt="model mapping" src="../images/model-mapping.png?raw=true" />
+   - <img width="380" height="141" alt="model mapping effects" src="../images/model-mapping-effects.png?raw=true" />
 3. 「一键启动全部服务」ボタンをクリック
 4. プログラムが自動的に完了します：
    - SSL証明書を生成し、システムキーチェーンにインストール

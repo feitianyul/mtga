@@ -70,8 +70,9 @@ MTGA es una solución de proveedor de servicios de modelos fijos para IDE basada
 2. Ejecuta el archivo exe descargado haciendo doble clic (se requieren permisos de administrador)
 3. En la interfaz gráfica abierta, completa la URL de la API y el ID del modelo
    - **La URL de la API solo necesita el dominio (el número de puerto es opcional, si no lo entiendes no lo completes), no es necesario incluir la ruta posterior, por ejemplo: `https://your-api.example.com`**
-   - **Presta atención para diferenciar correctamente el nombre del modelo, que no entre en conflicto con los nombres de los modelos incorporados:**
-   - <img width="249" height="67" alt="differentiate model name" src="https://github.com/BiFangKNT/mtga/blob/gui/images/differentiate-model_name.png?raw=true" />
+   - **Si deseas habilitar capacidades multimodales, puedes mapear el nombre del modelo al nombre del modelo multimodal incorporado:**
+   - <img width="247" height="76" alt="model mapping" src="../images/model-mapping.png?raw=true" />
+   - <img width="380" height="141" alt="model mapping effects" src="../images/model-mapping-effects.png?raw=true" />
 4. Haz clic en el botón "Iniciar todos los servicios con un clic"
 5. Espera a que el programa complete automáticamente las siguientes operaciones:
    - Generar e instalar el certificado
@@ -97,7 +98,9 @@ MTGA es una solución de proveedor de servicios de modelos fijos para IDE basada
 1. Inicia `MTGA_GUI.app` (la primera ejecución puede requerir permitir la ejecución en Preferencias del Sistema)
 2. En la interfaz gráfica, completa:
    - **URL de la API**: tu dirección de servicio API (por ejemplo: `https://your-api.example.com`)
-   - **ID del modelo**: nombre personalizado del modelo (evita conflictos con modelos incorporados)
+   - **Si deseas habilitar capacidades multimodales, puedes mapear el nombre del modelo al nombre del modelo multimodal incorporado:**
+   - <img width="247" height="76" alt="model mapping" src="../images/model-mapping.png?raw=true" />
+   - <img width="380" height="141" alt="model mapping effects" src="../images/model-mapping-effects.png?raw=true" />
 3. Haz clic en el botón "Iniciar todos los servicios con un clic"
 4. El programa completará automáticamente:
    - Generar e instalar el certificado SSL en el llavero del sistema

@@ -70,8 +70,9 @@ MTGA는 Windows와 macOS용 로컬 프록시 기반 IDE 고정 모델 서비스 
 2. 다운로드한 exe 파일 실행 (관리자 권한 필요)
 3. 열린 그래픽 인터페이스에서 API URL과 모델 ID 입력
    - **API URL은 도메인만 입력 (포트 번호는 선택 사항, 모르면 입력하지 않음), 뒤의 경로는 입력하지 않음, 예: `https://your-api.example.com`**
-   - **모델 이름을 정확히 구분하여 내장 모델 이름과 충돌하지 않도록 주의:**
-   - <img width="249" height="67" alt="differentiate model name" src="https://github.com/BiFangKNT/mtga/blob/gui/images/differentiate-model_name.png?raw=true" />
+   - **멀티모달 기능을 활성화하려면, 모델 이름을 내장된 멀티모달 모델 이름에 매핑할 수 있습니다:**
+   - <img width="247" height="76" alt="model mapping" src="../images/model-mapping.png?raw=true" />
+   - <img width="380" height="141" alt="model mapping effects" src="../images/model-mapping-effects.png?raw=true" />
 4. "모든 서비스 일괄 시작" 버튼 클릭
 5. 프로그램이 자동으로 다음 작업을 완료할 때까지 대기:
    - 인증서 생성 및 설치
@@ -97,7 +98,9 @@ MTGA는 Windows와 macOS용 로컬 프록시 기반 IDE 고정 모델 서비스 
 1. `MTGA_GUI.app`을 실행합니다 (첫 실행 시 시스템 환경설정에서 실행 허용이 필요할 수 있음)
 2. 그래픽 인터페이스에서 다음을 입력합니다:
    - **API URL**: 사용자의 API 서비스 주소 (예: `https://your-api.example.com`)
-   - **모델 ID**: 사용자 정의 모델 이름 (기본 제공 모델과 충돌하지 않도록 함)
+   - **멀티모달 기능을 활성화하려면, 모델 이름을 내장된 멀티모달 모델 이름에 매핑할 수 있습니다:**
+   - <img width="247" height="76" alt="model mapping" src="../images/model-mapping.png?raw=true" />
+   - <img width="380" height="141" alt="model mapping effects" src="../images/model-mapping-effects.png?raw=true" />
 3. "모든 서비스 일괄 시작" 버튼을 클릭합니다
 4. 프로그램이 자동으로 완료합니다:
    - SSL 인증서 생성 및 시스템 키체인에 설치

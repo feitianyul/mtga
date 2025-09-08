@@ -70,8 +70,9 @@ MTGA é uma solução de provedor de serviços de modelo fixo para IDE baseada e
 2. Execute o arquivo exe baixado com um duplo clique (requer permissões de administrador)  
 3. Na interface gráfica aberta, preencha a URL da API e o ID do modelo  
    - **A URL da API só precisa do domínio (a porta é opcional, se não souber, não preencha), não é necessário incluir a rota posterior, por exemplo: `https://your-api.example.com`**  
-   - **Atenção para diferenciar o nome do modelo, não conflite com os nomes de modelos internos:**  
-   - <img width="249" height="67" alt="differentiate model name" src="https://github.com/BiFangKNT/mtga/blob/gui/images/differentiate-model_name.png?raw=true" />  
+   - **Se desejar ativar a capacidade multimodal, você pode mapear o nome do modelo para o nome do modelo multimodal interno:**
+   - <img width="247" height="76" alt="mapa de modelos" src="../images/model-mapping.png?raw=true" />
+   - <img width="380" height="141" alt="efeitos do mapeamento de modelos" src="../images/model-mapping-effects.png?raw=true" />
 4. Clique no botão "Iniciar Todos os Serviços com Um Clique"  
 5. Aguarde até que o programa complete automaticamente as seguintes operações:  
    - Gerar e instalar o certificado  
@@ -97,7 +98,9 @@ MTGA é uma solução de provedor de serviços de modelo fixo para IDE baseada e
 1. Inicie o `MTGA_GUI.app` (na primeira execução, pode ser necessário permitir a execução nas Preferências do Sistema)
 2. Preencha na interface gráfica:
    - **API URL**: Seu endereço de serviço de API (ex: `https://your-api.example.com`)
-   - **ID do Modelo**: Nome personalizado do modelo (evite conflitos com modelos integrados)
+   - **Se desejar ativar a capacidade multimodal, você pode mapear o nome do modelo para o nome do modelo multimodal interno:**
+   - <img width="247" height="76" alt="mapa de modelos" src="../images/model-mapping.png?raw=true" />
+   - <img width="380" height="141" alt="efeitos do mapeamento de modelos" src="../images/model-mapping-effects.png?raw=true" />
 3. Clique no botão "Iniciar Todos os Serviços com Um Clique"
 4. O programa completará automaticamente:
    - Geração e instalação do certificado SSL no keychain do sistema

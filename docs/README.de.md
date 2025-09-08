@@ -70,8 +70,9 @@ MTGA ist eine auf einem lokalen Proxy basierende IDE-Lösung für feste Modellan
 2. Führen Sie die heruntergeladene exe-Datei durch Doppelklick aus (Administratorrechte erforderlich)
 3. Füllen Sie in der geöffneten grafischen Oberfläche die API-URL und die Modell-ID aus
    - **API-URL muss nur die Domain enthalten (Portnummer optional, nicht ausfüllen wenn unsicher), keine nachfolgenden Routen, z.B.: `https://your-api.example.com`**
-   - **Achten Sie auf die Unterscheidung des Modellnamens, Konflikte mit integrierten Modellnamen vermeiden:**
-   - <img width="249" height="67" alt="differentiate model name" src="https://github.com/BiFangKNT/mtga/blob/gui/images/differentiate-model_name.png?raw=true" />
+   - **Wenn Sie multimodale Fähigkeiten aktivieren möchten, können Sie den Modellnamen auf den integrierten multimodalen Modellnamen abbilden:**
+   - <img width="247" height="76" alt="model mapping" src="../images/model-mapping.png?raw=true" />
+   - <img width="380" height="141" alt="model mapping effects" src="../images/model-mapping-effects.png?raw=true" />
 4. Klicken Sie auf den Button "Alle Dienste mit einem Klick starten"
 5. Warten Sie, bis das Programm automatisch folgende Aktionen durchführt:
    - Generierung und Installation des Zertifikats
@@ -97,7 +98,9 @@ MTGA ist eine auf einem lokalen Proxy basierende IDE-Lösung für feste Modellan
 1. Starten Sie `MTGA_GUI.app` (bei erstmaliger Ausführung möglicherweise in den Systemeinstellungen die Ausführung erlauben)
 2. Füllen Sie in der grafischen Oberfläche aus:
    - **API-URL**: Ihre API-Service-Adresse (z.B.: `https://your-api.example.com`)
-   - **Modell-ID**: Benutzerdefinierter Modellname (Konflikte mit integrierten Modellen vermeiden)
+   - **Wenn Sie multimodale Fähigkeiten aktivieren möchten, können Sie den Modellnamen auf den integrierten multimodalen Modellnamen abbilden:**
+   - <img width="247" height="76" alt="model mapping" src="../images/model-mapping.png?raw=true" />
+   - <img width="380" height="141" alt="model mapping effects" src="../images/model-mapping-effects.png?raw=true" />
 3. Klicken Sie auf den Button "Alle Dienste mit einem Klick starten"
 4. Das Programm führt automatisch durch:
    - Generierung und Installation des SSL-Zertifikats in den System-Schlüsselbund

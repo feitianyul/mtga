@@ -70,8 +70,9 @@ MTGA is a local proxy-based IDE fixed model provider solution for Windows and ma
 2. Double-click the downloaded exe file to run (requires administrator privileges)
 3. In the opened graphical interface, fill in the API URL and Model ID
    - **API URL only needs the domain name (port number is optional, do not fill if unsure), no need to include the route, for example: `https://your-api.example.com`**
-   - **Pay attention to distinguish the model name, do not conflict with built-in model names:**
-   - <img width="249" height="67" alt="differentiate model name" src="https://github.com/BiFangKNT/mtga/blob/gui/images/differentiate-model_name.png?raw=true" />
+   - **If you wish to enable multimodal capabilities, you can map the model name to the built-in multimodal model name:**
+   - <img width="247" height="76" alt="model mapping" src="../images/model-mapping.png?raw=true" />
+   - <img width="380" height="141" alt="model mapping effects" src="../images/model-mapping-effects.png?raw=true" />
 4. Click the "Start All Services with One Click" button
 5. Wait for the program to automatically complete the following operations:
    - Generate and install the certificate
@@ -97,7 +98,9 @@ MTGA is a local proxy-based IDE fixed model provider solution for Windows and ma
 1. Launch `MTGA_GUI.app` (first run may require allowing it to run in System Preferences)
 2. Fill in the graphical interface:
    - **API URL**: Your API service address (e.g., `https://your-api.example.com`)
-   - **Model ID**: Custom model name (avoid conflicts with built-in models)
+   - **If you wish to enable multimodal capabilities, you can map the model name to the built-in multimodal model name:**
+   - <img width="247" height="76" alt="model mapping" src="../images/model-mapping.png?raw=true" />
+   - <img width="380" height="141" alt="model mapping effects" src="../images/model-mapping-effects.png?raw=true" />
 3. Click the "Start All Services with One Click" button
 4. The program will automatically complete:
    - Generate and install the SSL certificate into the system keychain
