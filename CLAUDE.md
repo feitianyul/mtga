@@ -60,49 +60,50 @@ uv sync --extra mac-build
 
 ## 常用命令
 
-### 开发调试
+### 快速启动（推荐）
 
-#### 原版本（开发环境）
+#### Windows 平台
 ```bash
-# 直接运行 GUI
-uv run python mtga_gui.py
-
-# 运行代理服务器 (调试模式)
-uv run python trae_proxy.py --debug
-
-# 生成证书
-uv run python generate_certs.py
-```
-
-#### 重构版本（生产推荐）
-```bash
-# 直接运行重构版 GUI
-uv run python mtga_gui.py
-
-# 使用模块化方式测试各组件
-uv run python -c "from modules.cert_generator import generate_certificates; generate_certificates()"
-uv run python -c "from modules.cert_installer import install_ca_cert; install_ca_cert()"
-```
-
-### Windows 平台
-```bash
-# 使用批处理脚本启动
+# GUI 自动启动（自动管理员权限、依赖安装）
 run_mtga_gui.bat
 
-# 构建独立可执行文件（开发测试用）
-build_standalone.bat
-
-# 构建单文件版本（推荐发行用）
-build_onefile.bat
+# 或直接运行（需要管理员权限）
+uv run python mtga_gui.py
 ```
 
-### macOS 平台  
+#### macOS 平台  
 ```bash
-# 使用 shell 脚本启动
+# GUI 自动启动（自动权限管理、依赖安装）
 ./run_mtga_gui.sh
 
-# 创建 macOS 应用包
-cd mac && ./create_mac_app.sh
+# 或直接运行（需要 sudo 权限）
+sudo uv run python mtga_gui.py
+```
+
+### 开发调试
+
+#### 环境设置
+```bash
+# 安装基础依赖
+uv sync
+
+# 安装构建依赖 (Windows)
+uv sync --extra win-build
+
+# 安装构建依赖 (macOS)  
+uv sync --extra mac-build
+```
+
+#### 测试和验证
+```bash
+# 测试目标 API 连接
+uv run python test_target_api.py
+
+# 生成证书（开发调试）
+uv run python -c "from modules.cert_generator import generate_certificates; generate_certificates()"
+
+# 安装CA证书（开发调试）
+uv run python -c "from modules.cert_installer import install_ca_cert; install_ca_cert()"
 ```
 
 ## 构建和打包
@@ -110,20 +111,44 @@ cd mac && ./create_mac_app.sh
 ### Windows (Nuitka)
 
 #### 单文件版本（推荐生产发行）
-- 使用 `build_onefile.bat` 构建单文件版本
+```bash
+# 构建单文件可执行程序
+build_onefile.bat
+```
 - 需要 Visual Studio 2022 和 C++ 构建工具  
 - 输出位置: `dist-onefile\MTGA_GUI-v{版本号}-x64.exe`
 - **推荐用于生产发行和用户分发**
 - **支持用户数据持久化存储**
 
 #### 独立版本（开发测试用）
-- 使用 `build_standalone.bat` 构建独立版本
+```bash
+# 构建独立版本程序
+build_standalone.bat
+```
 - 需要 Visual Studio 2022 和 C++ 构建工具
 - 输出位置: `dist-standalone\mtga_gui.dist\MTGA_GUI.exe`
 - **适用于开发测试环境**
 
 ### macOS (应用包)
-- 使用 `mac/create_mac_app.sh` 创建应用包
+
+#### 标准应用包版本
+```bash
+# 构建 macOS 应用包（.app）
+./build_mac_app.sh
+```
+- 使用 Nuitka `--standalone` + `--macos-create-app-bundle`
+- 输出位置: `dist-onefile/MTGA_GUI-v{版本号}-{架构}.app`
+- 支持 Intel/Apple Silicon 架构自动识别
+- 启动速度快，无需解压过程
+
+#### 传统应用包（开发用）
+```bash
+# 创建应用包并生成 DMG
+cd mac && ./create_mac_app.sh
+
+# 可选：创建 DMG 安装包
+uv run dmgbuild -s mac/dmg_settings.py "MTGA GUI Installer" MTGA_GUI-v{版本号}-{架构}.dmg
+```
 - 支持 DMG 安装包生成
 - 自动配置应用图标和启动脚本
 
@@ -199,10 +224,33 @@ cd mac && ./create_mac_app.sh
 - 优先编辑现有文件而非创建新文件
 - **Bash 命令路径规范** - 在 Bash 环境中使用正斜杠路径格式 (例如: `C:/github/mtga/` 而非 `C:\github\mtga\`)
 
-### 测试和验证
-- 运行 `test_target_api.py` 验证目标 API 连接
-- 检查代理服务器日志确认请求转发正常
-- 确认 IDE 中自定义模型配置正确
+### 调试和测试
+```bash
+# 验证目标 API 连接
+uv run python test_target_api.py
+
+# 以调试模式运行（如果支持）
+uv run python mtga_gui.py --debug
+```
+
+### 路径和资源管理
+- `modules/resource_manager.py` - 处理开发/打包环境的路径问题
+- `is_packaged()` - 检测是否在 Nuitka 打包环境中运行
+- `get_user_data_dir()` - 获取用户数据持久化存储目录
+
+### 模块架构图
+```
+mtga_gui.py (主程序)
+├── modules/
+│   ├── resource_manager.py    # 资源路径管理
+│   ├── cert_generator.py      # 证书生成
+│   ├── cert_installer.py      # 证书安装
+│   ├── hosts_manager.py       # hosts文件管理
+│   └── proxy_server.py        # 代理服务器（线程模式）
+├── ca/                        # 证书配置和脚本
+├── openssl/                   # OpenSSL 工具
+└── icons/                     # 应用图标资源
+```
 
 ## 故障排除
 

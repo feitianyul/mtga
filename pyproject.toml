@@ -41,6 +41,7 @@ win-build = [
     "nuitka>=2.7.12",
 ]
 mac-build = [
+    "nuitka>=2.7.12",
     "dmgbuild>=1.6.5",
 ]
 

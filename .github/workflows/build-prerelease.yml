@@ -1,0 +1,236 @@
+name: 🚀 构建和发布预发布版
+
+on:
+  push:
+    tags:
+      - 'v*.*.*-*'  # 预发布版标签格式：v1.2.0-beta.1, v1.2.0-rc.1
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号 (例如: 1.2.0-beta.1)'
+        required: true
+        default: '1.2.0-beta.1'
+
+env:
+  PYTHON_VERSION: '3.13'
+
+jobs:
+  build-macos:
+    name: 🍎 构建 macOS
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        arch: [x64, arm64]
+        include:
+          - arch: x64
+            runner_arch: x86_64
+            nuitka_arch: x86_64
+          - arch: arm64  
+            runner_arch: arm64
+            nuitka_arch: arm64
+
+    steps:
+      - name: 📥 检出代码
+        uses: actions/checkout@v4
+
+      - name: 🐍 设置 Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: 📦 安装 uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: 🔧 安装依赖
+        run: |
+          uv sync --extra mac-build
+
+      - name: 🛠️ 安装 Xcode Command Line Tools
+        run: |
+          sudo xcode-select --install || true
+          # 等待安装完成或跳过如果已安装
+          while ! xcode-select -p &>/dev/null; do
+            echo "等待 Xcode Command Line Tools 安装..."
+            sleep 10
+          done
+
+      - name: ⚙️ 获取版本信息
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/v}
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "APP_NAME=MTGA_GUI-v$VERSION-${{ matrix.arch }}" >> $GITHUB_OUTPUT
+          echo "DMG_NAME=MTGA_GUI-v$VERSION-${{ matrix.arch }}" >> $GITHUB_OUTPUT
+
+      - name: 🔨 构建 macOS 应用包
+        run: |
+          # 修改构建脚本中的版本号
+          sed -i.bak "s/VERSION=\".*\"/VERSION=\"${{ steps.version.outputs.VERSION }}\"/g" build_mac_app.sh
+          
+          # 根据架构设置输出文件名
+          sed -i.bak "s/--output-filename=MTGA_GUI-v\$VERSION-\$(uname -m)/--output-filename=${{ steps.version.outputs.APP_NAME }}/g" build_mac_app.sh
+          
+          # 执行构建
+          chmod +x build_mac_app.sh
+          ./build_mac_app.sh
+
+      - name: 📱 验证应用包
+        run: |
+          APP_PATH="dist-onefile/${{ steps.version.outputs.APP_NAME }}.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "❌ 应用包构建失败: $APP_PATH 不存在"
+            exit 1
+          fi
+          
+          echo "✅ 应用包构建成功: $APP_PATH"
+          echo "📊 应用包大小: $(du -sh "$APP_PATH" | cut -f1)"
+          echo "📁 应用包结构:"
+          find "$APP_PATH" -maxdepth 2 -type d | head -10
+
+      - name: 🎁 创建 DMG 安装包
+        run: |
+          # 确保 DMG 配置文件存在
+          if [ ! -f "mac/dmg_settings.py" ]; then
+            echo "❌ DMG 配置文件不存在: mac/dmg_settings.py"
+            exit 1
+          fi
+          
+          # 创建 DMG
+          uv run dmgbuild \
+            -s mac/dmg_settings.py \
+            "MTGA GUI v${{ steps.version.outputs.VERSION }} Installer" \
+            "dist-onefile/${{ steps.version.outputs.DMG_NAME }}.dmg"
+          
+          echo "✅ DMG 创建成功"
+          echo "📊 DMG 大小: $(du -sh "dist-onefile/${{ steps.version.outputs.DMG_NAME }}.dmg" | cut -f1)"
+
+      - name: 📤 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}-artifacts
+          path: |
+            dist-onefile/${{ steps.version.outputs.APP_NAME }}.app
+            dist-onefile/${{ steps.version.outputs.DMG_NAME }}.dmg
+          retention-days: 7
+
+  # Windows 构建任务（预留框架）
+  build-windows:
+    name: 🪟 构建 Windows
+    runs-on: windows-latest
+    if: false  # 暂时禁用，后续启用
+    
+    steps:
+      - name: 📥 检出代码
+        uses: actions/checkout@v4
+        
+      - name: 🐍 设置 Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          
+      # TODO: 实现 Windows 构建逻辑
+      - name: 🔧 Windows 构建 (占位符)
+        run: echo "Windows 构建将在后续实现"
+
+  create-prerelease:
+    name: 🚀 创建预发布版
+    needs: [build-macos]  # build-windows 准备好时加入
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 检出代码
+        uses: actions/checkout@v4
+
+      - name: ⚙️ 获取版本信息
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            TAG_NAME="v$VERSION"
+          else
+            VERSION=${GITHUB_REF#refs/tags/v}
+            TAG_NAME=${GITHUB_REF#refs/tags/}
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_OUTPUT
+
+      - name: 📥 下载所有构建产物
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: 📋 列出构建产物
+        run: |
+          echo "🗂️ 构建产物列表:"
+          find artifacts -type f -name "*.app" -o -name "*.dmg" -o -name "*.exe" | sort
+
+      - name: 🏷️ 创建或更新标签
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # 删除已存在的标签（如果有）
+          git tag -d ${{ steps.version.outputs.TAG_NAME }} || true
+          git push origin :refs/tags/${{ steps.version.outputs.TAG_NAME }} || true
+          
+          # 创建新标签
+          git tag -a ${{ steps.version.outputs.TAG_NAME }} -m "🚀 预发布版 ${{ steps.version.outputs.VERSION }}"
+          git push origin ${{ steps.version.outputs.TAG_NAME }}
+
+      - name: 📝 生成发布说明
+        id: release_notes
+        run: |
+          cat > release_notes.md << 'EOF'
+          ## 🚀 MTGA GUI v${{ steps.version.outputs.VERSION }} (预发布版)
+          
+          > ⚠️ **这是预发布版本，可能包含未完全测试的功能，请谨慎在生产环境中使用。**
+          
+          ### 📦 下载说明
+          
+          #### macOS 用户
+          - **Intel Mac**: 下载 `MTGA_GUI-v${{ steps.version.outputs.VERSION }}-x64.dmg`
+          - **Apple Silicon Mac**: 下载 `MTGA_GUI-v${{ steps.version.outputs.VERSION }}-arm64.dmg`
+          
+          #### 安装方法
+          1. 下载对应架构的 DMG 文件
+          2. 双击 DMG 文件挂载安装包
+          3. 将 `MTGA GUI.app` 拖拽到 `Applications` 文件夹
+          4. 首次运行可能需要在系统偏好设置中允许运行
+          
+          ### 🔧 技术信息
+          - Python 版本: ${{ env.PYTHON_VERSION }}
+          - 构建时间: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          - 提交哈希: ${{ github.sha }}
+          
+          ### 🐛 问题反馈
+          如遇到问题，请在 [GitHub Issues](https://github.com/${{ github.repository }}/issues) 中反馈。
+          EOF
+          
+          echo "RELEASE_NOTES<<EOF" >> $GITHUB_OUTPUT
+          cat release_notes.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: 🚀 创建 GitHub 预发布版
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ steps.version.outputs.TAG_NAME }}
+          name: "🚀 MTGA GUI v${{ steps.version.outputs.VERSION }}"
+          body: ${{ steps.release_notes.outputs.RELEASE_NOTES }}
+          prerelease: true
+          draft: false
+          artifacts: |
+            artifacts/macos-x64-artifacts/*.dmg
+            artifacts/macos-arm64-artifacts/*.dmg
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: ✅ 发布完成
+        run: |
+          echo "🎉 预发布版 v${{ steps.version.outputs.VERSION }} 发布完成!"
+          echo "🔗 发布页面: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.TAG_NAME }}"
