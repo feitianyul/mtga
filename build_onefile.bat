@@ -2,7 +2,7 @@
 chcp 65001
 
 REM ========== 版本配置 ==========
-set "VERSION=1.1.1"
+set "VERSION=1.2.0"
 REM ================================
 
 echo 正在使用 Nuitka 构建单文件版本...
@@ -69,7 +69,7 @@ uv run --python .venv\Scripts\python.exe nuitka ^
 echo.
 if %ERRORLEVEL% equ 0 (
     echo ✅ 单文件版本构建完成！
-    echo 可执行文件位于：dist-onefile\MTGA_GUI_Single.exe
+    echo 可执行文件位于：dist-onefile\MTGA_GUI-v%VERSION%-x64.exe
     echo.
     echo 单文件版本特点:
     echo • ✅ 仅一个 .exe 文件，便于分发

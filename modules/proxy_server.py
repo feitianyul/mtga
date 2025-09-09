@@ -10,6 +10,7 @@ import ssl
 import os
 import logging
 import socket
+import yaml
 from werkzeug.serving import WSGIRequestHandler, BaseWSGIServer
 from flask import Flask, request, jsonify, Response
 import requests
@@ -66,6 +67,9 @@ class ProxyServer:
         self.stream_mode = self.config.get('stream_mode')  # None, 'true', 'false'
         self.debug_mode = self.config.get('debug_mode', False)
         
+        # 加载全局配置（用于模型映射和鉴权）
+        self.global_config = self._load_global_config()
+        
         # 验证配置
         if self.target_api_base_url == 'YOUR_REVERSE_ENGINEERED_API_ENDPOINT_BASE_URL':
             self.log_func("错误: 请在配置中设置正确的 API URL")
@@ -73,6 +77,40 @@ class ProxyServer:
         
         # 创建 Flask 应用
         self._create_app()
+    
+    def _load_global_config(self):
+        """加载全局配置文件"""
+        try:
+            config_file = self.resource_manager.get_user_config_file()
+            if os.path.exists(config_file):
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    return yaml.safe_load(f) or {}
+        except Exception as e:
+            self.log_func(f"加载全局配置失败: {e}")
+        return {}
+    
+    def _get_mapped_model_id(self):
+        """获取映射的模型ID，用于 /v1/models 接口返回"""
+        return self.global_config.get('mapped_model_id', self.custom_model_id)
+    
+    def _verify_auth(self, auth_header):
+        """验证鉴权header"""
+        if not auth_header:
+            return False
+        
+        # 获取配置的MTGA鉴权key
+        mtga_auth_key = self.global_config.get('mtga_auth_key', '')
+        if not mtga_auth_key:
+            # 如果没有配置鉴权key，则跳过验证
+            return True
+        
+        # 解析Authorization header (格式: "Bearer key" 或 "key")
+        if auth_header.startswith('Bearer '):
+            provided_key = auth_header[7:]  # 移除 "Bearer " 前缀
+        else:
+            provided_key = auth_header
+        
+        return provided_key == mtga_auth_key
     
     def _create_app(self):
         """创建 Flask 应用并配置路由"""
@@ -89,19 +127,52 @@ class ProxyServer:
                              self._chat_completions, methods=['POST'])
     
     def _get_models(self):
-        """处理模型列表请求"""
+        """处理模型列表请求，支持映射模型ID和鉴权验证"""
         self.log_func(f"收到模型列表请求 /v1/models")
+        
+        # 验证鉴权
+        auth_header = request.headers.get('Authorization')
+        if not self._verify_auth(auth_header):
+            self.log_func("模型列表请求鉴权失败")
+            return jsonify({
+                "error": {
+                    "message": "Invalid authentication",
+                    "type": "authentication_error"
+                }
+            }), 401
+        
+        # 获取映射的模型ID
+        mapped_model_id = self._get_mapped_model_id()
+        
         model_data = {
             "object": "list",
             "data": [
                 {
-                    "id": self.custom_model_id,
+                    "id": mapped_model_id,
                     "object": "model",
                     "owned_by": "openai",
+                    "created": int(time.time()),
+                    "permission": [
+                        {
+                            "id": f"modelperm-{mapped_model_id}",
+                            "object": "model_permission",
+                            "created": int(time.time()),
+                            "allow_create_engine": False,
+                            "allow_sampling": True,
+                            "allow_logprobs": True,
+                            "allow_search_indices": False,
+                            "allow_view": True,
+                            "allow_fine_tuning": False,
+                            "organization": "*",
+                            "group": None,
+                            "is_blocking": False
+                        }
+                    ]
                 }
             ]
         }
-        self.log_func(f"返回模型列表: {model_data}")
+        
+        self.log_func(f"返回映射模型: {mapped_model_id}")
         return jsonify(model_data)
     
     def _chat_completions(self):
@@ -158,10 +229,28 @@ class ProxyServer:
                 request_data['stream'] = stream_value
         
         # 准备转发的请求头
+        # 验证MTGA鉴权（用于访问代理服务）
         auth_header = request.headers.get('Authorization')
+        if not self._verify_auth(auth_header):
+            self.log_func("聊天补全请求MTGA鉴权失败")
+            return jsonify({
+                "error": {
+                    "message": "Invalid authentication",
+                    "type": "authentication_error"
+                }
+            }), 401
+        
+        # 使用配置组中的 API key（如果有的话）
+        target_api_key = self.config.get('api_key', '')
         forward_headers = {'Content-Type': 'application/json'}
-        if auth_header:
+        if target_api_key:
+            # 使用配置组中的API key
+            forward_headers['Authorization'] = f'Bearer {target_api_key}'
+            self.log_func("使用配置组中的API key")
+        elif auth_header:
+            # 如果配置组没有API key，则透传原始的Authorization header
             forward_headers['Authorization'] = auth_header
+            self.log_func("透传原始Authorization header")
         
         try:
             target_url = f"{self.target_api_base_url.rstrip('/')}/v1/chat/completions"

@@ -20,6 +20,7 @@ import ctypes
 import time
 from pathlib import Path
 import yaml
+import requests
 
 # 导入自定义模块
 try:
@@ -75,7 +76,7 @@ def check_environment():
     missing_resources = resource_manager.check_resources()
     
     if missing_resources:
-        error_msg = "环境检查失败，缺少以下资源:\\n" + "\\n".join(missing_resources)
+        error_msg = "环境检查失败，缺少以下资源:\n" + "\n".join(missing_resources)
         return False, error_msg
     
     return True, "环境检查通过"
@@ -100,13 +101,39 @@ def load_config_groups():
     return [], 0
 
 
-def save_config_groups(config_groups, current_index=0):
-    """保存配置组到配置文件"""
+def load_global_config():
+    """从配置文件加载全局配置"""
     try:
-        config_data = {
-            'config_groups': config_groups,
-            'current_config_index': current_index
-        }
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                config = yaml.safe_load(f)
+                if config:
+                    mapped_model_id = config.get('mapped_model_id', '')
+                    mtga_auth_key = config.get('mtga_auth_key', '')
+                    return mapped_model_id, mtga_auth_key
+    except Exception:
+        pass
+    return '', ''
+
+
+def save_config_groups(config_groups, current_index=0, mapped_model_id=None, mtga_auth_key=None):
+    """保存配置组和全局配置到配置文件"""
+    try:
+        # 首先读取现有配置，保留其他字段
+        config_data = {}
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                config_data = yaml.safe_load(f) or {}
+        
+        # 更新配置组和索引
+        config_data['config_groups'] = config_groups
+        config_data['current_config_index'] = current_index
+        
+        # 更新全局配置（如果提供）
+        if mapped_model_id is not None:
+            config_data['mapped_model_id'] = mapped_model_id
+        if mtga_auth_key is not None:
+            config_data['mtga_auth_key'] = mtga_auth_key
         
         os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
         
@@ -127,6 +154,130 @@ def get_current_config():
     if config_groups and 0 <= current_index < len(config_groups):
         return config_groups[current_index]
     return {}
+
+
+def test_model_connection(config_group, log_func=print):
+    """测试模型连接（GET /v1/models/{模型id}）"""
+    def run_test():
+        model_id = '未知模型'  # 提前初始化，避免未绑定问题
+        try:
+            api_url = config_group.get('api_url', '').rstrip('/')
+            model_id = config_group.get('model_id', '')
+            api_key = config_group.get('api_key', '')
+            
+            if not api_url or not model_id:
+                log_func("测试失败: API URL或模型ID为空")
+                return
+            
+            # 构建测试URL
+            test_url = f"{api_url}/v1/models/{model_id}"
+            
+            # 准备请求头
+            headers = {}
+            if api_key:
+                headers['Authorization'] = f'Bearer {api_key}'
+            
+            log_func(f"正在测试模型连接: {test_url}")
+            
+            # 发送GET请求测试模型
+            response = requests.get(test_url, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                log_func(f"✅ 模型测试成功: {model_id}")
+                try:
+                    model_info = response.json()
+                    if 'id' in model_info:
+                        log_func(f"   模型ID: {model_info['id']}")
+                    if 'object' in model_info:
+                        log_func(f"   对象类型: {model_info['object']}")
+                except:
+                    log_func("   (响应解析成功，但无法获取详细信息)")
+            else:
+                log_func(f"❌ 模型测试失败: HTTP {response.status_code}")
+                try:
+                    error_info = response.text[:200]
+                    log_func(f"   错误信息: {error_info}")
+                except:
+                    log_func("   (无法获取错误详情)")
+                    
+        except requests.exceptions.Timeout:
+            log_func(f"❌ 模型测试超时: {model_id}")
+        except requests.exceptions.RequestException as e:
+            log_func(f"❌ 模型测试网络错误: {str(e)}")
+        except Exception as e:
+            log_func(f"❌ 模型测试意外错误: {str(e)}")
+    
+    # 在后台线程中运行测试，避免阻塞UI
+    threading.Thread(target=run_test, daemon=True).start()
+
+
+def test_chat_completion(config_group, log_func=print):
+    """测试聊天补全连接（POST /v1/chat/completions）"""
+    def run_test():
+        model_id = '未知模型'  # 提前初始化，避免未绑定问题
+        try:
+            api_url = config_group.get('api_url', '').rstrip('/')
+            model_id = config_group.get('model_id', '')
+            api_key = config_group.get('api_key', '')
+            
+            if not api_url or not model_id:
+                log_func("测活失败: API URL或模型ID为空")
+                return
+            
+            # 构建测试URL
+            test_url = f"{api_url}/v1/chat/completions"
+            
+            # 准备请求头
+            headers = {
+                'Content-Type': 'application/json'
+            }
+            if api_key:
+                headers['Authorization'] = f'Bearer {api_key}'
+            
+            # 准备测试数据（最小输入）
+            test_data = {
+                "model": model_id,
+                "messages": [
+                    {"role": "user", "content": "1"}
+                ],
+                "max_tokens": 1,
+                "temperature": 0
+            }
+            
+            log_func(f"正在测活模型: {model_id} (会消耗少量tokens)")
+            
+            # 发送POST请求测试聊天补全
+            response = requests.post(test_url, json=test_data, headers=headers, timeout=30)
+            
+            if response.status_code == 200:
+                log_func(f"✅ 模型测活成功: {model_id}")
+                try:
+                    completion_info = response.json()
+                    if 'choices' in completion_info and completion_info['choices']:
+                        content = completion_info['choices'][0].get('message', {}).get('content', '').strip()
+                        log_func(f"   响应内容: {content[:50]}{'...' if len(content) > 50 else ''}")
+                    if 'usage' in completion_info:
+                        usage = completion_info['usage']
+                        log_func(f"   消耗tokens: {usage.get('total_tokens', '未知')}")
+                except:
+                    log_func("   (响应成功，但无法解析详细信息)")
+            else:
+                log_func(f"❌ 模型测活失败: HTTP {response.status_code}")
+                try:
+                    error_info = response.text[:200]
+                    log_func(f"   错误信息: {error_info}")
+                except:
+                    log_func("   (无法获取错误详情)")
+                    
+        except requests.exceptions.Timeout:
+            log_func(f"❌ 模型测活超时: {model_id}")
+        except requests.exceptions.RequestException as e:
+            log_func(f"❌ 模型测活网络错误: {str(e)}")
+        except Exception as e:
+            log_func(f"❌ 模型测活意外错误: {str(e)}")
+    
+    # 在后台线程中运行测试，避免阻塞UI
+    threading.Thread(target=run_test, daemon=True).start()
 
 
 def create_main_window():
@@ -219,6 +370,46 @@ def create_main_window():
         refresh_config_tree()
         log("已刷新配置组列表")
     
+    # 测活按钮功能
+    def test_selected_config():
+        """测活选中的配置组"""
+        selected_index = get_selected_index()
+        if selected_index < 0:
+            log("请先选择要测活的配置组")
+            return
+        
+        config_group = config_groups[selected_index]
+        test_chat_completion(config_group, log)
+    
+    # 测活按钮
+    test_btn = ttk.Button(list_header_frame, text="测活", command=test_selected_config, width=6)
+    test_btn.pack(side=tk.RIGHT, padx=5)
+    
+    # 为测活按钮添加提示
+    def create_tooltip_for_test():
+        tooltip_window = None
+        
+        def on_enter(event):
+            nonlocal tooltip_window
+            tooltip_window = tk.Toplevel()
+            tooltip_window.wm_overrideredirect(True)
+            tooltip_window.wm_geometry(f"+{event.x_root+10}+{event.y_root+10}")
+            tooltip_window.configure(bg='lightyellow', relief='solid', bd=1)
+            label = tk.Label(tooltip_window, text="测试选中配置组的实际对话功能\n会发送最小请求并消耗少量tokens\n请确保配置正确后使用", 
+                           bg='lightyellow', font=('Arial', 9), wraplength=250)
+            label.pack()
+        
+        def on_leave(event):
+            nonlocal tooltip_window
+            if tooltip_window:
+                tooltip_window.destroy()
+                tooltip_window = None
+        
+        test_btn.bind('<Enter>', on_enter)
+        test_btn.bind('<Leave>', on_leave)
+    
+    create_tooltip_for_test()
+    
     refresh_btn = ttk.Button(list_header_frame, text="刷新", command=refresh_config_list, width=6)
     refresh_btn.pack(side=tk.RIGHT, padx=16)
     
@@ -249,7 +440,7 @@ def create_main_window():
     tree_frame = ttk.Frame(config_list_frame)
     tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
     
-    columns = ('序号', 'API URL', '模型ID', '实际模型ID')
+    columns = ('序号', 'API URL', '实际模型ID', 'API Key')
     config_tree = ttk.Treeview(tree_frame, columns=columns, show='headings', height=6)
     
     # 滚动条
@@ -261,13 +452,13 @@ def create_main_window():
     # 设置列
     config_tree.heading('序号', text='序号')
     config_tree.heading('API URL', text='API URL')
-    config_tree.heading('模型ID', text='模型ID')
     config_tree.heading('实际模型ID', text='实际模型ID')
+    config_tree.heading('API Key', text='API Key')
     
     config_tree.column('序号', width=30, anchor=tk.CENTER)
     config_tree.column('API URL', width=200)
-    config_tree.column('模型ID', width=120)
     config_tree.column('实际模型ID', width=120)
+    config_tree.column('API Key', width=120)
     
     config_tree.grid(row=0, column=0, sticky='nsew')
     v_scrollbar.grid(row=0, column=1, sticky='ns')
@@ -291,12 +482,23 @@ def create_main_window():
             config_tree.delete(item)
         
         for i, group in enumerate(config_groups):
-            target_model = group.get('target_model_id', '') or '(无)'
+            # 向下兼容：如果是旧配置还有target_model_id，显示它；否则显示API key的掩码版本
+            if 'target_model_id' in group:
+                # 旧配置兼容模式
+                fourth_col = group.get('target_model_id', '') or '(无)'
+            else:
+                # 新配置：显示API key的掩码版本
+                api_key = group.get('api_key', '')
+                if api_key:
+                    fourth_col = f"{'*' * (len(api_key) - 4)}{api_key[-4:]}" if len(api_key) > 4 else "***"
+                else:
+                    fourth_col = '(无)'
+            
             config_tree.insert('', 'end', values=(
                 i + 1,
                 group.get('api_url', ''),
                 group.get('model_id', ''),
-                target_model
+                fourth_col
             ))
         
         if config_groups and 0 <= current_config_index < len(config_groups):
@@ -330,30 +532,35 @@ def create_main_window():
             name = name_var.get().strip()
             api_url = api_url_var.get().strip()
             model_id = model_id_var.get().strip()
-            target_model_id = target_model_var.get().strip()
+            api_key = api_key_var.get().strip()
             
-            if not api_url or not model_id:
-                log("错误: API URL和模型ID不能为空")
+            # 调整验证逻辑：API URL、实际模型ID、API Key是必填的
+            if not api_url or not model_id or not api_key:
+                log("错误: API URL、实际模型ID和API Key都是必填项")
                 return
             
             new_group = {
-                'name': name,
+                'name': name,  # 配置组名称改为可选
                 'api_url': api_url,
-                'model_id': model_id,
-                'target_model_id': target_model_id
+                'model_id': model_id,  # 这是实际调用的模型ID
+                'api_key': api_key  # 新增API key字段
             }
             
             config_groups.append(new_group)
             if save_config_groups(config_groups, current_config_index):
-                log(f"已添加配置组: {name}")
+                display_name = name if name else f"配置组 {len(config_groups)}"
+                log(f"已添加配置组: {display_name}")
                 refresh_config_list()
                 add_window.destroy()
+                
+                # 保存后测试模型
+                test_model_connection(new_group, log)
             else:
                 log("保存配置组失败")
         
         add_window = tk.Toplevel(window)
         add_window.title("新增配置组")
-        add_window.geometry("400x250")
+        add_window.geometry("450x300")  # 调整窗口大小以容纳新字段
         add_window.resizable(False, False)
         add_window.transient(window)
         add_window.grab_set()
@@ -367,28 +574,36 @@ def create_main_window():
         main_frame = ttk.Frame(add_window, padding=10)
         main_frame.pack(fill=tk.BOTH, expand=True)
         
-        ttk.Label(main_frame, text="配置组名称:").grid(row=0, column=0, sticky=tk.W, pady=5)
+        # 配置组名称（可选）
+        ttk.Label(main_frame, text="配置组名称 (可选):").grid(row=0, column=0, sticky=tk.W, pady=5)
         name_var = tk.StringVar()
-        name_entry = ttk.Entry(main_frame, textvariable=name_var, width=30)
+        name_entry = ttk.Entry(main_frame, textvariable=name_var, width=35)
         name_entry.grid(row=0, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
         
-        ttk.Label(main_frame, text="API URL:").grid(row=1, column=0, sticky=tk.W, pady=5)
+        # API URL（必填）
+        ttk.Label(main_frame, text="* API URL:").grid(row=1, column=0, sticky=tk.W, pady=5)
         api_url_var = tk.StringVar()
-        api_url_entry = ttk.Entry(main_frame, textvariable=api_url_var, width=30)
+        api_url_entry = ttk.Entry(main_frame, textvariable=api_url_var, width=35)
         api_url_entry.grid(row=1, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
         
-        ttk.Label(main_frame, text="模型ID:").grid(row=2, column=0, sticky=tk.W, pady=5)
+        # 实际模型ID（必填）
+        ttk.Label(main_frame, text="* 实际模型ID:").grid(row=2, column=0, sticky=tk.W, pady=5)
         model_id_var = tk.StringVar()
-        model_id_entry = ttk.Entry(main_frame, textvariable=model_id_var, width=30)
+        model_id_entry = ttk.Entry(main_frame, textvariable=model_id_var, width=35)
         model_id_entry.grid(row=2, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
         
-        ttk.Label(main_frame, text="实际模型ID (可选):").grid(row=3, column=0, sticky=tk.W, pady=5)
-        target_model_var = tk.StringVar()
-        target_model_entry = ttk.Entry(main_frame, textvariable=target_model_var, width=30)
-        target_model_entry.grid(row=3, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
+        # API Key（必填）
+        ttk.Label(main_frame, text="* API Key:").grid(row=3, column=0, sticky=tk.W, pady=5)
+        api_key_var = tk.StringVar()
+        api_key_entry = ttk.Entry(main_frame, textvariable=api_key_var, width=35, show="*")
+        api_key_entry.grid(row=3, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
+        
+        # 添加说明标签
+        info_label = ttk.Label(main_frame, text="* 为必填项", font=('Arial', 8), foreground='gray')
+        info_label.grid(row=4, column=0, columnspan=2, sticky=tk.W, pady=5)
         
         button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=4, column=0, columnspan=2, pady=20)
+        button_frame.grid(row=5, column=0, columnspan=2, pady=20)
         
         ttk.Button(button_frame, text="保存", command=save_new_config).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="取消", command=add_window.destroy).pack(side=tk.LEFT, padx=5)
@@ -412,31 +627,36 @@ def create_main_window():
             name = name_var.get().strip()
             api_url = api_url_var.get().strip()
             model_id = model_id_var.get().strip()
-            target_model_id = target_model_var.get().strip()
+            api_key = api_key_var.get().strip()
             
-            if not api_url or not model_id:
-                log("错误: API URL和模型ID不能为空")
+            # 调整验证逻辑：API URL、实际模型ID、API Key是必填的
+            if not api_url or not model_id or not api_key:
+                log("错误: API URL、实际模型ID和API Key都是必填项")
                 return
             
             # 更新配置组
             config_groups[selected_index] = {
-                'name': name,
+                'name': name,  # 配置组名称改为可选
                 'api_url': api_url,
-                'model_id': model_id,
-                'target_model_id': target_model_id
+                'model_id': model_id,  # 这是实际调用的模型ID
+                'api_key': api_key  # API key字段
             }
             
             if save_config_groups(config_groups, current_config_index):
-                log(f"已修改配置组: {name}")
+                display_name = name if name else f"配置组 {selected_index + 1}"
+                log(f"已修改配置组: {display_name}")
                 refresh_config_list()
                 edit_window.destroy()
+                
+                # 保存后测试模型
+                test_model_connection(config_groups[selected_index], log)
             else:
                 log("保存配置组失败")
         
         # 创建修改窗口
         edit_window = tk.Toplevel(window)
         edit_window.title("修改配置组")
-        edit_window.geometry("400x250")
+        edit_window.geometry("450x300")  # 调整窗口大小
         edit_window.resizable(False, False)
         edit_window.transient(window)
         edit_window.grab_set()
@@ -450,28 +670,36 @@ def create_main_window():
         main_frame = ttk.Frame(edit_window, padding=10)
         main_frame.pack(fill=tk.BOTH, expand=True)
         
-        ttk.Label(main_frame, text="配置组名称:").grid(row=0, column=0, sticky=tk.W, pady=5)
+        # 配置组名称（可选）
+        ttk.Label(main_frame, text="配置组名称 (可选):").grid(row=0, column=0, sticky=tk.W, pady=5)
         name_var = tk.StringVar(value=current_group.get('name', ''))
-        name_entry = ttk.Entry(main_frame, textvariable=name_var, width=30)
+        name_entry = ttk.Entry(main_frame, textvariable=name_var, width=35)
         name_entry.grid(row=0, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
         
-        ttk.Label(main_frame, text="API URL:").grid(row=1, column=0, sticky=tk.W, pady=5)
+        # API URL（必填）
+        ttk.Label(main_frame, text="* API URL:").grid(row=1, column=0, sticky=tk.W, pady=5)
         api_url_var = tk.StringVar(value=current_group.get('api_url', ''))
-        api_url_entry = ttk.Entry(main_frame, textvariable=api_url_var, width=30)
+        api_url_entry = ttk.Entry(main_frame, textvariable=api_url_var, width=35)
         api_url_entry.grid(row=1, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
         
-        ttk.Label(main_frame, text="模型ID:").grid(row=2, column=0, sticky=tk.W, pady=5)
+        # 实际模型ID（必填）
+        ttk.Label(main_frame, text="* 实际模型ID:").grid(row=2, column=0, sticky=tk.W, pady=5)
         model_id_var = tk.StringVar(value=current_group.get('model_id', ''))
-        model_id_entry = ttk.Entry(main_frame, textvariable=model_id_var, width=30)
+        model_id_entry = ttk.Entry(main_frame, textvariable=model_id_var, width=35)
         model_id_entry.grid(row=2, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
         
-        ttk.Label(main_frame, text="实际模型ID (可选):").grid(row=3, column=0, sticky=tk.W, pady=5)
-        target_model_var = tk.StringVar(value=current_group.get('target_model_id', ''))
-        target_model_entry = ttk.Entry(main_frame, textvariable=target_model_var, width=30)
-        target_model_entry.grid(row=3, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
+        # API Key（必填）
+        ttk.Label(main_frame, text="* API Key:").grid(row=3, column=0, sticky=tk.W, pady=5)
+        api_key_var = tk.StringVar(value=current_group.get('api_key', ''))
+        api_key_entry = ttk.Entry(main_frame, textvariable=api_key_var, width=35, show="*")
+        api_key_entry.grid(row=3, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
+        
+        # 添加说明标签
+        info_label = ttk.Label(main_frame, text="* 为必填项", font=('Arial', 8), foreground='gray')
+        info_label.grid(row=4, column=0, columnspan=2, sticky=tk.W, pady=5)
         
         button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=4, column=0, columnspan=2, pady=20)
+        button_frame.grid(row=5, column=0, columnspan=2, pady=20)
         
         ttk.Button(button_frame, text="保存", command=save_edited_config).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="取消", command=edit_window.destroy).pack(side=tk.LEFT, padx=5)
@@ -571,6 +799,61 @@ def create_main_window():
     
     # 初始化配置组列表
     refresh_config_list()
+    
+    # 全局配置框架
+    global_config_frame = ttk.LabelFrame(left_frame, text="全局配置")
+    global_config_frame.pack(fill=tk.X, padx=5, pady=5)
+    
+    # 映射模型ID配置
+    mapped_model_frame = ttk.Frame(global_config_frame)
+    mapped_model_frame.pack(fill=tk.X, padx=5, pady=2)
+    ttk.Label(mapped_model_frame, text="映射模型ID:", width=12).pack(side=tk.LEFT)
+    mapped_model_var = tk.StringVar()
+    mapped_model_entry = ttk.Entry(mapped_model_frame, textvariable=mapped_model_var, width=25)
+    mapped_model_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 0))
+    
+    # MTGA鉴权key配置
+    mtga_auth_frame = ttk.Frame(global_config_frame)
+    mtga_auth_frame.pack(fill=tk.X, padx=5, pady=2)
+    ttk.Label(mtga_auth_frame, text="MTGA鉴权Key:", width=12).pack(side=tk.LEFT)
+    mtga_auth_var = tk.StringVar()
+    mtga_auth_entry = ttk.Entry(mtga_auth_frame, textvariable=mtga_auth_var, width=25, show="*")
+    mtga_auth_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 0))
+    
+    # 加载并初始化全局配置
+    def load_global_config_values():
+        """加载并设置全局配置值到GUI"""
+        mapped_model_id, mtga_auth_key = load_global_config()
+        mapped_model_var.set(mapped_model_id)
+        mtga_auth_var.set(mtga_auth_key)
+    
+    def save_global_config_values():
+        """保存全局配置值"""
+        mapped_model_id = mapped_model_var.get().strip()
+        mtga_auth_key = mtga_auth_var.get().strip()
+        
+        # 验证必填字段
+        if not mapped_model_id or not mtga_auth_key:
+            log("错误: 映射模型ID和MTGA鉴权Key都是必填项")
+            return False
+        
+        # 获取当前配置组信息
+        config_groups, current_config_index = load_config_groups()
+        
+        # 保存全局配置
+        if save_config_groups(config_groups, current_config_index, mapped_model_id, mtga_auth_key):
+            log("全局配置已保存")
+            return True
+        else:
+            log("保存全局配置失败")
+            return False
+    
+    # 初始化全局配置值
+    load_global_config_values()
+    
+    # 为全局配置添加保存按钮
+    global_save_btn = ttk.Button(global_config_frame, text="保存全局配置", command=save_global_config_values)
+    global_save_btn.pack(pady=5)
     
     # 调试模式复选框
     debug_mode_var = tk.BooleanVar(value=False)
