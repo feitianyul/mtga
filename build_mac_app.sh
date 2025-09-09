@@ -93,8 +93,8 @@ uv run --python .venv/bin/python nuitka \
     --include-data-files=openssl/openssl.exe=openssl/openssl.exe \
     --include-data-files=openssl/libcrypto-3-x64.dll=openssl/libcrypto-3-x64.dll \
     --include-data-files=openssl/libssl-3-x64.dll=openssl/libssl-3-x64.dll \
-    --include-data-files=icons/f0bb32_bg-black.ico=icons/f0bb32_bg-black.ico \
-    --macos-app-icon=icons/f0bb32_bg-black.ico \
+    --include-data-files=icons/f0bb32_bg-black.icns=icons/f0bb32_bg-black.icns \
+    --macos-app-icon=icons/f0bb32_bg-black.icns \
     --enable-plugin=tk-inter \
     --remove-output \
     --disable-console \
