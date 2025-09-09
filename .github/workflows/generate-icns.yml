@@ -1,0 +1,55 @@
+name: Generate ICNS and commit to branch
+on:
+  workflow_dispatch: {}
+
+jobs:
+  generate-icns:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install pillow cairosvg imageio
+
+      - name: Ensure branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # 切到目标分支（如果不存在则新建）
+          git fetch origin
+          if git rev-parse --verify origin/add-icns-in-repo >/dev/null 2>&1; then
+            git checkout -B add-icns-in-repo origin/add-icns-in-repo
+          else
+            git checkout -B add-icns-in-repo
+          fi
+
+      - name: Generate icon.iconset and icns
+        run: |
+          python tools/convert_iconset.py --src icons/f0bb32_bg-black.svg --out icons/f0bb32_bg-black.icns
+          ls -la icons || true
+          file icons/f0bb32_bg-black.icns || true
+
+      - name: Commit and push icns if changed
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git add icons/f0bb32_bg-black.icns || true
+          if git diff --cached --quiet; then
+            echo "没有变化，跳过提交。"
+          else
+            git commit -m "chore: add generated macOS icon icns"
+            git push --set-upstream origin add-icns-in-repo
+            echo "已推送到分支 add-icns-in-repo"
+          fi
