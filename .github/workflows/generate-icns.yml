@@ -18,29 +18,48 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install system deps (Homebrew)
+      - name: Install system deps (Homebrew) and persist env
         run: |
-          # 更新 Homebrew 并安装 cairosvg 所需的系统库
-          brew update || true
-          brew install pkg-config cairo pango gdk-pixbuf libffi || true
-          # 确保 pkg-config 能找到 libffi（有时需要）
-          if [ -d "$(brew --prefix libffi)/lib/pkgconfig" ]; then
-            export PKG_CONFIG_PATH="$(brew --prefix libffi)/lib/pkgconfig:$PKG_CONFIG_PATH"
-            echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH"
-          fi
+          set -e
+          # 更新 Homebrew 并安装 cairosvg 所需的系统库（不要吞掉错误）
+          brew update
+          brew install pkg-config cairo pango gdk-pixbuf libffi
+
+          # 计算 brew 前缀与可能的 formula 前缀（兼容不同环境）
+          BREW_PREFIX="$(brew --prefix)"
+          CAIRO_PREFIX="$(brew --prefix cairo 2>/dev/null || echo "$BREW_PREFIX")"
+          LIBFFI_PREFIX="$(brew --prefix libffi 2>/dev/null || echo "$BREW_PREFIX")"
+
+          # 把关键环境写入 GITHUB_ENV，使它们在后续 steps 中生效
+          # PKG_CONFIG_PATH：让 pkg-config 能找到 .pc 文件（pip 编译扩展/查找库）
+          echo "PKG_CONFIG_PATH=${CAIRO_PREFIX}/lib/pkgconfig:${LIBFFI_PREFIX}/lib/pkgconfig:$PKG_CONFIG_PATH" >> "$GITHUB_ENV"
+
+          # 编译/链接相关标志，供需要编译的扩展使用
+          echo "LDFLAGS=-L${CAIRO_PREFIX}/lib -L${LIBFFI_PREFIX}/lib" >> "$GITHUB_ENV"
+          echo "CPPFLAGS=-I${CAIRO_PREFIX}/include -I${LIBFFI_PREFIX}/include" >> "$GITHUB_ENV"
+
+          # 把 brew bin 加到 PATH
+          echo "PATH=${BREW_PREFIX}/bin:$PATH" >> "$GITHUB_ENV"
+
+          # macOS 上运行时需要让动态链接器能找到 Homebrew 的 dylib
+          # DYLD_FALLBACK_LIBRARY_PATH 在许多情况下比 DYLD_LIBRARY_PATH 更可靠
+          echo "DYLD_FALLBACK_LIBRARY_PATH=${CAIRO_PREFIX}/lib:${LIBFFI_PREFIX}/lib:${BREW_PREFIX}/lib" >> "$GITHUB_ENV"
 
       - name: Install Python deps
         run: |
+          set -e
           python -m pip install --upgrade pip
-          pip install pillow cairosvg imageio cairosvg
+          # 安装 cairosvg 等 Python 依赖
+          pip install --no-cache-dir pillow cairosvg imageio
 
       - name: Ensure branch
         run: |
+          set -e
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # 切到目标分支（如果不存在则新建）
           git fetch origin
-          if git rev-parse --verify origin/add-icns-in-repo >/dev/null 2>&1; then
+          if git ls-remote --exit-code --heads origin add-icns-in-repo >/dev/null 2>&1; then
             git checkout -B add-icns-in-repo origin/add-icns-in-repo
           else
             git checkout -B add-icns-in-repo
@@ -48,6 +67,12 @@ jobs:
 
       - name: Generate icon.iconset and icns
         run: |
+          set -e
+          # 确认环境变量已生效（调试用）
+          echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH"
+          echo "LDFLAGS=$LDFLAGS"
+          echo "CPPFLAGS=$CPPFLAGS"
+          echo "DYLD_FALLBACK_LIBRARY_PATH=$DYLD_FALLBACK_LIBRARY_PATH"
           python tools/convert_iconset.py --src icons/f0bb32_bg-black.svg --out icons/f0bb32_bg-black.icns
           ls -la icons || true
           file icons/f0bb32_bg-black.icns || true
@@ -56,6 +81,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -e
           git add icons/f0bb32_bg-black.icns || true
           if git diff --cached --quiet; then
             echo "没有变化，跳过提交。"
