@@ -18,10 +18,21 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Install system deps (Homebrew)
+        run: |
+          # 更新 Homebrew 并安装 cairosvg 所需的系统库
+          brew update || true
+          brew install pkg-config cairo pango gdk-pixbuf libffi || true
+          # 确保 pkg-config 能找到 libffi（有时需要）
+          if [ -d "$(brew --prefix libffi)/lib/pkgconfig" ]; then
+            export PKG_CONFIG_PATH="$(brew --prefix libffi)/lib/pkgconfig:$PKG_CONFIG_PATH"
+            echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH"
+          fi
+
       - name: Install Python deps
         run: |
           python -m pip install --upgrade pip
-          pip install pillow cairosvg imageio
+          pip install pillow cairosvg imageio cairosvg
 
       - name: Ensure branch
         run: |

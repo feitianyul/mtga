@@ -40,7 +40,13 @@ def rasterize_svg_to_image(src: Path, size=1024):
     try:
         import cairosvg
     except Exception:
-        raise RuntimeError("缺少 cairosvg，安装: pip install cairosvg")
+        raise RuntimeError(
+            "缺少 cairosvg 或其底层系统依赖 (libcairo 等)。"
+            " 请先安装 Python 包: pip install cairosvg\n"
+            "在 macOS runner 上还需要安装系统库，例如:\n"
+            "  brew install pkg-config cairo pango gdk-pixbuf libffi\n"
+            "在 Linux runner 上请安装相应的系统库（如 libcairo2、libpango 等）。"
+        )
     png_bytes = cairosvg.svg2png(url=str(src), output_width=size, output_height=size)
     from io import BytesIO
     return Image.open(BytesIO(png_bytes)).convert("RGBA")
