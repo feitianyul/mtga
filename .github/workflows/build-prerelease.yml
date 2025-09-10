@@ -75,8 +75,8 @@ jobs:
           # 修改构建脚本中的版本号
           sed -i.bak "s/VERSION=\".*\"/VERSION=\"${{ steps.version.outputs.VERSION }}\"/g" build_mac_app.sh
           
-          # 根据架构设置输出文件名
-          sed -i.bak "s/--output-filename=MTGA_GUI-v\$VERSION-\$(uname -m)/--output-filename=${{ steps.version.outputs.APP_NAME }}/g" build_mac_app.sh
+          # 根据架构设置输出文件名，替换 $(uname -m) 为具体架构
+          sed -i.bak "s/\$(uname -m)/${{ matrix.arch }}/g" build_mac_app.sh
           
           # 显示修改后的构建脚本相关行，用于调试
           echo "🔍 检查修改后的构建脚本:"
