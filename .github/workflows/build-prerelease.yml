@@ -20,11 +20,13 @@ jobs:
     runs-on: macos-latest
     strategy:
       matrix:
-        arch: [x64, arm64]
+        arch: 
+          # - x64
+          - arm64
         include:
-          - arch: x64
-            runner_arch: x86_64
-            nuitka_arch: x86_64
+          # - arch: x64
+          #   runner_arch: x86_64
+          #   nuitka_arch: x86_64
           - arch: arm64  
             runner_arch: arm64
             nuitka_arch: arm64
