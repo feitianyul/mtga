@@ -48,18 +48,17 @@ required_files=(
     "$SCRIPT_DIR/mac/Info.plist"
     "$SCRIPT_DIR/mac/MTGA_GUI"
     "$SCRIPT_DIR/icons/f0bb32_bg-black.png"
-    "$SCRIPT_DIR/generate_certs.py"
     "$SCRIPT_DIR/mtga_gui.py"
     "$SCRIPT_DIR/pyproject.toml"
     "$SCRIPT_DIR/README.md"
     "$SCRIPT_DIR/run_mtga_gui.sh"
-    "$SCRIPT_DIR/trae_proxy.py"
     "$SCRIPT_DIR/uv.lock"
 )
 
 required_dirs=(
     "$SCRIPT_DIR/ca"
     "$SCRIPT_DIR/openssl"
+    "$SCRIPT_DIR/modules"
 )
 
 # 检查文件
@@ -143,12 +142,10 @@ fi
 # 复制项目文件到 mtga_project 目录
 print_info "复制项目文件..."
 project_files=(
-    "generate_certs.py"
     "mtga_gui.py"
     "pyproject.toml"
     "README.md"
     "run_mtga_gui.sh"
-    "trae_proxy.py"
     "uv.lock"
 )
 
@@ -162,6 +159,16 @@ for file in "${project_files[@]}"; do
         exit 1
     fi
 done
+
+# 复制模块目录到项目目录
+print_info "复制 modules 目录..."
+cp -r "$SCRIPT_DIR/modules" "$PROJECT_DIR/"
+if [[ $? -eq 0 ]]; then
+    print_success "modules 目录复制成功"
+else
+    print_error "modules 目录复制失败"
+    exit 1
+fi
 
 # 复制项目目录（处理权限问题）
 print_info "复制 ca 目录..."
