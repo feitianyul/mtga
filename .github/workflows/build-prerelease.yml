@@ -256,7 +256,7 @@ jobs:
           
           ### 🔧 技术信息
           - Python 版本: ${{ env.PYTHON_VERSION }}
-          - 构建时间: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          - 构建时间: ${{ github.run_started_at }}
           - 提交哈希: ${{ github.sha }}
           
           ### 🐛 问题反馈
