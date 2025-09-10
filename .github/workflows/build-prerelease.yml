@@ -78,22 +78,45 @@ jobs:
           # 根据架构设置输出文件名
           sed -i.bak "s/--output-filename=MTGA_GUI-v\$VERSION-\$(uname -m)/--output-filename=${{ steps.version.outputs.APP_NAME }}/g" build_mac_app.sh
           
+          # 显示修改后的构建脚本相关行，用于调试
+          echo "🔍 检查修改后的构建脚本:"
+          echo "VERSION 行:"
+          grep "VERSION=" build_mac_app.sh | head -1
+          echo "output-filename 行:"
+          grep "output-filename" build_mac_app.sh
+          
           # 执行构建
           chmod +x build_mac_app.sh
           ./build_mac_app.sh
 
       - name: 📱 验证应用包
         run: |
-          APP_PATH="dist-onefile/${{ steps.version.outputs.APP_NAME }}.app"
-          if [ ! -d "$APP_PATH" ]; then
-            echo "❌ 应用包构建失败: $APP_PATH 不存在"
+          echo "🔍 检查 dist-onefile 目录内容:"
+          ls -la dist-onefile/ || echo "❌ dist-onefile 目录不存在"
+          
+          # 查找实际生成的 .app 文件
+          APP_FILES=(dist-onefile/*.app)
+          if [ ! -e "${APP_FILES[0]}" ]; then
+            echo "❌ 没有找到 .app 文件"
+            echo "📁 当前目录结构:"
+            find dist-onefile/ -type f -name "*.app" 2>/dev/null || echo "没有找到任何 .app 文件"
             exit 1
           fi
           
-          echo "✅ 应用包构建成功: $APP_PATH"
-          echo "📊 应用包大小: $(du -sh "$APP_PATH" | cut -f1)"
+          # 使用找到的第一个 .app 文件
+          ACTUAL_APP_PATH="${APP_FILES[0]}"
+          echo "✅ 应用包构建成功: $ACTUAL_APP_PATH"
+          echo "📊 应用包大小: $(du -sh "$ACTUAL_APP_PATH" | cut -f1)"
           echo "📁 应用包结构:"
-          find "$APP_PATH" -maxdepth 2 -type d | head -10
+          find "$ACTUAL_APP_PATH" -maxdepth 2 -type d | head -10
+          
+          # 检查期望的文件名是否匹配
+          EXPECTED_PATH="dist-onefile/${{ steps.version.outputs.APP_NAME }}.app"
+          if [ "$ACTUAL_APP_PATH" != "$EXPECTED_PATH" ]; then
+            echo "⚠️ 警告: 实际文件名与期望不符"
+            echo "期望: $EXPECTED_PATH"
+            echo "实际: $ACTUAL_APP_PATH"
+          fi
 
       - name: 🎁 创建 DMG 安装包
         run: |
@@ -102,6 +125,19 @@ jobs:
             echo "❌ DMG 配置文件不存在: mac/dmg_settings.py"
             exit 1
           fi
+          
+          # 查找实际的 .app 文件
+          APP_FILES=(dist-onefile/*.app)
+          if [ ! -e "${APP_FILES[0]}" ]; then
+            echo "❌ 没有找到 .app 文件用于创建 DMG"
+            exit 1
+          fi
+          
+          ACTUAL_APP_PATH="${APP_FILES[0]}"
+          APP_NAME=$(basename "$ACTUAL_APP_PATH" .app)
+          
+          echo "📦 使用应用包: $ACTUAL_APP_PATH"
+          echo "📦 DMG 文件名: ${{ steps.version.outputs.DMG_NAME }}.dmg"
           
           # 创建 DMG
           uv run dmgbuild \
@@ -117,8 +153,8 @@ jobs:
         with:
           name: macos-${{ matrix.arch }}-artifacts
           path: |
-            dist-onefile/${{ steps.version.outputs.APP_NAME }}.app
-            dist-onefile/${{ steps.version.outputs.DMG_NAME }}.dmg
+            dist-onefile/*.app
+            dist-onefile/*.dmg
           retention-days: 7
 
   # Windows 构建任务（预留框架）
