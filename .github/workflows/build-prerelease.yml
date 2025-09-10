@@ -88,6 +88,15 @@ jobs:
           # 执行构建
           chmod +x build_mac_app.sh
           ./build_mac_app.sh
+          
+          # Nuitka 在 macOS 应用包模式下忽略 --output-filename，总是使用源文件名
+          # 需要手动重命名到期望的文件名
+          if [ -d "dist-onefile/mtga_gui.app" ]; then
+            EXPECTED_NAME="${{ steps.version.outputs.APP_NAME }}.app"
+            echo "🔄 重命名应用包: mtga_gui.app → $EXPECTED_NAME"
+            mv "dist-onefile/mtga_gui.app" "dist-onefile/$EXPECTED_NAME"
+            echo "✅ 重命名完成"
+          fi
 
       - name: 📱 验证应用包
         run: |
@@ -134,10 +143,14 @@ jobs:
           fi
           
           ACTUAL_APP_PATH="${APP_FILES[0]}"
-          APP_NAME=$(basename "$ACTUAL_APP_PATH" .app)
+          ACTUAL_APP_NAME=$(basename "$ACTUAL_APP_PATH")
           
           echo "📦 使用应用包: $ACTUAL_APP_PATH"
           echo "📦 DMG 文件名: ${{ steps.version.outputs.DMG_NAME }}.dmg"
+          
+          # 设置环境变量供DMG配置文件使用
+          export MTGA_APP_NAME="$ACTUAL_APP_NAME"
+          echo "🔧 设置 DMG 应用名称: $MTGA_APP_NAME"
           
           # 创建 DMG
           uv run dmgbuild \

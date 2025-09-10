@@ -5,8 +5,8 @@
 
 import os.path
 
-# Application path
-application = 'MTGA_GUI.app'
+# Application path - 使用环境变量或默认值
+application = os.environ.get('MTGA_APP_NAME', 'MTGA_GUI.app')
 appname = os.path.basename(application)
 
 # Volume settings
