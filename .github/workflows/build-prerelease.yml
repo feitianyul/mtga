@@ -143,14 +143,13 @@ jobs:
           fi
           
           ACTUAL_APP_PATH="${APP_FILES[0]}"
-          ACTUAL_APP_NAME=$(basename "$ACTUAL_APP_PATH")
           
           echo "📦 使用应用包: $ACTUAL_APP_PATH"
           echo "📦 DMG 文件名: ${{ steps.version.outputs.DMG_NAME }}.dmg"
           
-          # 设置环境变量供DMG配置文件使用
-          export MTGA_APP_NAME="$ACTUAL_APP_NAME"
-          echo "🔧 设置 DMG 应用名称: $MTGA_APP_NAME"
+          # 设置环境变量供DMG配置文件使用，包含完整路径
+          export MTGA_APP_NAME="$ACTUAL_APP_PATH"
+          echo "🔧 设置 DMG 应用路径: $MTGA_APP_NAME"
           
           # 创建 DMG
           uv run dmgbuild \
