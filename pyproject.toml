@@ -43,6 +43,7 @@ win-build = [
 mac-build = [
     "nuitka>=2.7.12",
     "dmgbuild>=1.6.5",
+    "imageio",
 ]
 
 [project.scripts]

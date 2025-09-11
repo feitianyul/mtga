@@ -25,3 +25,4 @@ debug_request.log
 MTGA_GUI.app
 *.dmg
 .trae
+node_modules
