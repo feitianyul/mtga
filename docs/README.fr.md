@@ -39,7 +39,28 @@ MTGA est une solution basée sur un proxy local pour fournisseurs de modèles fi
 
 ## Journal des modifications
 
-### v1.1.1 (Dernière version)
+### v1.2.0 (Dernier)
+- 🔄 **Refonte de l'architecture de mapping des modèles** - Passage du "mapping un-à-un" à une architecture de "modèle de mapping unifié"
+  - Le client trae utilise un ID de modèle de mapping unifié, MTGA bascule le modèle backend réel via le groupe de configuration
+  - Le serveur proxy supporte le mapping des IDs de modèle et la validation d'authentification MTGA
+  - La configuration globale prend en charge la définition de l'ID du modèle de mapping et de la clé d'authentification MTGA
+- ⚡ **Optimisation de la gestion des groupes de configuration** - Refonte des champs et de la logique de validation des groupes de configuration
+  - Le nom du groupe de configuration devient optionnel, l'URL API, l'ID réel du modèle et la clé API deviennent obligatoires
+  - Suppression du champ d'ID du modèle cible, remplacé par une configuration de mapping globale
+  - Renommage des en-têtes des groupes de configuration, rétrocompatibilité avec les anciens fichiers de configuration
+- 🧪 **Ajout d'une fonctionnalité de tests automatisés** - Système complet de test de connexion aux modèles
+  - Test automatique de la connexion au modèle après sauvegarde de la configuration (GET `/v1/models/{id du modèle}`)
+  - Fonction de test manuel de disponibilité, support des tests de complétion de chat (POST `/v1/chat/completions`)
+  - Journal détaillé des tests, incluant le contenu des réponses et le décompte des tokens consommés
+- 🎯 **Amélioration de l'expérience utilisateur** - Ajout d'un bouton de test de disponibilité et d'infobulles détaillées
+  - Le bouton de test de disponibilité supporte les infobulles explicatives, indiquant les risques de consommation de tokens
+  - Tests asynchrones pour éviter le blocage de l'interface utilisateur, gestion complète des erreurs
+  - Affichage sécurisé de la clé API (masquage)
+
+<details>
+<summary>Versions historiques</summary>
+
+### v1.1.1
 
 - 🐛 **Correction d'un problème avec la fonction de modification des hosts** - Résolution d'un problème de caractère de saut de ligne anormal lors de la modification du fichier hosts
 
@@ -59,6 +80,8 @@ MTGA est une solution basée sur un proxy local pour fournisseurs de modèles fi
 - 🔄 **Changement de fournisseur par défaut** - Passage de DeepSeek à OpenAI  
 - 📦 **Refactorisation des fichiers** - Renommage des fichiers liés à ds au format `*_ds.*` pour archivage  
 - 🌐 **Modification du format de l'URL de l'API** - Passage de `https://your-api.example.com/v1` à `https://your-api.example.com`
+
+</details>
 
 ---
 

@@ -39,7 +39,28 @@ MTGA es una solución de proveedor de servicios de modelos fijos para IDE basada
 
 ## Registro de cambios
 
-### v1.1.1 (Más reciente)
+### v1.2.0 (Última versión)
+- 🔄 **Reestructuración de la arquitectura de mapeo de modelos** - Cambio de "mapeo uno a uno" a arquitectura de "modelo de mapeo unificado"
+  - El extremo trae usa un ID de modelo de mapeo unificado, MTGA alterna el modelo backend real a través del grupo de configuración
+  - El servidor proxy soporta el mapeo de ID de modelo y la verificación de autenticación MTGA
+  - La configuración global soporta el ajuste del ID de modelo de mapeo y la clave de autenticación MTGA
+- ⚡ **Optimización de la gestión de grupos de configuración** - Reestructuración de campos de grupo de configuración y lógica de validación
+  - El nombre del grupo de configuración es opcional, URL de API, ID del modelo real y clave API son obligatorios
+  - Se elimina el campo de ID del modelo objetivo, cambiado a configuración de mapeo global
+  - Cambio de nombre en encabezados de tabla de grupo de configuración, compatible hacia atrás con archivos de configuración antiguos
+- 🧪 **Nueva función de pruebas automatizadas** - Sistema completo de prueba de conexión de modelos
+  - Prueba automática de conexión del modelo tras guardar configuración (GET `/v1/models/{modelo_id}`)
+  - Función de prueba manual disponible, soporta prueba de complemento de chat (POST `/v1/chat/completions`)
+  - Salida detallada de registros de pruebas, incluyendo contenido de respuesta y estadísticas de consumo de tokens
+- 🎯 **Mejora de la experiencia del usuario** - Nuevo botón de prueba activa y consejos detallados
+  - Botón de prueba activa soporta tooltip con aviso del riesgo de consumo de tokens
+  - Prueba asíncrona para evitar bloqueo de interfaz, mecanismo completo de manejo de errores
+  - Visualización segura de clave API (enmascaramiento)
+
+<details>
+<summary>Versiones anteriores</summary>
+
+### v1.1.1
 
 - 🐛 **Corregido problema con la función de modificación de hosts** - Solucionado problema de caracteres de nueva línea anómalos al modificar el archivo hosts
 
@@ -59,6 +80,8 @@ MTGA es una solución de proveedor de servicios de modelos fijos para IDE basada
 - 🔄 **Proveedor de servicios predeterminado cambiado** - De DeepSeek a OpenAI
 - 📦 **Refactorización de archivos** - Archivos relacionados con ds renombrados a formato `*_ds.*` para archivo
 - 🌐 **Formato de URL de API cambiado** - De `https://your-api.example.com/v1` a `https://your-api.example.com`
+
+</details>
 
 ---
 

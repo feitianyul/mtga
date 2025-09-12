@@ -39,7 +39,28 @@ MTGA ist eine auf einem lokalen Proxy basierende IDE-Lösung für feste Modellan
 
 ## Changelog
 
-### v1.1.1 (Aktuellste)
+### v1.2.0 (Neueste)
+- 🔄 **Umstrukturierung der Modellzuordnungsarchitektur** – von "Eins-zu-Eins-Zuordnung" zu einer "einheitlichen Modellzuordnungsarchitektur"
+  - Der trae-Endpunkt verwendet eine einheitliche Zuordnungsmodell-ID, MTGA wechselt über die Konfigurationsgruppe das tatsächliche Backend-Modell
+  - Der Proxy-Server unterstützt Modell-ID-Zuordnung und MTGA Authentifizierungsprüfung
+  - Globale Konfiguration unterstützt Einstellungen der Zuordnungsmodell-ID und MTGA Authentifizierungs-Key
+- ⚡ **Optimierung der Konfigurationsgruppenverwaltung** – Umstrukturierung der Felder und Validierungslogik der Konfigurationsgruppe
+  - Der Name der Konfigurationsgruppe ist optional, API-URL, tatsächliche Modell-ID und API-Key sind Pflichtfelder
+  - Feld für Zielmodell-ID entfernt, stattdessen globale Zuordnungs-Konfiguration
+  - Kopfzeile der Konfigurationsgruppen wurde umbenannt, abwärtskompatibel mit alten Konfigurationsdateien
+- 🧪 **Neue automatisierte Testfunktion** – Vollständiges Modellverbindungstestsystem
+  - Nach dem Speichern der Konfiguration wird die Modellverbindung automatisch getestet (GET `/v1/models/{Modell-id}`)
+  - Manuelle Lebendigkeitstestfunktion, unterstützt Chat-Vervollständigungstest (POST `/v1/chat/completions`)
+  - Detaillierte Testprotokolle inkl. Antwortinhalt und Token-Verbrauchsstatistik
+- 🎯 **Verbesserte Benutzererfahrung** – Neuer Lebendigkeitstest-Button und ausführliche Hinweise
+  - Der Lebendigkeitstest-Button unterstützt Tooltip-Hinweise, die vor Tokenverbrauch warnen
+  - Asynchrone Tests verhindern UI-Blockaden, verbesserte Fehlerbehandlung
+  - Sichere Anzeige des API-Keys (Maskierung)
+
+<details>
+<summary>Historische Versionen</summary>
+
+### v1.1.1
 
 - 🐛 **Problem mit der Hosts-Änderungsfunktion behoben** - Behebt das Problem mit abnormalen Zeilenumbrüchen bei der Änderung der Hosts-Datei
 
@@ -59,6 +80,8 @@ MTGA ist eine auf einem lokalen Proxy basierende IDE-Lösung für feste Modellan
 - 🔄 **Standardanbieter geändert** - Von DeepSeek zu OpenAI geändert
 - 📦 **Dateirestrukturierung** - DS-bezogene Dateien umbenannt in `*_ds.*` Format archiviert
 - 🌐 **API-URL-Format geändert** - Von `https://your-api.example.com/v1` zu `https://your-api.example.com` geändert
+
+</details>
 
 ---
 

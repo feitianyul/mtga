@@ -39,7 +39,28 @@ MTGA is a local proxy-based IDE fixed model provider solution for Windows and ma
 
 ## Changelog
 
-### v1.1.1 (Latest)
+### v1.2.0 (Latest)
+- 🔄 **Refactored Model Mapping Architecture** - Changed from "One-to-One Mapping" to "Unified Mapping Model" architecture
+  - Trae side uses a unified mapping model ID, MTGA switches the actual backend model through configuration groups
+  - Proxy server supports model ID mapping and MTGA authentication verification
+  - Global configuration supports mapping model ID and MTGA authentication key settings
+- ⚡ **Configuration Group Management Optimization** - Refactored configuration group fields and validation logic
+  - Configuration group name changed to optional, API URL, actual model ID, and API Key set as mandatory
+  - Removed target model ID field, switching to global mapping configuration
+  - Renamed configuration group table headers with backward compatibility for old config files
+- 🧪 **Added Automated Testing Features** - Comprehensive model connectivity testing system
+  - Automatically test model connectivity after saving configurations (GET `/v1/models/{model_id}`)
+  - Manual liveness test feature, supports chat completion testing (POST `/v1/chat/completions`)
+  - Detailed test logs output, including response content and token consumption statistics
+- 🎯 **Enhanced User Experience** - Added liveness test button and detailed prompts
+  - Liveness test button supports tooltip hints explaining token consumption risks
+  - Asynchronous testing to avoid UI blocking with improved error handling mechanism
+  - API Key security display (masked) 
+
+<details>
+<summary>Changelog</summary>
+
+### v1.1.1
 
 - 🐛 **Fixed hosts modification issue** - Resolved abnormal line breaks when modifying hosts file
 
@@ -59,6 +80,8 @@ MTGA is a local proxy-based IDE fixed model provider solution for Windows and ma
 - 🔄 **Default provider changed** - Changed from DeepSeek to OpenAI
 - 📦 **File restructuring** - Renamed ds-related files to `*_ds.*` format for archiving
 - 🌐 **API URL format changed** - From `https://your-api.example.com/v1` to `https://your-api.example.com`
+
+</details>
 
 ---
 
