@@ -90,11 +90,8 @@ uv run --python .venv/bin/python nuitka \
     --include-data-files=ca/v3_req.cnf=ca/v3_req.cnf \
     --include-data-files=ca/youtube.cnf=ca/youtube.cnf \
     --include-data-files=ca/youtube.subj=ca/youtube.subj \
-    --include-data-files=openssl/openssl.exe=openssl/openssl.exe \
-    --include-data-files=openssl/libcrypto-3-x64.dll=openssl/libcrypto-3-x64.dll \
-    --include-data-files=openssl/libssl-3-x64.dll=openssl/libssl-3-x64.dll \
-    --include-data-files=icons/f0bb32_bg-black.icns=icons/f0bb32_bg-black.icns \
-    --macos-app-icon=icons/f0bb32_bg-black.icns \
+    --include-data-files=mac/MTGA_GUI_Launcher_Fixed=MTGA_GUI_Launcher_Fixed \
+    --macos-app-icon=mac/icon.icns \
     --enable-plugin=tk-inter \
     --remove-output \
     --disable-console \
@@ -107,7 +104,34 @@ uv run --python .venv/bin/python nuitka \
 echo
 if [[ $? -eq 0 ]]; then
     print_success "✅ macOS 应用包构建完成！"
-    print_success "应用程序包位于：dist-onefile/MTGA_GUI-v$VERSION-$(uname -m).app"
+
+    app_path="dist-onefile/mtga_gui.app"
+    
+    # 修复权限问题 - 将应用包所有权改为当前用户
+    # print_info "修复应用包权限..."
+    # current_user=$(whoami)
+    # if [[ -d "$app_path" && "$current_user" != "root" ]]; then
+    #     sudo chown -R "$current_user:staff" "$app_path"
+    #     print_success "权限修复完成"
+    # fi
+
+    # 修改 Info.plist 使用启动器作为主可执行文件
+    print_info "配置启动器..."
+    info_plist="$app_path/Contents/Info.plist"
+    if [[ -f "$info_plist" ]]; then
+        # 备份原始文件
+        cp "$info_plist" "$info_plist.backup"
+        
+        # 修改 CFBundleExecutable 指向启动器
+        sed -i '' 's/<string>MTGA_GUI-v.*<\/string>/<string>MTGA_GUI_Launcher_Fixed<\/string>/g' "$info_plist"
+        
+        # 确保启动器有执行权限
+        chmod +x "$app_path/Contents/MacOS/MTGA_GUI_Launcher_Fixed"
+        
+        print_success "启动器配置完成"
+    fi
+    
+    print_success "应用程序包位于：$app_path"
     echo
     print_success "macOS 应用包特点:"
     print_success "• ✅ 标准 macOS .app 应用程序包格式"
