@@ -237,6 +237,7 @@ jobs:
       - name: 📝 生成发布说明
         id: release_notes
         run: |
+          BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           cat > release_notes.md << 'EOF'
           ## 🚀 MTGA GUI v${{ steps.version.outputs.VERSION }} (预发布版)
           
@@ -256,7 +257,7 @@ jobs:
           
           ### 🔧 技术信息
           - Python 版本: ${{ env.PYTHON_VERSION }}
-          - 构建时间: ${{ github.run_started_at }}
+          - 构建时间: $BUILD_TIME
           - 提交哈希: ${{ github.sha }}
           
           ### 🐛 问题反馈
