@@ -198,21 +198,44 @@ def install_ca_cert_macos(ca_cert_file, log_func=print):
                 
                 return True
         else:
-            # 在终端环境下，使用传统的 sudo 方法
-            cmd = f'sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "{ca_cert_file}"'
-            log_func(f"执行命令: {cmd}")
-            return_code, stdout, stderr = run_command(cmd, shell=True)
+            # 在 GUI 环境下，直接添加到登录钥匙串
+            log_func("将证书添加到登录钥匙串...")
             
-            if stdout:
-                log_func(stdout)
-            if stderr:
-                log_func(stderr)
-            
-            if return_code == 0:
-                log_func("CA 证书安装成功！")
+            try:
+                # 添加到登录钥匙串（不需要管理员权限）
+                cmd = ['security', 'add-certificates', '-k', 'login.keychain', ca_cert_file]
+                result = subprocess.run(cmd, capture_output=True, text=True)
+                
+                if result.returncode == 0:
+                    log_func("✅ 证书已成功添加到登录钥匙串")
+                elif "already exists" in result.stderr:
+                    log_func("证书已存在于登录钥匙串中")
+                else:
+                    log_func(f"添加失败: {result.stderr}")
+                    return False
+                
+                # 打开钥匙串访问应用
+                subprocess.run(['open', '/System/Applications/Utilities/Keychain Access.app'], check=False)
+                
+                # 尝试打开证书文件（会自动定位到证书）
+                subprocess.run(['open', ca_cert_file], check=False)
+                
+                log_func("")
+                log_func("=== 请手动设置证书信任（重要步骤）===")
+                log_func("1. 钥匙串访问已打开")
+                log_func("2. 在左侧选择'登录'钥匙串")
+                log_func("3. 在证书列表中找到刚添加的证书")
+                log_func("4. 双击证书打开详情")
+                log_func("5. 展开'信任'部分")
+                log_func("6. 将'使用此证书时'设为'始终信任'")
+                log_func("7. 关闭窗口并输入密码确认")
+                log_func("")
+                log_func("完成后，证书将被系统信任，HTTPS代理可正常工作")
+                
                 return True
-            else:
-                log_func(f"证书安装失败，返回码: {return_code}")
+                    
+            except Exception as e:
+                log_func(f"证书安装操作失败: {e}")
                 return False
                 
     except Exception as e:

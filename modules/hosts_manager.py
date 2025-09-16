@@ -94,6 +94,60 @@ def restore_hosts_file(log_func=print):
         return False
 
 
+def write_hosts_file_with_permission(hosts_file, content, encoding, log_func=print):
+    """
+    使用适当的权限写入 hosts 文件
+    
+    参数:
+        hosts_file: hosts 文件路径
+        content: 要写入的内容
+        encoding: 文件编码
+        log_func: 日志输出函数
+        
+    返回:
+        成功返回 True，失败返回 False
+    """
+    if sys.platform == 'darwin':
+        # macOS: 使用 osascript 请求管理员权限
+        import tempfile
+        import base64
+        
+        # 创建临时文件
+        with tempfile.NamedTemporaryFile(mode='w', encoding=encoding, delete=False) as temp_file:
+            temp_file.write(content)
+            temp_path = temp_file.name
+        
+        try:
+            # 使用 osascript 复制文件（需要管理员权限）
+            cmd = f'''osascript -e 'do shell script "cp \\"{temp_path}\\" \\"{hosts_file}\\"" with administrator privileges' '''
+            result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+            
+            if result.returncode == 0:
+                log_func("✅ hosts 文件写入成功")
+                return True
+            else:
+                if "User canceled" in result.stderr:
+                    log_func("用户取消了操作")
+                else:
+                    log_func(f"写入失败: {result.stderr}")
+                return False
+        finally:
+            # 清理临时文件
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+    else:
+        # Windows 和其他系统：直接写入
+        try:
+            with open(hosts_file, 'w', encoding=encoding) as f:
+                f.write(content)
+            return True
+        except PermissionError:
+            log_func("❌ 权限不足，请以管理员身份运行")
+            return False
+
+
 def add_hosts_entry(domain, ip="127.0.0.1", log_func=print):
     """
     添加 hosts 条目
@@ -137,12 +191,15 @@ def add_hosts_entry(domain, ip="127.0.0.1", log_func=print):
             log_func("hosts 文件已包含该条目，无需修改")
             return True
         
-        # 添加条目
-        with open(hosts_file, 'a', encoding=encoding) as f:
-            f.write(f"\n# Added by MTGA GUI\n{hosts_entry}\n")
+        # 添加条目到内容
+        content += f"\n# Added by MTGA GUI\n{hosts_entry}\n"
         
-        log_func("hosts 文件修改成功！")
-        return True
+        # 使用权限写入
+        if write_hosts_file_with_permission(hosts_file, content, encoding, log_func):
+            log_func("hosts 文件修改成功！")
+            return True
+        else:
+            return False
         
     except Exception as e:
         log_func(f"修改 hosts 文件失败: {e}")
@@ -193,11 +250,12 @@ def remove_hosts_entry(domain, log_func=print):
             new_lines.append(line)
         
         if removed_count > 0:
-            # 写回文件
-            with open(hosts_file, 'w', encoding=encoding) as f:
-                f.write('\n'.join(new_lines))
-            
-            log_func(f"hosts 文件已重置，删除了 {removed_count} 个 {domain} 条目")
+            # 写回文件（使用权限）
+            new_content = '\n'.join(new_lines)
+            if write_hosts_file_with_permission(hosts_file, new_content, encoding, log_func):
+                log_func(f"hosts 文件已重置，删除了 {removed_count} 个 {domain} 条目")
+            else:
+                return False
         else:
             log_func(f"hosts 文件中未找到 {domain} 条目")
         

@@ -1,24 +1,21 @@
 #!/bin/bash
 
-# MTGA GUI 启动器 - macOS双击启动专用版本
-# 解决双击启动时的环境和权限问题
+# MTGA GUI 启动器 - 无需管理员权限版本
+# 保留完整的 GUI 功能（剪贴板、窗口控制）
 
-# 设置错误处理
-set -e
-
-# 获取应用包路径和可执行文件路径
-APP_BUNDLE="$(dirname "$(dirname "$(dirname "$0")")")"
+# 获取路径
 SCRIPT_DIR="$(dirname "$0")"
 EXECUTABLE_PATH="$SCRIPT_DIR/MTGA_GUI-v1.2.0-arm64"
 
-# 日志文件用于调试
+# 日志文件
 LOG_FILE="/tmp/mtga_launcher.log"
 
 # 记录启动信息
-echo "$(date): 启动器开始执行" > "$LOG_FILE"
-echo "APP_BUNDLE: $APP_BUNDLE" >> "$LOG_FILE"
-echo "SCRIPT_DIR: $SCRIPT_DIR" >> "$LOG_FILE" 
-echo "EXECUTABLE_PATH: $EXECUTABLE_PATH" >> "$LOG_FILE"
+{
+    echo "$(date): 启动器开始执行"
+    echo "SCRIPT_DIR: $SCRIPT_DIR"
+    echo "EXECUTABLE_PATH: $EXECUTABLE_PATH"
+} > "$LOG_FILE"
 
 # 检查可执行文件
 if [[ ! -f "$EXECUTABLE_PATH" ]]; then
@@ -33,25 +30,26 @@ if [[ ! -f "$EXECUTABLE_PATH" ]]; then
     fi
 fi
 
+# 设置环境变量（关键！修复 Tkinter 功能）
+export LANG="zh_CN.UTF-8"
+export LC_ALL="zh_CN.UTF-8"
+export PYTHONIOENCODING="utf-8"
+export TCL_LIBRARY="$SCRIPT_DIR/tcl-files"
+export TK_LIBRARY="$SCRIPT_DIR/tk-files"
+
+# 记录环境变量
+{
+    echo "环境变量设置:"
+    echo "  TCL_LIBRARY=$TCL_LIBRARY"
+    echo "  TK_LIBRARY=$TK_LIBRARY"
+} >> "$LOG_FILE"
+
 # 切换到正确的工作目录
 cd "$SCRIPT_DIR"
 echo "工作目录: $(pwd)" >> "$LOG_FILE"
 
-# 使用osascript请求管理员权限并启动
-echo "请求管理员权限并启动程序..." >> "$LOG_FILE"
-
-# 设置UTF-8编码环境变量，解决中文字符编码问题
-export LANG="zh_CN.UTF-8"
-export LC_ALL="zh_CN.UTF-8"
-export PYTHONIOENCODING="utf-8"
-
-# 使用简单的启动方式
-osascript << EOF
-try
-    do shell script "export LANG=zh_CN.UTF-8; export LC_ALL=zh_CN.UTF-8; export PYTHONIOENCODING=utf-8; '$EXECUTABLE_PATH'" with administrator privileges
-on error errMsg number errNum
-    display dialog "启动失败: " & errMsg buttons {"OK"} default button "OK"
-end try
-EOF
+# 直接以普通用户身份启动（保留所有 GUI 功能）
+echo "以普通用户身份启动..." >> "$LOG_FILE"
+"$EXECUTABLE_PATH" >> "$LOG_FILE" 2>&1 &
 
 echo "$(date): 启动器执行完成" >> "$LOG_FILE"

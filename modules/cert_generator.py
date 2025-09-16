@@ -25,10 +25,18 @@ def run_openssl_command(command, error_message, log_func=print):
     """运行 OpenSSL 命令并检查结果"""
     log_func(f"执行命令: {' '.join(command)}")
     result = subprocess.run(command, capture_output=True, text=True)
+    
+    # 特殊处理证书签署的情况 - 如果stderr包含"Signature ok"，则认为成功
     if result.returncode != 0:
-        error_msg = f"{error_message}\n错误输出: {result.stderr}"
-        log_func(error_msg)
-        return False, error_msg
+        if "Signature ok" in result.stderr and "subject=" in result.stderr:
+            # 证书签署成功，只是序列号文件权限问题，不影响实际功能
+            log_func("证书签署成功（忽略序列号文件权限警告）")
+            return True, result.stderr
+        else:
+            error_msg = f"{error_message}\n错误输出: {result.stderr}"
+            log_func(error_msg)
+            return False, error_msg
+    
     if result.stdout:
         log_func(result.stdout.strip())
     return True, result.stdout
@@ -286,20 +294,47 @@ def generate_server_cert(resource_manager, domain="api.openai.com", log_func=pri
     server_crt_path = resource_manager.get_cert_file(domain)
     log_func(f"正在使用 CA 签署证书 {domain}.crt...")
     
-    success, _ = run_openssl_command(
+    # 为LibreSSL准备序列号文件路径（避免权限问题）
+    ca_serial_path = os.path.join(resource_manager.ca_path, "ca.srl")
+    
+    # 确保序列号文件存在且可写
+    try:
+        if not os.path.exists(ca_serial_path):
+            with open(ca_serial_path, 'w') as f:
+                f.write('01')
+    except Exception as e:
+        log_func(f"警告: 无法创建序列号文件: {e}")
+        # 如果无法创建序列号文件，仍继续尝试，让OpenSSL自己处理
+    
+    success, output = run_openssl_command(
         [
             resource_manager.openssl_path, "x509", "-req", "-extensions", "v3_req",
             "-days", "365", "-sha256", "-in", server_csr_path,
-            "-CA", ca_crt_path, "-CAkey", ca_key_path, "-CAcreateserial",
+            "-CA", ca_crt_path, "-CAkey", ca_key_path, 
+            "-CAserial", ca_serial_path,
             "-out", server_crt_path, "-extfile", temp_config_file
         ],
         f"签署证书 {domain}.crt 失败",
         log_func
     )
     if not success:
+        log_func(f"签署证书失败，输出: {output}")
         return False
     
-    log_func(f"证书 {domain}.crt 生成成功")
+    # 验证证书文件是否实际生成且不为空
+    if not os.path.exists(server_crt_path):
+        log_func(f"错误: 证书文件 {server_crt_path} 未生成")
+        return False
+    
+    file_size = os.path.getsize(server_crt_path)
+    if file_size == 0:
+        log_func(f"错误: 证书文件 {server_crt_path} 为空文件")
+        return False
+    
+    log_func(f"证书 {domain}.crt 生成成功 (大小: {file_size} bytes)")
+    log_func(f"私钥 {domain}.key 生成成功")
+    log_func("")
+    log_func(f"=== 服务器证书生成完成 ===")
     return True
 
 

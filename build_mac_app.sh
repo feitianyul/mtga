@@ -93,6 +93,7 @@ uv run --python .venv/bin/python nuitka \
     --include-data-files=mac/MTGA_GUI_Launcher_Fixed=MTGA_GUI_Launcher_Fixed \
     --macos-app-icon=mac/icon.icns \
     --enable-plugin=tk-inter \
+    --macos-target-arch=arm64 \
     --remove-output \
     --disable-console \
     --include-package=modules \
@@ -101,8 +102,11 @@ uv run --python .venv/bin/python nuitka \
     --output-filename=MTGA_GUI-v$VERSION-$(uname -m) \
     mtga_gui.py
 
+# 保存 Nuitka 构建的退出码
+build_exit_code=$?
+
 echo
-if [[ $? -eq 0 ]]; then
+if [[ $build_exit_code -eq 0 ]]; then
     print_success "✅ macOS 应用包构建完成！"
 
     app_path="dist-onefile/mtga_gui.app"
@@ -119,9 +123,6 @@ if [[ $? -eq 0 ]]; then
     print_info "配置启动器..."
     info_plist="$app_path/Contents/Info.plist"
     if [[ -f "$info_plist" ]]; then
-        # 备份原始文件
-        cp "$info_plist" "$info_plist.backup"
-        
         # 修改 CFBundleExecutable 指向启动器
         sed -i '' 's/<string>MTGA_GUI-v.*<\/string>/<string>MTGA_GUI_Launcher_Fixed<\/string>/g' "$info_plist"
         
@@ -129,6 +130,31 @@ if [[ $? -eq 0 ]]; then
         chmod +x "$app_path/Contents/MacOS/MTGA_GUI_Launcher_Fixed"
         
         print_success "启动器配置完成"
+    fi
+    
+    # 重新签名应用以修复剪贴板权限
+    print_info "重新签名应用..."
+    entitlements_path="mac/entitlements.plist"
+    if [[ -f "$entitlements_path" ]]; then
+        # 签名实际的二进制文件
+        binary_file="$app_path/Contents/MacOS/MTGA_GUI-v$VERSION-$(uname -m)"
+        if [[ -f "$binary_file" ]]; then
+            if codesign --force --sign - --entitlements "$entitlements_path" "$binary_file"; then
+                print_success "二进制文件签名完成"
+            else
+                print_warning "二进制文件签名失败"
+            fi
+        fi
+        
+        # 然后签名整个应用包（不创建备份文件）
+        if codesign --force --sign - --entitlements "$entitlements_path" "$app_path"; then
+            print_success "应用签名完成（已修复剪贴板权限）"
+        else
+            print_warning "应用签名失败，剪贴板功能可能受限"
+        fi
+    else
+        print_warning "权限文件不存在: $entitlements_path"
+        print_warning "剪贴板功能可能受限"
     fi
     
     print_success "应用程序包位于：$app_path"
@@ -149,7 +175,7 @@ if [[ $? -eq 0 ]]; then
     print_info "uv run dmgbuild -s mac/dmg_settings.py \"MTGA GUI Installer\" MTGA_GUI-v$VERSION-$(uname -m).dmg"
     echo
 else
-    print_error "❌ 构建失败，返回码: $?"
+    print_error "❌ 构建失败，返回码: $build_exit_code"
     print_error "请检查错误信息并确保所有依赖已正确安装"
     print_error "常见问题解决方案:"
     print_error "1. 确保已安装 Xcode Command Line Tools: xcode-select --install"

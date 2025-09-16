@@ -897,6 +897,7 @@ def create_main_window():
         """安装证书任务"""
         def task():
             log("开始安装CA证书...")
+            # install_ca_cert 内部会处理权限请求
             if install_ca_cert(log_func=log):
                 log("✅ CA证书安装完成")
             else:
@@ -1074,6 +1075,7 @@ def create_main_window():
             """清除用户数据（保留备份文件夹）"""
             try:
                 import shutil
+                from modules.resource_manager import copy_template_files
                 
                 # 确认对话框
                 result = messagebox.askyesno(
@@ -1104,6 +1106,14 @@ def create_main_window():
                     
                     log(f"✅ 用户数据清除成功，删除了 {len(items_to_remove)} 个项目")
                     log("备份文件夹已保留")
+                    
+                    # 清除数据后复制模板文件
+                    log("正在复制模板文件...")
+                    copied_files = copy_template_files()
+                    if copied_files:
+                        log(f"✅ 已复制 {len(copied_files)} 个模板文件")
+                    else:
+                        log("模板文件已存在或复制完成")
                 else:
                     log("没有需要清除的用户数据")
                     
@@ -1339,10 +1349,8 @@ def create_main_window():
 
 def main():
     """主函数"""
-    # 检查管理员权限
-    if not check_is_admin():
-        run_as_admin()
-        return
+    # 不再在启动时检查管理员权限
+    # 只在需要时（安装证书）请求权限
     
     # 创建并运行GUI
     root = create_main_window()
