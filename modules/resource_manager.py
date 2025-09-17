@@ -11,6 +11,15 @@ import tempfile
 from pathlib import Path
 
 
+def safe_print(message):
+    """Print helper tolerant of non-ASCII stdout."""
+    try:
+        print(message)
+    except UnicodeEncodeError:
+        fallback = str(message).encode("unicode_escape").decode("ascii", errors="replace")
+        print(fallback)
+
+
 def is_packaged():
     """检测是否在 Nuitka 打包环境中运行"""
     main_module = sys.modules.get('__main__')
@@ -41,27 +50,12 @@ def get_program_resource_dir():
     """获取程序资源目录（临时目录，包含配置模板等）"""
     if is_packaged():
         # Nuitka 单文件模式会将资源解压到一个临时目录
-        # 尝试多种方式获取正确的资源路径
-        
-        # 方式1：检查是否有 Nuitka 的临时解压目录
-        main_module = sys.modules.get('__main__')
-        if main_module and hasattr(main_module, '__file__') and main_module.__file__:
-            # 单文件模式下，__main__.__file__ 指向临时解压目录
-            main_dir = os.path.dirname(main_module.__file__)
-            if os.path.exists(main_dir):
-                return main_dir
-        
-        # 方式2：检查可执行文件同目录（独立模式）
+        # 对于 macOS app bundle，资源始终在可执行文件所在目录
         exe_dir = os.path.dirname(sys.executable)
-        if os.path.exists(os.path.join(exe_dir, 'ca')) or os.path.exists(os.path.join(exe_dir, 'openssl')):
-            return exe_dir
         
-        # 方式3：检查当前工作目录
-        cwd = os.getcwd()
-        if os.path.exists(os.path.join(cwd, 'ca')) or os.path.exists(os.path.join(cwd, 'openssl')):
-            return cwd
-        
-        # 默认返回可执行文件目录
+        # macOS app bundle 的资源始终在 Contents/MacOS 目录下
+        # 无需检查文件是否存在，直接返回可执行文件目录
+        # 因为 Nuitka --standalone 模式会将所有资源放在这里
         return exe_dir
     else:
         # 开发环境使用项目根目录
@@ -187,7 +181,7 @@ class ResourceManager:
         # 复制配置模板文件到用户目录
         copied_files = copy_template_files()
         if copied_files:
-            print(f"已复制模板文件到用户目录: {', '.join(copied_files)}")
+            safe_print(f"已复制模板文件到用户目录: {', '.join(copied_files)}")
     
     @property
     def base_path(self):
@@ -247,10 +241,10 @@ class ResourceManager:
                 debug_info.append(f"主模块文件路径: {main_module.__file__}")
         
         # 打印调试信息
-        print("=== 资源路径调试信息 ===")
+        safe_print("=== 资源路径调试信息 ===")
         for info in debug_info:
-            print(info)
-        print("=" * 30)
+            safe_print(info)
+        safe_print("=" * 30)
         
         # 检查 CA 目录（用户数据目录）
         if not os.path.exists(self.ca_path):

@@ -52,6 +52,11 @@ jobs:
           else
             VERSION=${GITHUB_REF#refs/tags/v}
           fi
+          
+          # 确保版本号不包含前缀"v"
+          VERSION=${VERSION#v}
+          
+          echo "🔍 处理后的版本号: $VERSION"
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "APP_NAME=MTGA_GUI-v$VERSION-${{ matrix.arch }}" >> $GITHUB_OUTPUT
           echo "DMG_NAME=MTGA_GUI-v$VERSION-${{ matrix.arch }}" >> $GITHUB_OUTPUT
@@ -73,7 +78,7 @@ jobs:
           echo "架构: ${{ matrix.arch }}"
           echo "架构参数: $ARCH_PARAM"
           
-          # 直接使用 Nuitka 构建，不修改脚本文件
+          # 使用 Nuitka 构建纯净的 macOS 应用包
           uv run --python .venv/bin/python nuitka \
             --standalone \
             --macos-create-app-bundle \
@@ -94,7 +99,6 @@ jobs:
             --include-data-files=ca/v3_req.cnf=ca/v3_req.cnf \
             --include-data-files=ca/youtube.cnf=ca/youtube.cnf \
             --include-data-files=ca/youtube.subj=ca/youtube.subj \
-            --include-data-files=mac/MTGA_GUI_Launcher_Fixed=MTGA_GUI_Launcher_Fixed \
             --macos-app-icon=mac/icon.icns \
             --enable-plugin=tk-inter \
             $ARCH_PARAM \
@@ -113,7 +117,7 @@ jobs:
             echo "✅ 重命名完成"
           fi
 
-      - name: 🔧 配置应用包
+      - name: 🔏 签名应用包（可选，用于剪贴板权限）
         run: |
           APP_PATH="dist-onefile/${{ steps.version.outputs.APP_NAME }}.app"
           
@@ -122,36 +126,21 @@ jobs:
             exit 1
           fi
           
-          echo "🔧 配置启动器..."
-          info_plist="$APP_PATH/Contents/Info.plist"
-          if [ -f "$info_plist" ]; then
-            # 修改 CFBundleExecutable 指向启动器
-            sed -i '' 's/<string>MTGA_GUI-v.*<\/string>/<string>MTGA_GUI_Launcher_Fixed<\/string>/g' "$info_plist"
-            
-            # 确保启动器有执行权限
-            chmod +x "$APP_PATH/Contents/MacOS/MTGA_GUI_Launcher_Fixed"
-            
-            echo "✅ 启动器配置完成"
-          fi
-          
-          # 重新签名应用以修复剪贴板权限
-          echo "🔏 重新签名应用..."
+          # 可选：使用 entitlements 重新签名以确保剪贴板权限
           entitlements_path="mac/entitlements.plist"
           if [ -f "$entitlements_path" ]; then
-            # 签名实际的二进制文件
-            binary_file="$APP_PATH/Contents/MacOS/MTGA_GUI-v${{ steps.version.outputs.VERSION }}-${{ matrix.arch }}"
-            if [ -f "$binary_file" ]; then
-              codesign --force --sign - --entitlements "$entitlements_path" "$binary_file" || echo "⚠️ 二进制文件签名失败"
-            fi
+            echo "🔏 重新签名以确保剪贴板权限..."
             
-            # 然后签名整个应用包
+            # 签名整个应用包
             if codesign --force --sign - --entitlements "$entitlements_path" "$APP_PATH"; then
               echo "✅ 应用签名完成（已修复剪贴板权限）"
             else
-              echo "⚠️ 应用签名失败，剪贴板功能可能受限"
+              echo "⚠️ 应用签名失败，但应用仍可正常使用"
             fi
+            
           else
-            echo "⚠️ 权限文件不存在: $entitlements_path"
+            echo "ℹ️ 未找到entitlements文件，跳过重新签名"
+            echo "ℹ️ 应用包使用Nuitka默认签名"
           fi
 
       - name: 📱 验证应用包

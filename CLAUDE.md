@@ -265,3 +265,4 @@ mtga_gui.py (主程序)
 ```bash
 uv run python trae_proxy.py --debug
 ```
+- 不要自己运行macos app构建脚本，我运行更方便。

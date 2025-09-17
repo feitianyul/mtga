@@ -1,5 +1,25 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
+# 在最早阶段设置 UTF-8 编码环境变量 - 必须在任何导入之前
+import os
+import sys
+import io
+os.environ.setdefault('LANG', 'zh_CN.UTF-8')
+os.environ.setdefault('LC_ALL', 'zh_CN.UTF-8') 
+os.environ.setdefault('PYTHONIOENCODING', 'utf-8')
+
+# 设置 Python locale
+import locale
+if sys.platform == 'darwin':
+    try:
+        locale.setlocale(locale.LC_ALL, 'zh_CN.UTF-8')
+    except:
+        try:
+            locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
+        except:
+            pass
+
 """
 MTGA GUI - 重构版本
 采用单进程模块化架构，解决 Nuitka 打包兼容性问题
@@ -10,9 +30,6 @@ MTGA GUI - 重构版本
 3. 修改 hosts 文件
 4. 启动代理服务器（线程模式）
 """
-
-import os
-import sys
 import threading
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox
@@ -21,6 +38,72 @@ import time
 from pathlib import Path
 import yaml
 import requests
+
+# Setup environment (fixes macOS Tkinter functionality)
+def setup_environment():
+    """Set necessary environment variables, especially for fixing Tkinter on macOS after Nuitka packaging"""
+    if sys.platform != 'darwin':  # Not macOS, return directly
+        return
+    
+    # Check if in packaged environment
+    if not (getattr(sys, 'frozen', False) or 'MTGA_GUI' in sys.executable):
+        return  # Development environment doesn't need special handling
+    
+    # Nuitka packaged environment
+    executable_dir = os.path.dirname(sys.executable)
+    
+    # Switch working directory - this is critical
+    # When launched from Finder on macOS, working directory is "/", must switch
+    if os.getcwd() == '/':
+        # Prefer switching to user home directory (safer)
+        home_dir = os.path.expanduser('~')
+        try:
+            os.chdir(home_dir)
+        except:
+            # Fallback: switch to executable directory
+            try:
+                os.chdir(executable_dir)
+            except:
+                pass  # If both fail, continue running
+    
+    # Set TCL/TK library paths (if they exist)
+    tcl_library = os.path.join(executable_dir, 'tcl-files')
+    tk_library = os.path.join(executable_dir, 'tk-files')
+    
+    if os.path.exists(tcl_library):
+        os.environ['TCL_LIBRARY'] = tcl_library
+    
+    if os.path.exists(tk_library):
+        os.environ['TK_LIBRARY'] = tk_library
+
+# Call setup_environment before importing other modules
+setup_environment()
+
+
+def ensure_utf8_stdio():
+    """Ensure stdout/stderr can emit UTF-8 even when Finder starts the app."""
+    for name in ("stdout", "stderr"):
+        stream = getattr(sys, name, None)
+        if not stream:
+            continue
+        encoding = getattr(stream, "encoding", None)
+        if encoding and encoding.lower().startswith("utf-8"):
+            continue
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except AttributeError:
+            buffer = getattr(stream, "buffer", None)
+            if buffer is None:
+                continue
+            try:
+                new_stream = io.TextIOWrapper(buffer, encoding="utf-8", errors="replace", line_buffering=True)
+            except Exception:
+                continue
+            setattr(sys, name, new_stream)
+        except Exception:
+            pass
+
+ensure_utf8_stdio()
 
 # 导入自定义模块
 try:
@@ -282,6 +365,13 @@ def test_chat_completion(config_group, log_func=print):
 
 def create_main_window():
     """创建主窗口"""
+    # 在 macOS 上，确保工作目录不是根目录
+    if sys.platform == 'darwin' and os.getcwd() == '/':
+        try:
+            os.chdir(os.path.expanduser('~'))
+        except:
+            pass
+    
     window = tk.Tk()
     window.title("MTGA GUI")
     window.geometry("1250x700")
@@ -333,7 +423,11 @@ def create_main_window():
         log_text.insert(tk.END, f"{formatted_message}\n")
         log_text.see(tk.END)
         log_text.update()  # 强制更新显示
-        print(formatted_message)  # 同时输出到控制台
+        try:
+            print(formatted_message)  # 同时输出到控制台
+        except UnicodeEncodeError:
+            fallback = formatted_message.encode("unicode_escape").decode("ascii", errors="replace")
+            print(fallback)
     
     # 显示环境检查结果
     env_ok, env_msg = check_environment()
@@ -1352,9 +1446,34 @@ def main():
     # 不再在启动时检查管理员权限
     # 只在需要时（安装证书）请求权限
     
-    # 创建并运行GUI
-    root = create_main_window()
-    root.mainloop()
+    try:
+        # 创建并运行GUI
+        root = create_main_window()
+        root.mainloop()
+    except Exception as e:
+        # 如果 GUI 创建失败，至少尝试记录错误
+        error_msg = f"GUI initialization failed: {e}\n"
+        try:
+            # 尝试写入错误日志
+            import traceback
+            error_file = os.path.join(os.path.expanduser('~'), 'mtga_gui_error.log')
+            with open(error_file, 'w') as f:
+                f.write(error_msg)
+                f.write(f"Working directory: {os.getcwd()}\n")
+                f.write(f"Traceback:\n{traceback.format_exc()}\n")
+        except:
+            pass
+        
+        # 在 macOS 上，如果是从 Finder 启动，显示错误对话框
+        if sys.platform == 'darwin':
+            try:
+                import tkinter.messagebox as msgbox
+                msgbox.showerror("MTGA GUI Error", error_msg)
+            except:
+                pass
+        
+        # 退出程序
+        sys.exit(1)
 
 
 if __name__ == "__main__":

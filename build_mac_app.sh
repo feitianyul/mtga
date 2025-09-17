@@ -70,6 +70,11 @@ fi
 print_info "正在构建 macOS 应用包 (mtga_gui.py)..."
 
 # 使用 uv 运行 Nuitka 构建 macOS 应用包
+# 设置编码环境变量，确保 UTF-8 处理
+export LANG=zh_CN.UTF-8
+export LC_ALL=zh_CN.UTF-8
+export PYTHONIOENCODING=utf-8
+
 uv run --python .venv/bin/python nuitka \
     --standalone \
     --macos-create-app-bundle \
@@ -90,7 +95,6 @@ uv run --python .venv/bin/python nuitka \
     --include-data-files=ca/v3_req.cnf=ca/v3_req.cnf \
     --include-data-files=ca/youtube.cnf=ca/youtube.cnf \
     --include-data-files=ca/youtube.subj=ca/youtube.subj \
-    --include-data-files=mac/MTGA_GUI_Launcher_Fixed=MTGA_GUI_Launcher_Fixed \
     --macos-app-icon=mac/icon.icns \
     --enable-plugin=tk-inter \
     --macos-target-arch=arm64 \
@@ -98,6 +102,7 @@ uv run --python .venv/bin/python nuitka \
     --disable-console \
     --include-package=modules \
     --macos-app-name="MTGA GUI" \
+    --macos-signed-app-name="com.mtga.gui" \
     --macos-app-version="$VERSION" \
     --output-filename=MTGA_GUI-v$VERSION-$(uname -m) \
     mtga_gui.py
@@ -119,44 +124,25 @@ if [[ $build_exit_code -eq 0 ]]; then
     #     print_success "权限修复完成"
     # fi
 
-    # 修改 Info.plist 使用启动器作为主可执行文件
-    print_info "配置启动器..."
-    info_plist="$app_path/Contents/Info.plist"
-    if [[ -f "$info_plist" ]]; then
-        # 修改 CFBundleExecutable 指向启动器
-        sed -i '' 's/<string>MTGA_GUI-v.*<\/string>/<string>MTGA_GUI_Launcher_Fixed<\/string>/g' "$info_plist"
-        
-        # 确保启动器有执行权限
-        chmod +x "$app_path/Contents/MacOS/MTGA_GUI_Launcher_Fixed"
-        
-        print_success "启动器配置完成"
-    fi
-    
-    # 重新签名应用以修复剪贴板权限
-    print_info "重新签名应用..."
-    entitlements_path="mac/entitlements.plist"
-    if [[ -f "$entitlements_path" ]]; then
-        # 签名实际的二进制文件
-        binary_file="$app_path/Contents/MacOS/MTGA_GUI-v$VERSION-$(uname -m)"
-        if [[ -f "$binary_file" ]]; then
-            if codesign --force --sign - --entitlements "$entitlements_path" "$binary_file"; then
-                print_success "二进制文件签名完成"
-            else
-                print_warning "二进制文件签名失败"
+    # 修改 Info.plist 使用启动器作为主可执行文件（已不再需要）
+    # 检查 .app 文件是否创建成功
+    APP_PATH="dist-onefile/mtga_gui.app"
+    if [ -d "$APP_PATH" ]; then
+        # 修复 Info.plist 中的 CFBundleIdentifier（如果需要）
+        INFO_PLIST="$APP_PATH/Contents/Info.plist"
+        if [ -f "$INFO_PLIST" ]; then
+            # 检查是否还是无效的 Bundle ID
+            if grep -q '<string>MTGA GUI</string>' "$INFO_PLIST"; then
+                # 使用 sed 替换无效的 Bundle ID
+                sed -i '' 's/<string>MTGA GUI<\/string>/<string>com.mtga.gui<\/string>/' "$INFO_PLIST"
+                print_success "已修复 Bundle ID 为标准格式: com.mtga.gui"
             fi
         fi
-        
-        # 然后签名整个应用包（不创建备份文件）
-        if codesign --force --sign - --entitlements "$entitlements_path" "$app_path"; then
-            print_success "应用签名完成（已修复剪贴板权限）"
-        else
-            print_warning "应用签名失败，剪贴板功能可能受限"
-        fi
-    else
-        print_warning "权限文件不存在: $entitlements_path"
-        print_warning "剪贴板功能可能受限"
     fi
     
+    print_success "应用包构建完成，无需额外配置"
+    print_info "环境变量已在 Python 代码中设置"
+    # 应用包构建完成，无需重新签名
     print_success "应用程序包位于：$app_path"
     echo
     print_success "macOS 应用包特点:"
