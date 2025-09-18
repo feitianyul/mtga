@@ -67,7 +67,7 @@ jobs:
             VERSION=${GITHUB_REF#refs/tags/v}
           fi
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-          echo "APP_NAME=MTGA_GUI-v$VERSION-${{ matrix.arch }}" >> $GITHUB_OUTPUT
+          echo "APP_NAME=mtga_gui" >> $GITHUB_OUTPUT
           echo "DMG_NAME=MTGA_GUI-v$VERSION-${{ matrix.arch }}" >> $GITHUB_OUTPUT
 
       - name: 🔨 构建 macOS 应用包
@@ -91,12 +91,12 @@ jobs:
           
           # Nuitka 在 macOS 应用包模式下忽略 --output-filename，总是使用源文件名
           # 需要手动重命名到期望的文件名
-          if [ -d "dist-onefile/mtga_gui.app" ]; then
-            EXPECTED_NAME="${{ steps.version.outputs.APP_NAME }}.app"
-            echo "🔄 重命名应用包: mtga_gui.app → $EXPECTED_NAME"
-            mv "dist-onefile/mtga_gui.app" "dist-onefile/$EXPECTED_NAME"
-            echo "✅ 重命名完成"
-          fi
+          # if [ -d "dist-onefile/mtga_gui.app" ]; then
+          #   EXPECTED_NAME="${{ steps.version.outputs.APP_NAME }}.app"
+          #   echo "🔄 重命名应用包: mtga_gui.app → $EXPECTED_NAME"
+          #   mv "dist-onefile/mtga_gui.app" "dist-onefile/$EXPECTED_NAME"
+          #   echo "✅ 重命名完成"
+          # fi
 
       - name: 📱 验证应用包
         run: |
@@ -237,33 +237,71 @@ jobs:
       - name: 📝 生成发布说明
         id: release_notes
         run: |
+          # 收集版本与时间信息，后续用于替换模板变量
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          PYTHON_VER="${{ env.PYTHON_VERSION }}"
+          COMMIT_SHA="${{ github.sha }}"
+          REPO_SLUG="${{ github.repository }}"
           BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          cat > release_notes.md << 'EOF'
-          ## 🚀 MTGA GUI v${{ steps.version.outputs.VERSION }} (预发布版)
-          
+
+          # 检索构建产物以便按实际平台生成下载说明
+          ARM_DMG=$(find artifacts -type f -name "*arm64.dmg" | head -n 1 || true)
+          X64_DMG=$(find artifacts -type f -name "*x64.dmg" | head -n 1 || true)
+          ARM_NAME=""
+          X64_NAME=""
+          if [ -n "$ARM_DMG" ]; then
+            ARM_NAME=$(basename "$ARM_DMG")
+          fi
+          if [ -n "$X64_DMG" ]; then
+            X64_NAME=$(basename "$X64_DMG")
+          fi
+
+          # 写入公共部分
+          cat > release_notes.md <<EOF
+          ## 🚀 MTGA GUI v${VERSION} (预发布版)
+
           > ⚠️ **这是预发布版本，可能包含未完全测试的功能，请谨慎在生产环境中使用。**
-          
+
           ### 📦 下载说明
-          
-          #### macOS 用户
-          - **Intel Mac**: 下载 `MTGA_GUI-v${{ steps.version.outputs.VERSION }}-x64.dmg`
-          - **Apple Silicon Mac**: 下载 `MTGA_GUI-v${{ steps.version.outputs.VERSION }}-arm64.dmg`
-          
+          EOF
+
+          # 仅在存在对应包时写入平台指引
+          if [ -n "$ARM_NAME" ] || [ -n "$X64_NAME" ]; then
+            {
+              echo
+              echo "#### macOS 用户"
+              if [ -n "$X64_NAME" ]; then
+                echo "- **Intel Mac**: 下载 \`$X64_NAME\`"
+              fi
+              if [ -n "$ARM_NAME" ]; then
+                echo "- **Apple Silicon Mac**: 下载 \`$ARM_NAME\`"
+              fi
+            } >> release_notes.md
+          else
+            {
+              echo
+              echo "#### macOS 用户"
+              echo "- 暂无可下载的 macOS 预发布包"
+            } >> release_notes.md
+          fi
+
+          cat >> release_notes.md <<EOF
+
           #### 安装方法
           1. 下载对应架构的 DMG 文件
           2. 双击 DMG 文件挂载安装包
           3. 将 `MTGA GUI.app` 拖拽到 `Applications` 文件夹
           4. 首次运行可能需要在系统偏好设置中允许运行
-          
+
           ### 🔧 技术信息
-          - Python 版本: ${{ env.PYTHON_VERSION }}
-          - 构建时间: $BUILD_TIME
-          - 提交哈希: ${{ github.sha }}
-          
+          - Python 版本: ${PYTHON_VER}
+          - 构建时间: ${BUILD_TIME}
+          - 提交哈希: ${COMMIT_SHA}
+
           ### 🐛 问题反馈
-          如遇到问题，请在 [GitHub Issues](https://github.com/${{ github.repository }}/issues) 中反馈。
+          如遇到问题，请在 [GitHub Issues](https://github.com/${REPO_SLUG}/issues) 中反馈。
           EOF
-          
+
           echo "RELEASE_NOTES<<EOF" >> $GITHUB_OUTPUT
           cat release_notes.md >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
