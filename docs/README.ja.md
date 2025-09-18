@@ -20,20 +20,33 @@ MTGA は、Windows と macOS 向けのローカルプロキシベースの IDE �
 
 ## 目次
 
-* [更新履歴](#更新履歴)
-* [クイックスタート](#クイックスタート)
-  * [Windows ユーザー（GUIワンクリック起動方式）](#windows-ユーザーguiワンクリック起動方式)
-  * [macOS ユーザー（アプリケーションインストール）](#macos-ユーザーアプリケーションインストール)
-* [スクリプトからの起動](#スクリプトからの起動)
-  * [ステップ 0：環境準備](#ステップ-0環境準備)
-    * [Windows](#windows)
-      * [ステップ 1：自己署名証明書の生成](#ステップ-1自己署名証明書の生成)
-      * [ステップ 2：Windows に CA 証明書を信頼させる](#ステップ-2windows-に-ca-証明書を信頼させる)
-      * [ステップ 3：Hosts ファイルの変更](#ステップ-3hosts-ファイルの変更)
-      * [ステップ 4：ローカルプロキシサーバーの実行 (Python)](#ステップ-4ローカルプロキシサーバーの実行-python)
-      * [ステップ 5：Trae IDE の設定](#ステップ-5trae-ide-の設定)
-    * [macOS](#macos)
- * [😎 最新情報の取得](#-最新情報の取得)
+- [MTGA](#mtga)
+  - [概要](#概要)
+  - [目次](#目次)
+  - [更新履歴](#更新履歴)
+    - [v1.2.0 (最新)](#v120-最新)
+    - [v1.1.1](#v111)
+    - [v1.1.0](#v110)
+    - [v1.0.0](#v100)
+  - [クイックスタート](#クイックスタート)
+    - [Windows ユーザー（GUIワンクリック起動方式）](#windows-ユーザーguiワンクリック起動方式)
+    - [macOS ユーザー（アプリケーションインストール）](#macos-ユーザーアプリケーションインストール)
+      - [インストール方法](#インストール方法)
+      - [使用方法](#使用方法)
+  - [macOSで「パッケージが壊れています」問題を解決する方法](#macosでパッケージが壊れています問題を解決する方法)
+    - [グラフィカルな解決方法](#グラフィカルな解決方法)
+    - [コマンドラインでの解決方法](#コマンドラインでの解決方法)
+  - [スクリプトからの起動](#スクリプトからの起動)
+    - [ステップ 0：環境準備](#ステップ-0環境準備)
+      - [Windows](#windows)
+        - [ステップ 1：自己署名証明書の生成](#ステップ-1自己署名証明書の生成)
+        - [ステップ 2：WindowsにCA証明書を信頼させる](#ステップ-2windowsにca証明書を信頼させる)
+        - [ステップ 3：Hostsファイルの修正](#ステップ-3hostsファイルの修正)
+        - [ステップ 4：ローカルプロキシサーバーを実行する (Python)](#ステップ-4ローカルプロキシサーバーを実行する-python)
+        - [ステップ 5：Trae IDE を設定する](#ステップ-5trae-ide-を設定する)
+      - [macOS](#macos)
+  - [😎 最新情報の取得](#-最新情報の取得)
+  - [クレジット](#クレジット)
 
 ---
 
@@ -133,9 +146,37 @@ MTGA は、Windows と macOS 向けのローカルプロキシベースの IDE �
 7. 下記の[Trae IDE 設定](#第-5-步配置-trae-ide)に従って設定を完了
 
 > [!NOTE]
-> - 初回実行時はシステムファイル修正のため管理者パスワード入力が必要
-> - 「システム環境設定 > セキュリティとプライバシー」でアプリケーションの実行を許可する必要がある場合があります
-> - ネットワーク権限の問題が発生した場合は、「システム環境設定 > セキュリティとプライバシー > ファイアウォール」でアプリケーションのネットワークアクセスを許可してください
+> - 証明書のインストールと hosts の変更には管理者権限が必要です
+> - 「パッケージが壊れています」というメッセージが表示された場合は、[macOSで「パッケージが壊れています」問題を解決する方法](#macosでパッケージが壊れています問題を解決する方法) を参照してください
+
+## macOSで「パッケージが壊れています」問題を解決する方法
+
+`MTGA_GUI.app` を起動した際に以下のような警告が表示された場合：
+
+<img width="244" height="223" alt="app corrupted" src="../images/app-corrupted.png?raw=true" />
+
+**キャンセルをクリック**してください。その後、以下の手順に従って問題を解決してください。
+
+### グラフィカルな解決方法
+
+1. [Sentinel Releases](https://github.com/alienator88/Sentinel/releases/latest) から `Sentinel.dmg` をダウンロードします。
+2. `Sentinel.dmg` ファイルをダブルクリックし、`Sentinel.app` を `Applications` フォルダにドラッグ＆ドロップします。
+3. Launchpad または Applications フォルダから `Sentinel.app` を起動します。
+4. 本プロジェクトの `MTGA_GUI.app` を `Sentinel.app` の左側のウィンドウにドラッグ＆ドロップします。
+   - <img width="355.33" height="373.33" alt="sentinel add app" src="../images/sentinel-add-app.png?raw=true" />
+
+これにより `MTGA_GUI.app` は自動的に処理され、起動します。
+
+### コマンドラインでの解決方法
+
+1. `MTGA_GUI.app` のフルパスを確認します（例：`/Applications/MTGA_GUI.app`）。
+2. ターミナル（Terminal）を開きます。
+3. 以下のコマンドを実行して `MTGA_GUI.app` の署名を解除します：
+   ```zsh
+   xattr -d com.apple.quarantine <アプリのフルパス>
+   ```
+   これにより `MTGA_GUI.app` の `com.apple.quarantine` 拡張属性が削除されます。
+4. `MTGA_GUI.app` を起動します。
 
 ---
 
@@ -155,10 +196,10 @@ MTGA は、Windows と macOS 向けのローカルプロキシベースの IDE �
 Git Bashを開く：
 
 ```bash
-# 切换到 ca 目录
+# ca ディレクトリに移動
 cd "mtga/ca"
 
-# 1. 生成 CA 证书 (ca.crt 和 ca.key)
+# 1. CA証明書の生成 (ca.crt と ca.key)
 ./genca.sh
 ```
 
@@ -168,8 +209,8 @@ cd "mtga/ca"
 *   他のフィールド（State, Locality, Organization, Common Name for CAなど）は必要に応じて入力または空欄、`X`と入力することを推奨。Common Nameは`MyLocalCA`などと入力可能。メールは空欄可。
 
 ```bash
-# 2. 生成 api.openai.com 的服务器证书 (api.openai.com.crt 和 api.openai.com.key)
-# 这个脚本会使用同目录下的 api.openai.com.subj 和 api.openai.com.cnf 配置文件
+# 2. api.openai.com のサーバー証明書の生成 (api.openai.com.crt と api.openai.com.key)
+# このスクリプトは同ディレクトリ下の api.openai.com.subj と api.openai.com.cnf 設定ファイルを使用
 ./gencrt.sh api.openai.com
 ```
 

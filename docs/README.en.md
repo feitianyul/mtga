@@ -20,20 +20,33 @@ MTGA is a local proxy-based IDE fixed model provider solution for Windows and ma
 
 ## Table of Contents
 
-* [Changelog](#changelog)
-* [Quick Start](#quick-start)
-  * [Windows Users (GUI One-Click Startup)](#windows-users-gui-one-click-startup)
-  * [macOS Users (Application Installation)](#macos-users-application-installation)
-* [Starting from Script](#starting-from-script)
-  * [Step 0: Environment Preparation](#step-0-environment-preparation)
-    * [Windows](#windows)
-      * [Step 1: Generate Self-Signed Certificate](#step-1-generate-self-signed-certificate)
-      * [Step 2: Make Windows Trust Your CA Certificate](#step-2-make-windows-trust-your-ca-certificate)
-      * [Step 3: Modify Hosts File](#step-3-modify-hosts-file)
-      * [Step 4: Run Local Proxy Server (Python)](#step-4-run-local-proxy-server-python)
-      * [Step 5: Configure Trae IDE](#step-5-configure-trae-ide)
-    * [macOS](#macos)
- * [😎 Stay Updated](#-stay-updated)
+- [MTGA](#mtga)
+  - [Introduction](#introduction)
+  - [Table of Contents](#table-of-contents)
+  - [Changelog](#changelog)
+    - [v1.2.0 (Latest)](#v120-latest)
+    - [v1.1.1](#v111)
+    - [v1.1.0](#v110)
+    - [v1.0.0](#v100)
+  - [Quick Start](#quick-start)
+    - [Windows Users (GUI One-Click Startup)](#windows-users-gui-one-click-startup)
+    - [macOS Users (Application Installation)](#macos-users-application-installation)
+      - [Installation Method](#installation-method)
+      - [Usage Instructions](#usage-instructions)
+  - [macOS Fix "The package is damaged" Issue](#macos-fix-the-package-is-damaged-issue)
+    - [Graphical Solution](#graphical-solution)
+    - [CLI Solution](#cli-solution)
+  - [Starting from Script](#starting-from-script)
+    - [Step 0: Environment Preparation](#step-0-environment-preparation)
+      - [Windows](#windows)
+        - [Step 1: Generate a Self-Signed Certificate](#step-1-generate-a-self-signed-certificate)
+        - [Step 2: Make Windows Trust Your CA Certificate](#step-2-make-windows-trust-your-ca-certificate)
+        - [Step 3: Modify the Hosts File](#step-3-modify-the-hosts-file)
+        - [Step 4: Run the Local Proxy Server (Python)](#step-4-run-the-local-proxy-server-python)
+        - [Step 5: Configure Trae IDE](#step-5-configure-trae-ide)
+      - [macOS](#macos)
+  - [😎 Stay Updated](#-stay-updated)
+  - [References](#references)
 
 ---
 
@@ -132,10 +145,38 @@ MTGA is a local proxy-based IDE fixed model provider solution for Windows and ma
 6. Start the local proxy server
 7. Complete the setup by following the [Trae IDE Configuration](#第-5-步配置-trae-ide) below
 
-> [!IMPORTANT]
-> - First run requires entering the administrator password to modify system files
-> - May need to allow the application to run in "System Preferences > Security & Privacy"
-> - If encountering network permission issues, allow the application network access in "System Preferences > Security & Privacy > Firewall"
+> [!NOTE]
+> - Certificate installation and hosts modification require administrator privileges
+> - If prompted with "The package is damaged", please refer to [macOS Fix "The package is damaged" Issue](#macos-fix-the-package-is-damaged-issue)
+
+## macOS Fix "The package is damaged" Issue
+
+If you see a prompt like this when launching `MTGA_GUI.app`:
+
+<img width="244" height="223" alt="app corrupted" src="../images/app-corrupted.png?raw=true" />
+
+**Click Cancel**. Then follow the steps below to resolve the issue:
+
+### Graphical Solution
+
+1. Go to [Sentinel Releases](https://github.com/alienator88/Sentinel/releases/latest) and download `Sentinel.dmg`
+2. Double-click the `Sentinel.dmg` file, then drag `Sentinel.app` to the `Applications` folder
+3. Launch `Sentinel.app` from Launchpad or the Applications folder
+4. Drag the `MTGA_GUI.app` from this project into the left window of `Sentinel.app`
+   - <img width="355.33" height="373.33" alt="sentinel add app" src="../images/sentinel-add-app.png?raw=true" />
+
+`MTGA_GUI.app` will be automatically processed and launched
+
+### CLI Solution
+
+1. Locate the full path of `MTGA_GUI.app`, e.g., `/Applications/MTGA_GUI.app`.
+2. Open the Terminal application.
+3. Run the following command to remove the signature quarantine from `MTGA_GUI.app`:
+   ```zsh
+   xattr -d com.apple.quarantine <full path of the app>
+   ```
+   This removes the `com.apple.quarantine` extended attribute from `MTGA_GUI.app`.
+4. Launch `MTGA_GUI.app`.
 
 ---
 
@@ -155,10 +196,10 @@ MTGA is a local proxy-based IDE fixed model provider solution for Windows and ma
 Open Git Bash:
 
 ```bash
-# 切换到 ca 目录
+# Change to the ca directory
 cd "mtga/ca"
 
-# 1. 生成 CA 证书 (ca.crt 和 ca.key)
+# 1. Generate the CA certificate (ca.crt and ca.key)
 ./genca.sh
 ```
 
@@ -168,8 +209,8 @@ When executing `./genca.sh`, it will ask "Do you want to generate ca cert and ke
 *   Other fields (like State, Locality, Organization, Common Name for CA) can be filled as needed or left blank; it's suggested to fill them with `X`. The Common Name can be something like `MyLocalCA`. The email field can be left empty.
 
 ```bash
-# 2. 生成 api.openai.com 的服务器证书 (api.openai.com.crt 和 api.openai.com.key)
-# 这个脚本会使用同目录下的 api.openai.com.subj 和 api.openai.com.cnf 配置文件
+# 2. Generate the SSL certificate for api.openai.com (api.openai.com.crt and api.openai.com.key)
+# This script uses the configuration files api.openai.com.subj and api.openai.com.cnf in the same directory
 ./gencrt.sh api.openai.com
 ```
 

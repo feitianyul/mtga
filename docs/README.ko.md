@@ -20,20 +20,33 @@ MTGA는 Windows와 macOS용 로컬 프록시 기반 IDE 고정 모델 서비스 
 
 ## 목차
 
-* [변경 로그](#변경-로그)
-* [빠른 시작](#빠른-시작)
-  * [Windows 사용자 (GUI 원클릭 시작 방식)](#windows-사용자gui-원클릭-시작-방식)
-  * [macOS 사용자 (애플리케이션 설치)](#macos-사용자애플리케이션-설치)
-* [스크립트로 시작하기](#스크립트로-시작하기)
-  * [0단계: 환경 준비](#0단계-환경-준비)
-    * [Windows](#windows)
-      * [1단계: 자체 서명 인증서 생성](#1단계-자체-서명-인증서-생성)
-      * [2단계: Windows가 CA 인증서를 신뢰하도록 설정](#2단계-windows가-ca-인증서를-신뢰하도록-설정)
-      * [3단계: Hosts 파일 수정](#3단계-hosts-파일-수정)
-      * [4단계: 로컬 프록시 서버 실행 (Python)](#4단계-로컬-프록시-서버-실행-python)
-      * [5단계: Trae IDE 구성](#5단계-trae-ide-구성)
-    * [macOS](#macos)
- * [😎 최신 상태 유지](#-최신-상태-유지)
+- [MTGA](#mtga)
+  - [소개](#소개)
+  - [목차](#목차)
+  - [변경 로그](#변경-로그)
+    - [v1.2.0 (최신)](#v120-최신)
+    - [v1.1.1](#v111)
+    - [v1.1.0](#v110)
+    - [v1.0.0](#v100)
+  - [빠른 시작](#빠른-시작)
+    - [Windows 사용자 (GUI 원클릭 실행 방식)](#windows-사용자-gui-원클릭-실행-방식)
+    - [macOS 사용자 (애플리케이션 설치)](#macos-사용자-애플리케이션-설치)
+      - [설치 방법](#설치-방법)
+      - [사용 방법](#사용-방법)
+  - [macOS “패키지가 손상되었습니다” 문제 해결](#macos-패키지가-손상되었습니다-문제-해결)
+    - [그래픽 인터페이스 해결 방법](#그래픽-인터페이스-해결-방법)
+    - [CLI(명령어) 해결 방법](#cli명령어-해결-방법)
+  - [스크립트로 시작하기](#스크립트로-시작하기)
+    - [0단계: 환경 준비](#0단계-환경-준비)
+      - [Windows](#windows)
+        - [1단계: 자체 서명 인증서 생성](#1단계-자체-서명-인증서-생성)
+        - [2단계: Windows에서 CA 인증서 신뢰 설정](#2단계-windows에서-ca-인증서-신뢰-설정)
+        - [3단계: Hosts 파일 수정](#3단계-hosts-파일-수정)
+        - [4단계: 로컬 프록시 서버 실행 (Python)](#4단계-로컬-프록시-서버-실행-python)
+        - [5단계: Trae IDE 구성](#5단계-trae-ide-구성)
+      - [macOS](#macos)
+  - [😎 최신 상태 유지](#-최신-상태-유지)
+  - [참고 자료](#참고-자료)
 
 ---
 
@@ -132,10 +145,40 @@ MTGA는 Windows와 macOS용 로컬 프록시 기반 IDE 고정 모델 서비스 
 6. 로컬 프록시 서버 시작
 7. 아래의 [Trae IDE 설정](#5-단계-trae-ide-설정)에 따라 설정 완료
 
-> **주의사항:**
-> - 첫 실행 시 시스템 파일 수정을 위해 관리자 비밀번호 입력 필요
-> - "시스템 환경설정 > 보안 및 개인정보 보호"에서 애플리케이션 실행 허용이 필요할 수 있음
-> - 네트워크 권한 문제 발생 시 "시스템 환경설정 > 보안 및 개인정보 보호 > 방화벽"에서 애플리케이션 네트워크 접근 허용
+> [!NOTE]
+목표 언어: 한국어
+
+> - 인증서 설치 및 hosts 수정은 관리자 권한이 필요합니다.
+> - “패키지가 손상되었습니다”라는 메시지가 나타나면 [macOS “패키지가 손상되었습니다” 문제 해결](#macos-패키지가-손상되었습니다-문제-해결)을 참고하세요.
+
+## macOS “패키지가 손상되었습니다” 문제 해결
+
+`MTGA_GUI.app` 실행 시 다음과 같은 메시지가 나타나면:
+
+<img width="244" height="223" alt="app corrupted" src="../images/app-corrupted.png?raw=true" />
+
+**취소** 버튼을 클릭하세요. 그 후 아래 방법을 따라 문제를 해결할 수 있습니다.
+
+### 그래픽 인터페이스 해결 방법
+
+1. [Sentinel Releases](https://github.com/alienator88/Sentinel/releases/latest)에서 `Sentinel.dmg`를 다운로드합니다.
+2. `Sentinel.dmg` 파일을 더블 클릭하여 열고, `Sentinel.app`를 `Applications` 폴더로 드래그합니다.
+3. 런치패드 또는 Applications 폴더에서 `Sentinel.app`를 실행합니다.
+4. 본 프로젝트의 `MTGA_GUI.app`를 `Sentinel.app`의 왼쪽 창으로 드래그합니다.
+   - <img width="355.33" height="373.33" alt="sentinel add app" src="../images/sentinel-add-app.png?raw=true" />
+
+`MTGA_GUI.app`가 자동으로 처리되고 실행됩니다.
+
+### CLI(명령어) 해결 방법
+
+1. `MTGA_GUI.app`의 전체 경로를 찾습니다. 예: `/Applications/MTGA_GUI.app`
+2. 터미널(Terminal) 앱을 실행합니다.
+3. 아래 명령어를 실행하여 `MTGA_GUI.app`를 서명 해제합니다:
+   ```zsh
+   xattr -d com.apple.quarantine <앱 전체 경로>
+   ```
+   위 명령어는 `MTGA_GUI.app`에서 `com.apple.quarantine` 확장 속성을 제거합니다.
+4. `MTGA_GUI.app`를 실행합니다.
 
 ---
 
@@ -155,10 +198,10 @@ MTGA는 Windows와 macOS용 로컬 프록시 기반 IDE 고정 모델 서비스 
 Git Bash 열기:
 
 ```bash
-# 切换到 ca 目录
+# ca 디렉토리로 이동
 cd "mtga/ca"
 
-# 1. 生成 CA 证书 (ca.crt 和 ca.key)
+# 1. CA 인증서 생성 (ca.crt 및 ca.key)
 ./genca.sh
 ```
 
@@ -168,8 +211,8 @@ cd "mtga/ca"
 *   기타 필드(State, Locality, Organization, Common Name for CA)는 필요에 따라 입력 또는 공백, `X` 입력 권장. Common Name은 `MyLocalCA` 등 입력 가능. 이메일은 공백 가능.
 
 ```bash
-# 2. 生成 api.openai.com 的服务器证书 (api.openai.com.crt 和 api.openai.com.key)
-# 这个脚本会使用同目录下的 api.openai.com.subj 和 api.openai.com.cnf 配置文件
+# 2. api.openai.com 서버 인증서 생성 (api.openai.com.crt 및 api.openai.com.key)
+#  이 스크립트는 동일 디렉토리의 api.openai.com.subj 및 api.openai.com.cnf 구성 파일을 사용합니다.
 ./gencrt.sh api.openai.com
 ```
 

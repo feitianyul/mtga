@@ -20,20 +20,33 @@ MTGA ist eine auf einem lokalen Proxy basierende IDE-Lösung für feste Modellan
 
 ## Inhaltsverzeichnis
 
-* [Changelog](#更新日志)
-* [Schnellstart](#快速开始)
-  * [Windows-Benutzer (GUI-Ein-Klick-Start)](#windows-用户gui一键启动方式)
-  * [macOS-Benutzer (Anwendungsinstallation)](#macos-用户应用程序安装)
-* [Vom Skript starten](#从脚本启动)
-  * [Schritt 0: Umgebungsvorbereitung](#第-0-步环境准备)
-    * [Windows](#windows)
-      * [Schritt 1: Selbstsigniertes Zertifikat generieren](#第-1-步生成自签名证书)
-      * [Schritt 2: CA-Zertifikat unter Windows vertrauen](#第-2-步让-windows-信任你的-ca-证书)
-      * [Schritt 3: Hosts-Datei ändern](#第-3-步修改-hosts-文件)
-      * [Schritt 4: Lokalen Proxy-Server ausführen (Python)](#第-4-步运行本地代理服务器-python)
-      * [Schritt 5: Trae IDE konfigurieren](#第-5-步配置-trae-ide)
-    * [macOS](#macos)
- * [😎 Auf dem neuesten Stand bleiben](#-保持更新)
+- [MTGA](#mtga)
+  - [Einführung](#einführung)
+  - [Inhaltsverzeichnis](#inhaltsverzeichnis)
+  - [Changelog](#changelog)
+    - [v1.2.0 (Neueste)](#v120-neueste)
+    - [v1.1.1](#v111)
+    - [v1.1.0](#v110)
+    - [v1.0.0](#v100)
+  - [Schnellstart](#schnellstart)
+    - [Windows-Benutzer (GUI-Ein-Klick-Start)](#windows-benutzer-gui-ein-klick-start)
+    - [macOS-Benutzer (Anwendungsinstallation)](#macos-benutzer-anwendungsinstallation)
+      - [Installationsmethode](#installationsmethode)
+      - [Verwendungsmethode](#verwendungsmethode)
+  - [macOS Lösung für das Problem „Paket ist beschädigt“](#macos-lösung-für-das-problem-paket-ist-beschädigt)
+    - [Grafische Lösung](#grafische-lösung)
+    - [CLI-Lösung](#cli-lösung)
+  - [Vom Skript starten](#vom-skript-starten)
+    - [Schritt 0: Umgebungsvorbereitung](#schritt-0-umgebungsvorbereitung)
+      - [Windows](#windows)
+        - [Schritt 1: Selbstsigniertes Zertifikat generieren](#schritt-1-selbstsigniertes-zertifikat-generieren)
+        - [Schritt 2: CA-Zertifikat unter Windows vertrauen](#schritt-2-ca-zertifikat-unter-windows-vertrauen)
+        - [Schritt 3: Hosts-Datei anpassen](#schritt-3-hosts-datei-anpassen)
+        - [Schritt 4: Lokalen Proxy-Server (Python) starten](#schritt-4-lokalen-proxy-server-python-starten)
+        - [Schritt 5: Trae IDE konfigurieren](#schritt-5-trae-ide-konfigurieren)
+      - [macOS](#macos)
+  - [😎 Auf dem neuesten Stand bleiben](#-auf-dem-neuesten-stand-bleiben)
+  - [Referenzen](#referenzen)
 
 ---
 
@@ -103,7 +116,7 @@ MTGA ist eine auf einem lokalen Proxy basierende IDE-Lösung für feste Modellan
    - Start des Proxy-Servers
 6. Nach Abschluss führen Sie die IDE-Konfiguration gemäß [Schritt 5: Trae IDE konfigurieren](#第-5-步配置-trae-ide) durch
 
-> **Hinweis:**
+> [!NOTE]
 > - Bei der ersten Ausführung müssen möglicherweise Firewall-Zugriffsberechtigungen erteilt werden
 > - Die Einzeldatei-Version unterstützt persistente Speicherung von Benutzerdaten, Konfigurationen und Zertifikate werden automatisch gespeichert
 
@@ -132,10 +145,38 @@ MTGA ist eine auf einem lokalen Proxy basierende IDE-Lösung für feste Modellan
 6. Lokalen Proxy-Server starten
 7. Führen Sie die Einrichtung gemäß der untenstehenden [Trae IDE Konfiguration](#第-5-步配置-trae-ide) ab
 
-> **Hinweise:**
-> - Bei erstmaliger Ausführung muss das Administratorkennwort zur Änderung von Systemdateien eingegeben werden
-> - Möglicherweise müssen in "Systemeinstellungen > Sicherheit & Datenschutz" die Ausführung der Anwendung erlaubt werden
-> - Bei Netzwerkberechtigungsproblemen, erlauben Sie in "Systemeinstellungen > Sicherheit & Datenschutz > Firewall" den Netzwerkzugriff der Anwendung
+> [!NOTE]
+> - Die Installation des Zertifikats und die Änderung der Hosts erfordern Administratorrechte
+> - Wenn die Meldung „Paket ist beschädigt“ erscheint, siehe [macOS Lösung für das Problem „Paket ist beschädigt“](#macos-lösung-für-das-problem-paket-ist-beschädigt)
+
+## macOS Lösung für das Problem „Paket ist beschädigt“
+
+Wenn beim Start von `MTGA_GUI.app` die folgende Meldung erscheint:
+
+<img width="244" height="223" alt="app corrupted" src="../images/app-corrupted.png?raw=true" />
+
+**Klicken Sie auf „Abbrechen“**. Folgen Sie dann den nächsten Schritten zur Lösung:
+
+### Grafische Lösung
+
+1. Laden Sie `Sentinel.dmg` von [Sentinel Releases](https://github.com/alienator88/Sentinel/releases/latest) herunter.
+2. Doppelklicken Sie auf die `Sentinel.dmg`-Datei und ziehen Sie `Sentinel.app` in den Ordner „Programme“ (Applications).
+3. Starten Sie `Sentinel.app` über das Launchpad oder den Programme-Ordner.
+4. Ziehen Sie `MTGA_GUI.app` aus diesem Projekt in das linke Fenster von `Sentinel.app`.
+   - <img width="355.33" height="373.33" alt="sentinel add app" src="../images/sentinel-add-app.png?raw=true" />
+
+`MTGA_GUI.app` wird automatisch verarbeitet und gestartet.
+
+### CLI-Lösung
+
+1. Finden Sie den vollständigen Pfad von `MTGA_GUI.app`, zum Beispiel `/Applications/MTGA_GUI.app`.
+2. Öffnen Sie das Terminal.
+3. Führen Sie den folgenden Befehl aus, um `MTGA_GUI.app` zu signieren:
+   ```zsh
+   xattr -d com.apple.quarantine <vollständiger Pfad der Anwendung>
+   ```
+   Dies entfernt das `com.apple.quarantine`-Erweiterungsattribut von `MTGA_GUI.app`.
+4. Starten Sie `MTGA_GUI.app`.
 
 ---
 
@@ -155,10 +196,10 @@ MTGA ist eine auf einem lokalen Proxy basierende IDE-Lösung für feste Modellan
 Git Bash öffnen:
 
 ```bash
-# 切换到 ca 目录
+# Wechseln Sie in das ca-Verzeichnis
 cd "mtga/ca"
 
-# 1. 生成 CA 证书 (ca.crt 和 ca.key)
+# 1. CA-Zertifikat generieren (ca.crt und ca.key)
 ./genca.sh
 ```
 
@@ -168,8 +209,8 @@ Bei Ausführung von `./genca.sh` wird gefragt: "Do you want to generate ca cert 
 *   Andere Felder (wie State, Locality, Organization, Common Name for CA) können nach Bedarf ausgefüllt oder leer gelassen werden, `X` wird empfohlen. Common Name kann z.B. `MyLocalCA` sein. E-Mail kann leer bleiben.
 
 ```bash
-# 2. 生成 api.openai.com 的服务器证书 (api.openai.com.crt 和 api.openai.com.key)
-# 这个脚本会使用同目录下的 api.openai.com.subj 和 api.openai.com.cnf 配置文件
+# 2. SSL-Zertifikat für api.openai.com generieren (api.openai.com.crt und api.openai.com.key)
+# Dieses Skript verwendet die Konfigurationsdateien api.openai.com.subj und api.openai.com.cnf im selben Verzeichnis
 ./gencrt.sh api.openai.com
 ```
 

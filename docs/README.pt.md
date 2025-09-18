@@ -20,20 +20,33 @@ MTGA é uma solução de provedor de serviços de modelo fixo para IDE baseada e
 
 ## Índice
 
-* [Registo de Alterações](#registo-de-alterações)
-* [Início Rápido](#início-rápido)
-  * [Utilizadores do Windows (Método de Inicialização com Um Clique via GUI)](#utilizadores-do-windows-método-de-inicialização-com-um-clique-via-gui)
-  * [Utilizadores do macOS (Instalação de Aplicação)](#utilizadores-do-macos-instalação-de-aplicação)
-* [Iniciar a Partir de Script](#iniciar-a-partir-de-script)
-  * [Passo 0: Preparação do Ambiente](#passo-0-preparação-do-ambiente)
-    * [Windows](#windows)
-      * [Passo 1: Gerar Certificado Autoassinado](#passo-1-gerar-certificado-autoassinado)
-      * [Passo 2: Fazer o Windows Confiar no Seu Certificado de AC](#passo-2-fazer-o-windows-confiar-no-seu-certificado-de-ac)
-      * [Passo 3: Modificar o Ficheiro Hosts](#passo-3-modificar-o-ficheiro-hosts)
-      * [Passo 4: Executar o Servidor Proxy Local (Python)](#passo-4-executar-o-servidor-proxy-local-python)
-      * [Passo 5: Configurar o IDE Trae](#passo-5-configurar-o-ide-trae)
-    * [macOS](#macos)
- * [😎 Manter-se Atualizado](#-manter-se-atualizado)
+- [MTGA](#mtga)
+  - [Introdução](#introdução)
+  - [Índice](#índice)
+  - [Registo de Alterações](#registo-de-alterações)
+    - [v1.2.0 (Última versão)](#v120-última-versão)
+    - [v1.1.1](#v111)
+    - [v1.1.0](#v110)
+    - [v1.0.0](#v100)
+  - [Início Rápido](#início-rápido)
+    - [Usuários do Windows (Método de inicialização com um clique via GUI)](#usuários-do-windows-método-de-inicialização-com-um-clique-via-gui)
+    - [Usuários macOS (Instalação via aplicativo)](#usuários-macos-instalação-via-aplicativo)
+      - [Método de instalação](#método-de-instalação)
+      - [Como usar](#como-usar)
+  - [macOS solucionando o problema “pacote está corrompido”](#macos-solucionando-o-problema-pacote-está-corrompido)
+    - [Solução gráfica](#solução-gráfica)
+    - [Solução via terminal (cli)](#solução-via-terminal-cli)
+  - [Inicialização via Script](#inicialização-via-script)
+    - [Passo 0: Preparação do Ambiente](#passo-0-preparação-do-ambiente)
+      - [Windows](#windows)
+        - [Passo 1: Gerar Certificado Autoassinado](#passo-1-gerar-certificado-autoassinado)
+        - [Passo 2: Fazer o Windows Confiar em Seu Certificado CA](#passo-2-fazer-o-windows-confiar-em-seu-certificado-ca)
+        - [Passo 3: Modificar Arquivo Hosts](#passo-3-modificar-arquivo-hosts)
+        - [Passo 4: Executar o servidor proxy local (Python)](#passo-4-executar-o-servidor-proxy-local-python)
+        - [Passo 5: Configurar o Trae IDE](#passo-5-configurar-o-trae-ide)
+      - [macOS](#macos)
+  - [😎 Mantenha-se Atualizado](#-mantenha-se-atualizado)
+  - [Referências](#referências)
 
 ---
 
@@ -103,7 +116,7 @@ MTGA é uma solução de provedor de serviços de modelo fixo para IDE baseada e
    - Iniciar o servidor proxy  
 6. Após a conclusão, configure o IDE de acordo com [Passo 5: Configurar o Trae IDE](#passo-5-configurar-o-trae-ide)
 
-> **Nota:**  
+> [!NOTE]
 > - A primeira execução pode exigir permissão de acesso ao firewall  
 > - A versão de arquivo único suporta armazenamento persistente de dados do usuário, configurações e certificados são salvos automaticamente
 
@@ -132,10 +145,38 @@ MTGA é uma solução de provedor de serviços de modelo fixo para IDE baseada e
 6. Inicie o servidor proxy local
 7. Complete a configuração conforme [Configuração do Trae IDE](#第-5-步配置-trae-ide) abaixo
 
-> **Notas importantes:**
-> - A primeira execução requer senha de administrador para modificar arquivos do sistema
-> - Pode ser necessário permitir a execução do aplicativo em "Preferências do Sistema > Segurança e Privacidade"
-> - Em caso de problemas de permissão de rede, permita o acesso do aplicativo em "Preferências do Sistema > Segurança e Privacidade > Firewall"
+> > [!NOTE]
+> - A instalação do certificado e a modificação do arquivo hosts exigem permissões de administrador
+> - Se surgir a mensagem "pacote está corrompido", consulte [macOS solucionando o problema “pacote está corrompido”](#macos-solucionando-o-problema-pacote-está-corrompido)
+
+## macOS solucionando o problema “pacote está corrompido”
+
+Se ao iniciar o `MTGA_GUI.app` aparecer o aviso como este:
+
+<img width="244" height="223" alt="app corrupted" src="../images/app-corrupted.png?raw=true" />
+
+**Clique em Cancelar**. Depois, siga os passos abaixo para resolver:
+
+### Solução gráfica
+
+1. Acesse [Sentinel Releases](https://github.com/alienator88/Sentinel/releases/latest) e baixe o arquivo `Sentinel.dmg`.
+2. Dê um duplo clique no arquivo `Sentinel.dmg` e arraste o `Sentinel.app` para a pasta `Applications`.
+3. Abra o `Sentinel.app` pelo Launchpad (Tela de Inicial) ou pela pasta Applications.
+4. Arraste o `MTGA_GUI.app` deste projeto para a janela do lado esquerdo do `Sentinel.app`.
+   - <img width="355.33" height="373.33" alt="sentinel add app" src="../images/sentinel-add-app.png?raw=true" />
+
+O `MTGA_GUI.app` será processado automaticamente e será iniciado.
+
+### Solução via terminal (cli)
+
+1. Localize o caminho completo do `MTGA_GUI.app`, por exemplo: `/Applications/MTGA_GUI.app`.
+2. Abra o aplicativo Terminal.
+3. Execute o comando abaixo para assinar o `MTGA_GUI.app`:
+   ```zsh
+   xattr -d com.apple.quarantine <caminho completo do app>
+   ```
+   Isso removerá o atributo estendido `com.apple.quarantine` do `MTGA_GUI.app`.
+4. Inicie o `MTGA_GUI.app`.
 
 ---
 
@@ -155,10 +196,10 @@ MTGA é uma solução de provedor de serviços de modelo fixo para IDE baseada e
 Abra o Git Bash:
 
 ```bash
-# 切换到 ca 目录
+# Mudar para o diretório ca
 cd "mtga/ca"
 
-# 1. 生成 CA 证书 (ca.crt 和 ca.key)
+# 1. Gerar certificado CA (ca.crt e ca.key)
 ./genca.sh
 ```
 
@@ -168,8 +209,8 @@ Ao executar `./genca.sh`, ele perguntará "Do you want to generate ca cert and k
 *   Outros campos (como State, Locality, Organization, Common Name for CA) podem ser preenchidos conforme necessário ou deixados em branco, sugere-se preencher `X`. Common Name pode ser preenchido com `MyLocalCA` ou similar. E-mail pode ser deixado em branco.
 
 ```bash
-# 2. 生成 api.openai.com 的服务器证书 (api.openai.com.crt 和 api.openai.com.key)
-# 这个脚本会使用同目录下的 api.openai.com.subj 和 api.openai.com.cnf 配置文件
+# 2. Gerar certificado api.openai.com (api.openai.com.crt e api.openai.com.key)
+#  Este script usa os arquivos api.openai.com.subj e api.openai.com.cnf na mesma pasta
 ./gencrt.sh api.openai.com
 ```
 
