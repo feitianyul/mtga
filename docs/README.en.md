@@ -15,7 +15,7 @@ MTGA is a local proxy-based IDE fixed model provider solution for Windows and ma
 <details>
   <summary>You can't see anything~~</summary>
   <br>
-  <p>MTGA stands for Make T Great Again!</p>
+  <p>MTGA stands for Make Trae Great Again!</p>
  </details>
 
 ## Table of Contents
@@ -36,6 +36,7 @@ MTGA is a local proxy-based IDE fixed model provider solution for Windows and ma
   - [macOS Fix "The package is damaged" Issue](#macos-fix-the-package-is-damaged-issue)
     - [Graphical Solution](#graphical-solution)
     - [CLI Solution](#cli-solution)
+  - [Troubleshooting 'Add Model Failed' Prompt on Trae Side](#troubleshooting-add-model-failed-prompt-on-trae-side)
   - [Starting from Script](#starting-from-script)
     - [Step 0: Environment Preparation](#step-0-environment-preparation)
       - [Windows](#windows)
@@ -119,6 +120,7 @@ MTGA is a local proxy-based IDE fixed model provider solution for Windows and ma
 > [!NOTE]
 > - First run may require allowing firewall access permissions
 > - The single-file version supports persistent storage of user data; configurations and certificates are automatically saved
+> - If adding a model on the Trae side fails, please refer to [Troubleshooting 'Add Model Failed' Prompt on Trae Side](#troubleshooting-add-model-failed-prompt-on-trae-side)
 
 ### macOS Users (Application Installation)
 
@@ -148,6 +150,7 @@ MTGA is a local proxy-based IDE fixed model provider solution for Windows and ma
 > [!NOTE]
 > - Certificate installation and hosts modification require administrator privileges
 > - If prompted with "The package is damaged", please refer to [macOS Fix "The package is damaged" Issue](#macos-fix-the-package-is-damaged-issue)
+> - If adding a model on the Trae side fails, please refer to [Troubleshooting 'Add Model Failed' Prompt on Trae Side](#troubleshooting-add-model-failed-prompt-on-trae-side)
 
 ## macOS Fix "The package is damaged" Issue
 
@@ -177,6 +180,21 @@ If you see a prompt like this when launching `MTGA_GUI.app`:
    ```
    This removes the `com.apple.quarantine` extended attribute from `MTGA_GUI.app`.
 4. Launch `MTGA_GUI.app`.
+
+## Troubleshooting 'Add Model Failed' Prompt on Trae Side
+
+Please check:
+- Whether the hosts file contains the line `127.0.0.1 api.openai.com`, and that it is not commented out (starting with #).
+- Ensure no other programs are using port 443 (such as browsers, VPNs, etc.).
+  - You can check using the following commands:
+    ```
+    # windows
+    netstat -ano | find ":443" | find "LISTENING"
+
+    # macos
+    netstat -lnp tcp | grep :443
+    ```
+  - If there is a process listening on port 443, it is recommended to close that process.
 
 ---
 
