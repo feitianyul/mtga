@@ -173,24 +173,110 @@ jobs:
   build-windows:
     name: 🪟 构建 Windows
     runs-on: windows-latest
-    if: false  # 暂时禁用，后续启用
-    
+
     steps:
       - name: 📥 检出代码
         uses: actions/checkout@v4
-        
+
       - name: 🐍 设置 Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          
-      # TODO: 实现 Windows 构建逻辑
-      - name: 🔧 Windows 构建 (占位符)
-        run: echo "Windows 构建将在后续实现"
+
+      - name: 📦 安装 uv
+        run: |
+          Invoke-WebRequest -Uri "https://astral.sh/uv/install.ps1" -OutFile "install.ps1"
+          ./install.ps1
+          echo "$env:USERPROFILE\.local\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: 🔧 安装依赖
+        run: |
+          uv sync --extra win-build
+
+      - name: 🔍 检查 Visual Studio
+        run: |
+          $vs2022Path = "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build"
+          if (Test-Path $vs2022Path) {
+            Write-Host "✅ 找到 Visual Studio 2022: $vs2022Path"
+          } else {
+            Write-Host "❌ 未找到 Visual Studio 2022，尝试使用其他版本"
+            $vsPath = "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build"
+            if (Test-Path $vsPath) {
+              Write-Host "✅ 找到 Visual Studio 2019: $vsPath"
+            } else {
+              Write-Host "❌ 未找到 Visual Studio，可能需要手动配置 MSVC"
+            }
+          }
+
+      - name: ⚙️ 获取版本信息
+        id: version
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $VERSION = "${{ github.event.inputs.version }}"
+          } else {
+            $VERSION = "${{ github.ref }}" -replace "refs/tags/v", ""
+          }
+          echo "VERSION=$VERSION" >> $env:GITHUB_OUTPUT
+          echo "EXE_NAME=MTGA_GUI-v$VERSION-x64.exe" >> $env:GITHUB_OUTPUT
+
+      - name: 🔨 构建 Windows 单文件版本
+        run: |
+          # 修改构建脚本中的版本号
+          $content = Get-Content "build_onefile.bat"
+          $content = $content -replace 'set "VERSION=.*"', "set `"VERSION=${{ steps.version.outputs.VERSION }}`""
+          $content | Set-Content "build_onefile.bat"
+
+          # 显示修改后的版本号
+          Write-Host "🔍 检查修改后的构建脚本:"
+          Select-String -Path "build_onefile.bat" -Pattern "VERSION=" | Select-Object -First 1
+
+          # 执行构建
+          try {
+            .\build_onefile.bat
+            Write-Host "✅ 构建脚本执行完成"
+          } catch {
+            Write-Host "❌ 构建失败: $_"
+            exit 1
+          }
+
+      - name: 📱 验证可执行文件
+        run: |
+          $exePath = "dist-onefile\${{ steps.version.outputs.EXE_NAME }}"
+          if (Test-Path $exePath) {
+            $size = (Get-Item $exePath).Length / 1MB
+            Write-Host "✅ Windows 可执行文件构建成功: $exePath"
+            Write-Host "📊 文件大小: $([math]::Round($size, 2)) MB"
+
+            # 验证文件格式
+            $fileInfo = Get-Item $exePath
+            Write-Host "📋 文件信息:"
+            Write-Host "  - 创建时间: $($fileInfo.CreationTime)"
+            Write-Host "  - 修改时间: $($fileInfo.LastWriteTime)"
+            Write-Host "  - 文件属性: $($fileInfo.Attributes)"
+          } else {
+            Write-Host "❌ 未找到可执行文件: $exePath"
+            Write-Host "📁 dist-onefile 目录内容:"
+            if (Test-Path "dist-onefile") {
+              Get-ChildItem -Path "dist-onefile" -Recurse | ForEach-Object {
+                Write-Host "  $($_.FullName) ($([math]::Round($_.Length/1MB, 2)) MB)"
+              }
+            } else {
+              Write-Host "  dist-onefile 目录不存在"
+            }
+            exit 1
+          }
+
+      - name: 📤 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-artifacts
+          path: |
+            dist-onefile/*.exe
+          retention-days: 7
 
   create-prerelease:
     name: 🚀 创建预发布版
-    needs: [build-macos]  # build-windows 准备好时加入
+    needs: [build-windows, build-macos]
     runs-on: ubuntu-latest
     
     steps:
@@ -245,10 +331,15 @@ jobs:
           BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
           # 检索构建产物以便按实际平台生成下载说明
+          WINDOWS_EXE=$(find artifacts -type f -name "*.exe" | head -n 1 || true)
           ARM_DMG=$(find artifacts -type f -name "*arm64.dmg" | head -n 1 || true)
           X64_DMG=$(find artifacts -type f -name "*x64.dmg" | head -n 1 || true)
+          WIN_NAME=""
           ARM_NAME=""
           X64_NAME=""
+          if [ -n "$WINDOWS_EXE" ]; then
+            WIN_NAME=$(basename "$WINDOWS_EXE")
+          fi
           if [ -n "$ARM_DMG" ]; then
             ARM_NAME=$(basename "$ARM_DMG")
           fi
@@ -263,9 +354,17 @@ jobs:
           > ⚠️ **这是预发布版本，可能包含未完全测试的功能，请谨慎在生产环境中使用。**
 
           ### 📦 下载说明
+
+          #### Windows 用户
           EOF
 
-          # 仅在存在对应包时写入平台指引
+          if [ -n "$WIN_NAME" ]; then
+            echo "- 下载 \`$WIN_NAME\` 并双击运行（需要管理员权限）" >> release_notes.md
+          else
+            echo "- 暂无可下载的 Windows 预发布包" >> release_notes.md
+          fi
+
+          # 仅在存在对应包时写入 macOS 平台指引
           if [ -n "$ARM_NAME" ] || [ -n "$X64_NAME" ]; then
             {
               echo
@@ -288,6 +387,13 @@ jobs:
           cat >> release_notes.md <<EOF
 
           #### 安装方法
+          **Windows:**
+          1. 下载 \`$WIN_NAME\` 文件
+          2. 双击运行（需要管理员权限）
+          3. 在图形界面中配置 API URL 和模型 ID
+          4. 点击"一键启动全部服务"
+
+          **macOS:**
           1. 下载对应架构的 DMG 文件
           2. 双击 DMG 文件挂载安装包
           3. 将 `MTGA GUI.app` 拖拽到 `Applications` 文件夹
@@ -315,6 +421,7 @@ jobs:
           prerelease: true
           draft: false
           artifacts: |
+            artifacts/windows-artifacts/*.exe
             artifacts/macos-x64-artifacts/*.dmg
             artifacts/macos-arm64-artifacts/*.dmg
           token: ${{ secrets.GITHUB_TOKEN }}
