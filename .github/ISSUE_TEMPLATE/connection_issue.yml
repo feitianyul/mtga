@@ -16,6 +16,31 @@ body:
           required: true
         - label: 已安装并信任本地 CA 证书（Windows 证书管理器 / macOS 钥匙串）
           required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 操作系统
+      options: [Windows 10/11, macOS Apple Silicon, macOS Intel, Linux]
+    validations:
+      required: true
+  - type: textarea
+    id: sysinfo
+    attributes:
+      label: 系统与内核信息（务必粘贴命令输出）
+      description: |
+        - macOS / Linux：请粘贴 `uname -mprs` 的完整输出
+        - Windows（PowerShell）：请粘贴以下命令的完整输出：
+          `"$([Environment]::OSVersion | ForEach-Object VersionString) $(if ([Environment]::Is64BitOperatingSystem) { "x64" } else { "x86" })"`
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: 版本信息
+      placeholder: MTGA GUI vX.Y.Z / Trae vA.B.C
+    validations:
+      required: true
   - type: input
     id: apiurl
     attributes:
@@ -43,28 +68,3 @@ body:
       label: 相关日志与截图
       description: 建议包含 MTGA 控制台输出、Trae 弹窗、服务端日志（必要时用代码块）
       render: shell
-  - type: dropdown
-    id: platform
-    attributes:
-      label: 操作系统
-      options: [Windows 10/11, macOS Apple Silicon, macOS Intel, Linux]
-    validations:
-      required: true
-  - type: textarea
-    id: sysinfo
-    attributes:
-      label: 系统与内核信息（务必粘贴命令输出）
-      description: |
-        - macOS / Linux：请粘贴 `uname -mprs` 的完整输出
-        - Windows（PowerShell）：请粘贴以下命令的完整输出：
-          `"$([Environment]::OSVersion | ForEach-Object VersionString) $(if ([Environment]::Is64BitOperatingSystem) { "x64" } else { "x86" })"`
-      render: shell
-    validations:
-      required: true
-  - type: input
-    id: versions
-    attributes:
-      label: 版本信息
-      placeholder: MTGA GUI vX.Y.Z / Trae vA.B.C
-    validations:
-      required: true
