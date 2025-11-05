@@ -1,5 +1,5 @@
 name: 🐞 Bug Report（通用）
-description: 不属于上面分类的异常/崩溃/功能异常
+description: 不属于下面分类的异常/崩溃/功能异常
 title: "[BUG] 简要标题"
 labels: [bug]
 body:
