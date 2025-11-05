@@ -1329,14 +1329,12 @@ def create_main_window():
     about_tab = ttk.Frame(notebook)
     notebook.add(about_tab, text="关于")
     
-    about_text = "MTGA GUI v1.1.1 - 重构版\n\n"
-    about_text += "本版本采用单进程模块化架构，解决了 Nuitka 打包兼容性问题。\n\n"
-    about_text += "主要改进：\n"
-    about_text += "• 消除了多进程架构导致的打包问题\n"
-    about_text += "• 移除了对虚拟环境的硬依赖\n"
-    about_text += "• 使用资源管理器统一处理文件路径\n"
-    about_text += "• 代理服务器使用线程模式而非子进程\n"
-    about_text += "• 支持开发环境和打包环境的无缝切换\n"
+    about_text = "MTGA GUI v1.2.0\n\n"
+    about_text += "版本亮点：\n"
+    about_text += "• 重构模型映射架构：使用统一映射模型ID，代理支持模型ID映射与MTGA鉴权，全局配置支持映射模型ID和鉴权Key\n"
+    about_text += "• 配置组管理优化：名称改为可选，API URL、实际模型ID、API Key改为必填，移除目标模型ID字段并保留旧配置兼容\n"
+    about_text += "• 新增自动化测试：保存配置后自动拉取模型信息，支持聊天补全测活，提供响应内容与token消耗日志\n"
+    about_text += "• 增强用户体验：增加测活按钮与提示，异步测试避免UI阻塞，API Key默认掩码显示\n"
     
     about_label = ttk.Label(about_tab, text=about_text, justify=tk.LEFT, wraplength=550)
     about_label.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)

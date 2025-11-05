@@ -4,12 +4,12 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mtga-gui"
-version = "1.0.0"
-description = "MTGA GUI 代理工具"
+version = "1.2.0"
+description = "基于本地代理的方式，绕过 IDE 的固定模型服务商限制"
 readme = "README.md"
 requires-python = ">=3.13"
 authors = [
-    {name = "MTGA GUI Team"}
+    {name = "BiFangKNT"}
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -47,10 +47,10 @@ mac-build = [
 ]
 
 [project.scripts]
-mtga-gui = "mtga_gui:main"
+mtga-gui = "mtga_gui:gui"
 
-[tool.uv]
-dev-dependencies = []
+[dependency-groups]
+dev = []
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
