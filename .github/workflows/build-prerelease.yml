@@ -18,15 +18,10 @@ on:
         options:
           - prerelease
           - release
-      description:
+      start_commit:
         description: >-
-          发布说明（Markdown，可参考示例：
-          ## 🎉 MTGA GUI vX.Y.Z
-          - 新增：xxx
-          - 修复：yyy
-          或者预发布：
-          ## 🚀 MTGA GUI vX.Y.Z-beta.1
-          - 变更：zzz）
+          起始提交哈希（示例：
+          1234567890abcdef1234567890abcdef12345678）
         required: true
 
 env:
@@ -52,6 +47,8 @@ jobs:
     steps:
       - name: 📥 检出代码
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: 🐍 设置 Python
         uses: actions/setup-python@v5
@@ -367,14 +364,43 @@ jobs:
         id: release_notes
         run: |
           TAG_NAME="${{ steps.version.outputs.TAG_NAME }}"
-          MANUAL_DESCRIPTION="${{ github.event.inputs.description || '' }}"
+          START_COMMIT_INPUT="${{ github.event.inputs.start_commit || '' }}"
+          TARGET_COMMIT="${{ github.sha }}"
 
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            if [ -z "$MANUAL_DESCRIPTION" ]; then
-              echo "❌ 手动触发工作流时必须填写发布说明"
+            if [ -z "$START_COMMIT_INPUT" ]; then
+              echo "❌ 手动触发工作流时必须填写起始提交哈希"
               exit 1
             fi
-            printf '%s' "$MANUAL_DESCRIPTION" > release_notes.md
+            if ! git cat-file -e "$START_COMMIT_INPUT^{commit}" 2>/dev/null; then
+              echo "❌ 无法在仓库中找到起始提交：$START_COMMIT_INPUT"
+              exit 1
+            fi
+
+            START_COMMIT=$(git rev-parse "$START_COMMIT_INPUT")
+
+            if ! git merge-base --is-ancestor "$START_COMMIT" "$TARGET_COMMIT"; then
+              echo "❌ 起始提交不在当前构建提交的历史中：$START_COMMIT_INPUT"
+              exit 1
+            fi
+
+            : > release_notes.md
+
+            START_SUBJECT=$(git show -s --format='%s' "$START_COMMIT")
+            if echo "$START_SUBJECT" | grep -Eq '^(feat|fix)\b'; then
+              echo "- $START_SUBJECT ($START_COMMIT)" >> release_notes.md
+            fi
+
+            git log --format='%H%x09%s' --reverse "$START_COMMIT..$TARGET_COMMIT" | while IFS=$'\t' read -r HASH SUBJECT; do
+              if echo "$SUBJECT" | grep -Eq '^(feat|fix)\b'; then
+                echo "- $SUBJECT ($HASH)" >> release_notes.md
+              fi
+            done
+
+            MATCH_TOTAL=$(grep -c '^- ' release_notes.md || true)
+            if [ "$MATCH_TOTAL" -eq 0 ]; then
+              echo "- 暂无匹配的 feat/fix 提交" >> release_notes.md
+            fi
           else
             git show --no-patch --format='- %s' "${{ github.sha }}" > release_notes.md 2>/dev/null || true
             if [ ! -s release_notes.md ]; then
