@@ -1,4 +1,4 @@
-name: 🚀 构建和发布预发布版
+name: 🚀 构建和发布版本
 
 on:
   push:
@@ -10,6 +10,24 @@ on:
         description: '版本号 (例如: 1.2.0-beta.1)'
         required: true
         default: '1.2.0-beta.1'
+      release_type:
+        description: '发布类型'
+        required: true
+        default: 'prerelease'
+        type: choice
+        options:
+          - prerelease
+          - release
+      description:
+        description: >-
+          发布说明（Markdown，可参考示例：
+          ## 🎉 MTGA GUI vX.Y.Z
+          - 新增：xxx
+          - 修复：yyy
+          或者预发布：
+          ## 🚀 MTGA GUI vX.Y.Z-beta.1
+          - 变更：zzz）
+        required: true
 
 env:
   PYTHON_VERSION: '3.13'
@@ -274,8 +292,8 @@ jobs:
             dist-onefile/*.exe
           retention-days: 7
 
-  create-prerelease:
-    name: 🚀 创建预发布版
+  create-release:
+    name: 🚀 创建 GitHub 发布
     needs: [build-windows, build-macos]
     runs-on: ubuntu-latest
     
@@ -289,12 +307,30 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             VERSION="${{ github.event.inputs.version }}"
             TAG_NAME="v$VERSION"
+            RELEASE_TYPE="${{ github.event.inputs.release_type }}"
           else
             VERSION=${GITHUB_REF#refs/tags/v}
             TAG_NAME=${GITHUB_REF#refs/tags/}
+            if [[ "${TAG_NAME}" == *"-"* ]]; then
+              RELEASE_TYPE="prerelease"
+            else
+              RELEASE_TYPE="release"
+            fi
           fi
+
+          if [ "$RELEASE_TYPE" = "release" ]; then
+            RELEASE_LABEL="正式发布版"
+            RELEASE_NAME="🎉 MTGA GUI v${VERSION}"
+          else
+            RELEASE_LABEL="预发布版"
+            RELEASE_NAME="🚀 MTGA GUI v${VERSION}"
+          fi
+
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "RELEASE_TYPE=$RELEASE_TYPE" >> $GITHUB_OUTPUT
+          echo "RELEASE_LABEL=$RELEASE_LABEL" >> $GITHUB_OUTPUT
+          echo "RELEASE_NAME=$RELEASE_NAME" >> $GITHUB_OUTPUT
 
       - name: 📥 下载所有构建产物
         uses: actions/download-artifact@v4
@@ -311,114 +347,52 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          LABEL="${{ steps.version.outputs.RELEASE_LABEL }}"
+          if [ "$LABEL" = "预发布版" ]; then
+            EMOJI="🚀"
+          else
+            EMOJI="🎉"
+          fi
           
           # 删除已存在的标签（如果有）
           git tag -d ${{ steps.version.outputs.TAG_NAME }} || true
           git push origin :refs/tags/${{ steps.version.outputs.TAG_NAME }} || true
           
           # 创建新标签
-          git tag -a ${{ steps.version.outputs.TAG_NAME }} -m "🚀 预发布版 ${{ steps.version.outputs.VERSION }}"
+          git tag -a ${{ steps.version.outputs.TAG_NAME }} -m "$EMOJI $LABEL ${{ steps.version.outputs.VERSION }}"
           git push origin ${{ steps.version.outputs.TAG_NAME }}
 
       - name: 📝 生成发布说明
         id: release_notes
         run: |
-          # 收集版本与时间信息，后续用于替换模板变量
-          VERSION="${{ steps.version.outputs.VERSION }}"
-          PYTHON_VER="${{ env.PYTHON_VERSION }}"
-          COMMIT_SHA="${{ github.sha }}"
-          REPO_SLUG="${{ github.repository }}"
-          BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          TAG_NAME="${{ steps.version.outputs.TAG_NAME }}"
+          MANUAL_DESCRIPTION="${{ github.event.inputs.description || '' }}"
 
-          # 检索构建产物以便按实际平台生成下载说明
-          WINDOWS_EXE=$(find artifacts -type f -name "*.exe" | head -n 1 || true)
-          ARM_DMG=$(find artifacts -type f -name "*arm64.dmg" | head -n 1 || true)
-          X64_DMG=$(find artifacts -type f -name "*x64.dmg" | head -n 1 || true)
-          WIN_NAME=""
-          ARM_NAME=""
-          X64_NAME=""
-          if [ -n "$WINDOWS_EXE" ]; then
-            WIN_NAME=$(basename "$WINDOWS_EXE")
-          fi
-          if [ -n "$ARM_DMG" ]; then
-            ARM_NAME=$(basename "$ARM_DMG")
-          fi
-          if [ -n "$X64_DMG" ]; then
-            X64_NAME=$(basename "$X64_DMG")
-          fi
-
-          # 写入公共部分
-          cat > release_notes.md <<EOF
-          ## 🚀 MTGA GUI v${VERSION} (预发布版)
-
-          > ⚠️ **这是预发布版本，可能包含未完全测试的功能，请谨慎在生产环境中使用。**
-
-          ### 📦 下载说明
-
-          #### Windows 用户
-          EOF
-
-          if [ -n "$WIN_NAME" ]; then
-            echo "- 下载 \`$WIN_NAME\` 并双击运行（需要管理员权限）" >> release_notes.md
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ -z "$MANUAL_DESCRIPTION" ]; then
+              echo "❌ 手动触发工作流时必须填写发布说明"
+              exit 1
+            fi
+            printf '%s' "$MANUAL_DESCRIPTION" > release_notes.md
           else
-            echo "- 暂无可下载的 Windows 预发布包" >> release_notes.md
+            git show --no-patch --format='- %s' "${{ github.sha }}" > release_notes.md 2>/dev/null || true
+            if [ ! -s release_notes.md ]; then
+              printf '%s\n' "$TAG_NAME" > release_notes.md
+            fi
           fi
-
-          # 仅在存在对应包时写入 macOS 平台指引
-          if [ -n "$ARM_NAME" ] || [ -n "$X64_NAME" ]; then
-            {
-              echo
-              echo "#### macOS 用户"
-              if [ -n "$X64_NAME" ]; then
-                echo "- **Intel Mac**: 下载 \`$X64_NAME\`"
-              fi
-              if [ -n "$ARM_NAME" ]; then
-                echo "- **Apple Silicon Mac**: 下载 \`$ARM_NAME\`"
-              fi
-            } >> release_notes.md
-          else
-            {
-              echo
-              echo "#### macOS 用户"
-              echo "- 暂无可下载的 macOS 预发布包"
-            } >> release_notes.md
-          fi
-
-          cat >> release_notes.md <<EOF
-
-          #### 安装方法
-          **Windows:**
-          1. 下载 \`$WIN_NAME\` 文件
-          2. 双击运行（需要管理员权限）
-          3. 在图形界面中配置 API URL 和模型 ID
-          4. 点击"一键启动全部服务"
-
-          **macOS:**
-          1. 下载对应架构的 DMG 文件
-          2. 双击 DMG 文件挂载安装包
-          3. 将 `MTGA GUI.app` 拖拽到 `Applications` 文件夹
-          4. 首次运行可能需要在系统偏好设置中允许运行
-
-          ### 🔧 技术信息
-          - Python 版本: ${PYTHON_VER}
-          - 构建时间: ${BUILD_TIME}
-          - 提交哈希: ${COMMIT_SHA}
-
-          ### 🐛 问题反馈
-          如遇到问题，请在 [GitHub Issues](https://github.com/${REPO_SLUG}/issues) 中反馈。
-          EOF
 
           echo "RELEASE_NOTES<<EOF" >> $GITHUB_OUTPUT
           cat release_notes.md >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: 🚀 创建 GitHub 预发布版
+      - name: 🚀 创建 GitHub 发布
         uses: ncipollo/release-action@v1
         with:
           tag: ${{ steps.version.outputs.TAG_NAME }}
-          name: "🚀 MTGA GUI v${{ steps.version.outputs.VERSION }}"
+          name: ${{ steps.version.outputs.RELEASE_NAME }}
           body: ${{ steps.release_notes.outputs.RELEASE_NOTES }}
-          prerelease: true
+          prerelease: ${{ steps.version.outputs.RELEASE_TYPE != 'release' }}
           draft: false
           artifacts: |
             artifacts/windows-artifacts/*.exe
@@ -428,5 +402,5 @@ jobs:
 
       - name: ✅ 发布完成
         run: |
-          echo "🎉 预发布版 v${{ steps.version.outputs.VERSION }} 发布完成!"
+          echo "🎉 ${{ steps.version.outputs.RELEASE_LABEL }} v${{ steps.version.outputs.VERSION }} 发布完成!"
           echo "🔗 发布页面: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.TAG_NAME }}"
