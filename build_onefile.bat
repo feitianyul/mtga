@@ -84,6 +84,7 @@ uv run --python .venv\Scripts\python.exe nuitka ^
     --show-progress ^
     --show-memory ^
     --output-dir=dist-onefile ^
+    --assume-yes-for-downloads ^
     --include-data-files=ca/README.md=ca/README.md ^
     --include-data-files=ca/api.openai.com.cnf=ca/api.openai.com.cnf ^
     --include-data-files=ca/api.openai.com.subj=ca/api.openai.com.subj ^
@@ -128,7 +129,13 @@ if %ERRORLEVEL% equ 0 (
             echo ✅ 单文件版本构建完成（已重命名）！
             echo 可执行文件位于：%EXPECTED_EXE%
         ) else (
-            echo ⚠️  未能找到或重命名生成的可执行文件，请检查 dist-onefile 目录
+            echo ⚠️ 未能找到或重命名生成的可执行文件，请检查 dist-onefile 目录
+            if defined GITHUB_ACTIONS (
+                exit /b 1
+            ) else (
+                pause
+                exit /b 1
+            )
         )
     )
     echo.
