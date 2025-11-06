@@ -12,11 +12,15 @@ echo.
 REM 检查虚拟环境是否存在
 if not exist ".venv\Scripts\python.exe" (
     echo 错误：虚拟环境不存在，请先运行 uv sync --extra win-build 安装依赖
-    pause
-    exit /b 1
+    if defined GITHUB_ACTIONS (
+        exit /b 1
+    ) else (
+        pause
+        exit /b 1
+    )
 )
 
-REM 检查是否存在 vs 2022
+REM 检查是否存在可用的 Visual Studio MSVC 工具链
 if not "%~1"=="" (
     set "VC_BUILD_DIR=%~1"
 )
@@ -26,8 +30,12 @@ if defined VC_BUILD_DIR (
         echo 使用外部提供的 MSVC 工具链目录：%VC_BUILD_DIR%
     ) else (
         echo 错误：传入的 MSVC 目录不存在：%VC_BUILD_DIR%
-        pause
-        exit /b 1
+        if defined GITHUB_ACTIONS (
+            exit /b 1
+        ) else (
+            pause
+            exit /b 1
+        )
     )
 ) else (
     set "PREFERRED_VS_DIR=C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build"
@@ -55,8 +63,12 @@ if defined VC_BUILD_DIR (
         echo 找到 Visual Studio 工具链目录：%VC_BUILD_DIR%
     ) else (
         echo 错误：未找到可用的 Visual Studio 工具链，请先安装 Visual Studio（含 MSVC）
-        pause
-        exit /b 1
+        if defined GITHUB_ACTIONS (
+            exit /b 1
+        ) else (
+            pause
+            exit /b 1
+        )
     )
 )
 
@@ -101,8 +113,24 @@ uv run --python .venv\Scripts\python.exe nuitka ^
 
 echo.
 if %ERRORLEVEL% equ 0 (
-    echo ✅ 单文件版本构建完成！
-    echo 可执行文件位于：dist-onefile\MTGA_GUI-v%VERSION%-x64.exe
+    set "EXPECTED_EXE=dist-onefile\MTGA_GUI-v%VERSION%-x64.exe"
+    if exist "%EXPECTED_EXE%" (
+        echo ✅ 单文件版本构建完成！
+        echo 可执行文件位于：%EXPECTED_EXE%
+    ) else (
+        for %%F in ("dist-onefile\*.exe") do (
+            if not exist "%EXPECTED_EXE%" (
+                echo ⚠️  检测到输出文件 %%~nxF ，重命名为 MTGA_GUI-v%VERSION%-x64.exe
+                move "%%~F" "%EXPECTED_EXE%" >nul
+            )
+        )
+        if exist "%EXPECTED_EXE%" (
+            echo ✅ 单文件版本构建完成（已重命名）！
+            echo 可执行文件位于：%EXPECTED_EXE%
+        ) else (
+            echo ⚠️  未能找到或重命名生成的可执行文件，请检查 dist-onefile 目录
+        )
+    )
     echo.
     echo 单文件版本特点:
     echo • ✅ 仅一个 .exe 文件，便于分发
@@ -113,6 +141,10 @@ if %ERRORLEVEL% equ 0 (
     echo.
 ) else (
     echo ❌ 构建失败，返回码: %ERRORLEVEL%
+)
+
+if defined GITHUB_ACTIONS (
+    goto :EOF
 )
 
 pause

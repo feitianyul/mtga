@@ -26,3 +26,4 @@ MTGA_GUI.app
 *.dmg
 .trae
 node_modules
+tmp

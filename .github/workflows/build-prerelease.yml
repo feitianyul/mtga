@@ -278,7 +278,12 @@ jobs:
 
           # 执行构建
           try {
-            .\build_onefile.bat
+            if ($env:VC_BUILD_DIR) {
+              Write-Host "ℹ️ 传递检测到的 MSVC 目录: $env:VC_BUILD_DIR"
+              & .\build_onefile.bat "$env:VC_BUILD_DIR"
+            } else {
+              & .\build_onefile.bat
+            }
             Write-Host "✅ 构建脚本执行完成"
           } catch {
             Write-Host "❌ 构建失败: $_"
@@ -287,27 +292,42 @@ jobs:
 
       - name: 📱 验证可执行文件
         run: |
-          $exePath = "dist-onefile\${{ steps.version.outputs.EXE_NAME }}"
-          if (Test-Path $exePath) {
-            $size = (Get-Item $exePath).Length / 1MB
-            Write-Host "✅ Windows 可执行文件构建成功: $exePath"
+          $expectedName = "${{ steps.version.outputs.EXE_NAME }}"
+          $expectedPath = Join-Path "dist-onefile" $expectedName
+
+          if (-not (Test-Path "dist-onefile")) {
+            Write-Host "❌ dist-onefile 目录不存在，无法找到构建产物"
+            exit 1
+          }
+
+          if (-not (Test-Path $expectedPath)) {
+            $latestExe = Get-ChildItem -Path "dist-onefile" -Filter *.exe -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+            if ($latestExe) {
+              Write-Host "⚠️ 发现未命名为期望格式的可执行文件: $($latestExe.Name)"
+              Rename-Item -Path $latestExe.FullName -NewName $expectedName -Force
+            }
+          }
+
+          if (Test-Path $expectedPath) {
+            $size = (Get-Item $expectedPath).Length / 1MB
+            Write-Host "✅ Windows 可执行文件构建成功: $expectedPath"
             Write-Host "📊 文件大小: $([math]::Round($size, 2)) MB"
 
-            # 验证文件格式
-            $fileInfo = Get-Item $exePath
+            $fileInfo = Get-Item $expectedPath
             Write-Host "📋 文件信息:"
             Write-Host "  - 创建时间: $($fileInfo.CreationTime)"
             Write-Host "  - 修改时间: $($fileInfo.LastWriteTime)"
             Write-Host "  - 文件属性: $($fileInfo.Attributes)"
+            "WINDOWS_EXE_PATH=$expectedPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           } else {
-            Write-Host "❌ 未找到可执行文件: $exePath"
+            Write-Host "❌ 未找到预期的可执行文件: $expectedPath"
             Write-Host "📁 dist-onefile 目录内容:"
-            if (Test-Path "dist-onefile") {
-              Get-ChildItem -Path "dist-onefile" -Recurse | ForEach-Object {
+            Get-ChildItem -Path "dist-onefile" -Recurse | ForEach-Object {
+              if ($_.PSIsContainer) {
+                Write-Host "  [目录] $($_.FullName)"
+              } else {
                 Write-Host "  $($_.FullName) ($([math]::Round($_.Length/1MB, 2)) MB)"
               }
-            } else {
-              Write-Host "  dist-onefile 目录不存在"
             }
             exit 1
           }
