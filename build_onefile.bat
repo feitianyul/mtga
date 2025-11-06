@@ -17,14 +17,47 @@ if not exist ".venv\Scripts\python.exe" (
 )
 
 REM 检查是否存在 vs 2022
-set "VS2022DIR=C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build"
+if not "%~1"=="" (
+    set "VC_BUILD_DIR=%~1"
+)
 
-if not exist "%VS2022DIR%" (
-    echo 错误：未找到 Visual Studio 2022，请先安装 Visual Studio 2022
-    pause
-    exit /b 1
-)else (
-    echo 找到 Visual Studio 2022 : %VS2022DIR%
+if defined VC_BUILD_DIR (
+    if exist "%VC_BUILD_DIR%" (
+        echo 使用外部提供的 MSVC 工具链目录：%VC_BUILD_DIR%
+    ) else (
+        echo 错误：传入的 MSVC 目录不存在：%VC_BUILD_DIR%
+        pause
+        exit /b 1
+    )
+) else (
+    set "PREFERRED_VS_DIR=C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build"
+    if exist "%PREFERRED_VS_DIR%" (
+        set "VC_BUILD_DIR=%PREFERRED_VS_DIR%"
+    ) else (
+        for %%I in (
+            "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build"
+            "C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build"
+            "C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build"
+            "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build"
+            "C:\Program Files (x86)\Microsoft Visual Studio\2019\Professional\VC\Auxiliary\Build"
+            "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build"
+            "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build"
+        ) do (
+            if not defined VC_BUILD_DIR (
+                if exist %%~I (
+                    set "VC_BUILD_DIR=%%~I"
+                )
+            )
+        )
+    )
+
+    if defined VC_BUILD_DIR (
+        echo 找到 Visual Studio 工具链目录：%VC_BUILD_DIR%
+    ) else (
+        echo 错误：未找到可用的 Visual Studio 工具链，请先安装 Visual Studio（含 MSVC）
+        pause
+        exit /b 1
+    )
 )
 
 REM 创建输出目录
