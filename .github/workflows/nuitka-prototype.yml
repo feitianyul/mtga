@@ -1,0 +1,153 @@
+name: ⚙️ Nuitka 原型验证
+
+on:
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: "3.13"
+  PROBE_ENTRY: tests/nuitka_probe_app.py
+  PROBE_OUTPUT_DIR: dist-onefile
+
+jobs:
+  nuitka-probe:
+    name: 🧪 Windows Nuitka 原型
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: 📥 检出代码
+        uses: actions/checkout@v4
+
+      - name: 📂 打印工作目录信息
+        run: |
+          $workspace = Resolve-Path .
+          Write-Host "GITHUB_WORKSPACE: $env:GITHUB_WORKSPACE"
+          Write-Host "当前工作目录: $($workspace.Path)"
+          Write-Host "目录内容:"
+          Get-ChildItem | ForEach-Object { Write-Host "  $($_.FullName)" }
+
+      - name: 🐍 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: 📦 安装 uv
+        run: |
+          Invoke-WebRequest -Uri "https://astral.sh/uv/install.ps1" -OutFile "install.ps1"
+          ./install.ps1
+          echo "$env:USERPROFILE\.local\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: 🔧 安装依赖 (win-build)
+        run: |
+          uv sync --extra win-build
+
+      - name: 🔍 检查 Visual Studio
+        run: |
+          $vcBuildDir = $null
+          $vswherePath = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+          if (Test-Path $vswherePath) {
+            try {
+              $installationPath = & $vswherePath -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+              if ($installationPath) {
+                $candidate = Join-Path $installationPath "VC\Auxiliary\Build"
+                if (Test-Path $candidate) {
+                  $vcBuildDir = $candidate
+                }
+              }
+            } catch {
+              Write-Host "⚠️ vswhere 检测失败: $_"
+            }
+          }
+
+          if (-not $vcBuildDir) {
+            $fallbackPaths = @(
+              "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build",
+              "C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build",
+              "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build",
+              "C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build",
+              "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build",
+              "C:\Program Files (x86)\Microsoft Visual Studio\2019\Professional\VC\Auxiliary\Build",
+              "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build",
+              "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build"
+            )
+
+            foreach ($path in $fallbackPaths) {
+              if (Test-Path $path) {
+                $vcBuildDir = $path
+                break
+              }
+            }
+          }
+
+          if ($vcBuildDir) {
+            Write-Host "✅ 找到可用的 MSVC 环境: $vcBuildDir"
+            "VC_BUILD_DIR=$vcBuildDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          } else {
+            Write-Host "❌ 未找到任何已安装的 Visual Studio MSVC 环境，后续构建可能失败"
+          }
+
+      - name: ⚙️ 获取版本信息
+        id: version
+        run: |
+          $probeVersion = "probe-${{ github.run_id }}"
+          echo "VERSION=$probeVersion" >> $env:GITHUB_OUTPUT
+          $exeName = "MTGA_GUI-v$probeVersion-x64.exe"
+          echo "EXE_NAME=$exeName" >> $env:GITHUB_OUTPUT
+
+      - name: 🔨 构建 Nuitka 原型 (快速)
+        run: |
+          $entryPath = (Resolve-Path $env:PROBE_ENTRY).Path
+          $version = "${{ steps.version.outputs.VERSION }}"
+          if ($env:VC_BUILD_DIR) {
+            Write-Host "传入 MSVC 目录: $env:VC_BUILD_DIR"
+            & .\build_probe_onefile.bat "$env:VC_BUILD_DIR" "$version" "$entryPath"
+          } else {
+            & .\build_probe_onefile.bat "" "$version" "$entryPath"
+          }
+
+      - name: 🔍 验证构建产物（含绝对路径）
+        run: |
+          $workspace = Resolve-Path .
+          $distDir = Join-Path $workspace.Path $env:PROBE_OUTPUT_DIR
+          $exePath = $env:PROBE_EXE_PATH
+          $expectedName = "${{ steps.version.outputs.EXE_NAME }}"
+          Write-Host "工作目录绝对路径: $($workspace.Path)"
+          Write-Host "dist-onefile 绝对路径: $distDir"
+          if (-not $exePath) {
+            $exePath = Join-Path $distDir $expectedName
+          }
+          Write-Host "期望的产物路径: $exePath"
+
+          if (Test-Path $exePath) {
+            $exeItem = Get-Item $exePath
+            Write-Host "✅ 找到可执行文件: $($exeItem.FullName)"
+            Write-Host "文件大小: $([math]::Round($exeItem.Length / 1MB, 2)) MB"
+            Write-Host "dist-onefile 顶层内容:"
+            Get-ChildItem -Path $distDir | ForEach-Object { Write-Host "  $($_.FullName)" }
+            "PROBE_EXE_PATH=$($exeItem.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          } else {
+            Write-Host "❌ 未找到可执行文件: $exePath"
+            Write-Host "当前 dist-onefile 内容:"
+            Get-ChildItem -Path $distDir -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+              Write-Host "  $($_.FullName)"
+            }
+            exit 1
+          }
+
+      - name: ▶️ 运行原型可执行文件
+        run: |
+          $exePath = $env:PROBE_EXE_PATH
+          if (-not $exePath) {
+            $workspace = Resolve-Path .
+            $exePath = Join-Path $workspace.Path $env:PROBE_OUTPUT_DIR
+            $exePath = Join-Path $exePath "${{ steps.version.outputs.EXE_NAME }}"
+          }
+          if (-not (Test-Path $exePath)) {
+            Write-Host "❌ 无法执行，未找到可执行文件: $exePath"
+            exit 1
+          }
+          $env:NUITKA_PROBE_FLAG = "workflow_run"
+          Write-Host "执行: $exePath"
+          & $exePath
