@@ -111,15 +111,7 @@ uv run --python .venv\Scripts\python.exe nuitka ^
     --output-filename=%PROBE_EXE_NAME% ^
     "%PROBE_ENTRY%"
 
-if %ERRORLEVEL% neq 0 (
-    echo [probe] ❌ 构建失败，返回码：%ERRORLEVEL%
-    if defined GITHUB_ACTIONS (
-        exit /b %ERRORLEVEL%
-    ) else (
-        pause
-        exit /b %ERRORLEVEL%
-    )
-)
+if %ERRORLEVEL% neq 0 goto PROBE_BUILD_FAIL
 
 set "WAIT_ATTEMPTS=0"
 set "ABS_EXPECTED_EXE="
@@ -154,6 +146,19 @@ if defined GITHUB_ACTIONS (
 )
 
 :AFTER_PROBE_RESULT
+
+goto END_PROBE
+
+:PROBE_BUILD_FAIL
+echo [probe] ❌ 构建失败，返回码：%ERRORLEVEL%
+if defined GITHUB_ACTIONS (
+    exit /b %ERRORLEVEL%
+) else (
+    pause
+    exit /b %ERRORLEVEL%
+)
+
+:END_PROBE
 
 if defined GITHUB_ACTIONS (
     goto :EOF
