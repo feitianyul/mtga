@@ -115,29 +115,64 @@ uv run --python .venv\Scripts\python.exe nuitka ^
 echo.
 if %ERRORLEVEL% equ 0 (
     set "EXPECTED_EXE=dist-onefile\MTGA_GUI-v%VERSION%-x64.exe"
+    set "EXPECTED_EXE_NAME=MTGA_GUI-v%VERSION%-x64.exe"
+    set "WAIT_ATTEMPTS=0"
+    set "FOUND_EXE_PATH="
+
+:WAIT_EXPECTED_ONEFILE
     if exist "%EXPECTED_EXE%" (
-        echo ✅ 单文件版本构建完成！
-        echo 可执行文件位于：%EXPECTED_EXE%
-    ) else (
-        for %%F in ("dist-onefile\*.exe") do (
-            if not exist "%EXPECTED_EXE%" (
-                echo ⚠️  检测到输出文件 %%~nxF ，重命名为 MTGA_GUI-v%VERSION%-x64.exe
-                move "%%~F" "%EXPECTED_EXE%" >nul
-            )
-        )
-        if exist "%EXPECTED_EXE%" (
-            echo ✅ 单文件版本构建完成（已重命名）！
-            echo 可执行文件位于：%EXPECTED_EXE%
-        ) else (
-            echo ⚠️ 未能找到或重命名生成的可执行文件，请检查 dist-onefile 目录
-            if defined GITHUB_ACTIONS (
-                exit /b 1
-            ) else (
-                pause
-                exit /b 1
-            )
-        )
+        goto REPORT_ONEFILE_SUCCESS
     )
+    if %WAIT_ATTEMPTS% GEQ 15 (
+        goto SEARCH_ONEFILE_ALTERNATIVE
+    )
+    set /a WAIT_ATTEMPTS+=1
+    timeout /t 2 /nobreak >nul
+    goto WAIT_EXPECTED_ONEFILE
+
+:SEARCH_ONEFILE_ALTERNATIVE
+    for /f "delims=" %%F in ('dir /b /a:-d "dist-onefile\*.exe" 2^>nul') do (
+        set "FOUND_EXE_PATH=dist-onefile\%%F"
+        set "FOUND_EXE_NAME=%%F"
+    )
+    if defined FOUND_EXE_PATH (
+        if /I "%FOUND_EXE_NAME%"=="%EXPECTED_EXE_NAME%" (
+            if exist "%FOUND_EXE_PATH%" (
+                goto REPORT_ONEFILE_SUCCESS
+            )
+        )
+        echo ⚠️ 检测到输出文件 %FOUND_EXE_PATH%，重命名为 %EXPECTED_EXE_NAME%
+        move /Y "%FOUND_EXE_PATH%" "%EXPECTED_EXE%" >nul 2>&1
+        if exist "%EXPECTED_EXE%" (
+            goto REPORT_ONEFILE_RENAMED
+        ) else (
+            echo ❌ 重命名失败，请检查 dist-onefile 目录
+            goto FAIL_ONEFILE
+        )
+    ) else (
+        goto FAIL_ONEFILE
+    )
+
+:REPORT_ONEFILE_SUCCESS
+    echo ✅ 单文件版本构建完成！
+    echo 可执行文件位于：%EXPECTED_EXE%
+    goto PRINT_ONEFILE_FEATURES
+
+:REPORT_ONEFILE_RENAMED
+    echo ✅ 单文件版本构建完成（已重命名）！
+    echo 可执行文件位于：%EXPECTED_EXE%
+    goto PRINT_ONEFILE_FEATURES
+
+:FAIL_ONEFILE
+    echo ❌ 未能找到任何 .exe 文件，请检查 dist-onefile 目录
+    if defined GITHUB_ACTIONS (
+        exit /b 1
+    ) else (
+        pause
+        exit /b 1
+    )
+
+:PRINT_ONEFILE_FEATURES
     echo.
     echo 单文件版本特点:
     echo • ✅ 仅一个 .exe 文件，便于分发

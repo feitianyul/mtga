@@ -121,22 +121,39 @@ if %ERRORLEVEL% neq 0 (
     )
 )
 
+set "WAIT_ATTEMPTS=0"
+set "ABS_EXPECTED_EXE="
+
+:WAIT_PROBE_EXE
 if exist "%EXPECTED_EXE%" (
     for %%I in ("%EXPECTED_EXE%") do set "ABS_EXPECTED_EXE=%%~fI"
-    echo [probe] ✅ 构建完成，产物：%ABS_EXPECTED_EXE%
-    if defined GITHUB_ENV (
-        >>"%GITHUB_ENV%" echo PROBE_EXE_PATH=%ABS_EXPECTED_EXE%
-    )
-) else (
-    echo [probe] ❌ 构建完成但未找到产物，请检查 %PROBE_OUTPUT_DIR%
-    dir "%PROBE_OUTPUT_DIR%"
-    if defined GITHUB_ACTIONS (
-        exit /b 1
-    ) else (
-        pause
-        exit /b 1
-    )
+    goto REPORT_PROBE_SUCCESS
 )
+if %WAIT_ATTEMPTS% GEQ 15 (
+    goto REPORT_PROBE_FAILURE
+)
+set /a WAIT_ATTEMPTS+=1
+timeout /t 2 /nobreak >nul
+goto WAIT_PROBE_EXE
+
+:REPORT_PROBE_SUCCESS
+echo [probe] ✅ 构建完成，产物：%ABS_EXPECTED_EXE%
+if defined GITHUB_ENV (
+    >>"%GITHUB_ENV%" echo PROBE_EXE_PATH=%ABS_EXPECTED_EXE%
+)
+goto AFTER_PROBE_RESULT
+
+:REPORT_PROBE_FAILURE
+echo [probe] ❌ 构建完成但未找到产物，请检查 %PROBE_OUTPUT_DIR%
+dir "%PROBE_OUTPUT_DIR%"
+if defined GITHUB_ACTIONS (
+    exit /b 1
+) else (
+    pause
+    exit /b 1
+)
+
+:AFTER_PROBE_RESULT
 
 if defined GITHUB_ACTIONS (
     goto :EOF
