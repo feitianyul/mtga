@@ -43,7 +43,6 @@ jobs:
           - arch: arm64  
             runner_arch: arm64
             nuitka_arch: arm64
-    if: false  # 暂时禁用，后续启用
 
     steps:
       - name: 📥 检出代码
