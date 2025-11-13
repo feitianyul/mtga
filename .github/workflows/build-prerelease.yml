@@ -384,6 +384,8 @@ jobs:
     steps:
       - name: 📥 检出代码
         uses: actions/checkout@v4
+        with:
+            fetch-depth: 0
 
       - name: ⚙️ 获取版本信息
         id: version
