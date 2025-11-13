@@ -59,11 +59,29 @@ jobs:
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> $GITHUB_PATH
+      - name: 💾 缓存 uv 依赖
+        uses: actions/cache@v4
+        with:
+          path: |
+            .venv
+            ~/.cache/uv
+          key: ${{ runner.os }}-uv-${{ matrix.arch }}-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-${{ matrix.arch }}-
 
       - name: 🔧 安装依赖
         run: |
           uv sync --extra mac-build
 
+      - name: 💾 缓存 Nuitka 工具
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/Nuitka
+            ~/.cache/nuitka
+          key: ${{ runner.os }}-nuitka-${{ matrix.arch }}-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-nuitka-${{ matrix.arch }}-
       - name: 🛠️ 安装 Xcode Command Line Tools
         run: |
           sudo xcode-select --install || true
@@ -203,10 +221,28 @@ jobs:
           Invoke-WebRequest -Uri "https://astral.sh/uv/install.ps1" -OutFile "install.ps1"
           ./install.ps1
           echo "$env:USERPROFILE\.local\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: 💾 缓存 uv 依赖
+        uses: actions/cache@v4
+        with:
+          path: |
+            .venv
+            ${{ env.USERPROFILE }}\.cache\uv
+          key: ${{ runner.os }}-uv-win-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-win-
 
       - name: 🔧 安装依赖
         run: |
           uv sync --extra win-build
+
+      - name: 💾 缓存 Nuitka 工具
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.USERPROFILE }}\AppData\Local\Nuitka
+          key: ${{ runner.os }}-nuitka-win-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-nuitka-win-
 
       - name: 🔍 检查 Visual Studio
         run: |
