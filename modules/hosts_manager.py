@@ -8,7 +8,7 @@ import os
 import sys
 import shutil
 import subprocess
-from .resource_manager import get_base_path, ResourceManager
+from .resource_manager import ResourceManager
 
 
 def get_hosts_file_path():
@@ -110,7 +110,6 @@ def write_hosts_file_with_permission(hosts_file, content, encoding, log_func=pri
     if sys.platform == 'darwin':
         # macOS: 使用 osascript 请求管理员权限
         import tempfile
-        import base64
         
         # 创建临时文件
         with tempfile.NamedTemporaryFile(mode='w', encoding=encoding, delete=False) as temp_file:
@@ -135,7 +134,7 @@ def write_hosts_file_with_permission(hosts_file, content, encoding, log_func=pri
             # 清理临时文件
             try:
                 os.remove(temp_path)
-            except:
+            except OSError:
                 pass
     else:
         # Windows 和其他系统：直接写入

@@ -9,7 +9,6 @@ import time
 import ssl
 import os
 import logging
-import socket
 import yaml
 from werkzeug.serving import WSGIRequestHandler, BaseWSGIServer
 from flask import Flask, request, jsonify, Response
@@ -128,7 +127,7 @@ class ProxyServer:
     
     def _get_models(self):
         """处理模型列表请求，支持映射模型ID和鉴权验证"""
-        self.log_func(f"收到模型列表请求 /v1/models")
+        self.log_func("收到模型列表请求 /v1/models")
         
         # 验证鉴权
         auth_header = request.headers.get('Authorization')
@@ -177,10 +176,9 @@ class ProxyServer:
     
     def _chat_completions(self):
         """处理聊天补全请求"""
-        self.log_func(f"收到聊天补全请求 /v1/chat/completions")
+        self.log_func("收到聊天补全请求 /v1/chat/completions")
         
         if self.debug_mode:
-            import datetime
             # 调试模式下记录请求头和请求体
             headers_str = "\\n".join(f"{k}: {v}" for k, v in request.headers.items())
             log_message = f"--- 请求头 (调试模式) ---\\n{headers_str}\\n--------------------------------------"

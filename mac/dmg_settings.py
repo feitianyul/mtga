@@ -24,7 +24,7 @@ if os.path.isabs(application):
 appname = os.path.basename(application)
 
 # 添加调试信息
-print(f"DMG配置调试信息:")
+print("DMG配置调试信息:")
 print(f"环境变量 MTGA_APP_NAME: {os.environ.get('MTGA_APP_NAME', 'Not Set')}")
 print(f"应用路径: {application}")
 print(f"应用名称: {appname}")

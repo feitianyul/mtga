@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# ruff: noqa: E402
 
 # 在最早阶段设置 UTF-8 编码环境变量 - 必须在任何导入之前
 import os
@@ -14,10 +15,10 @@ import locale
 if sys.platform == 'darwin':
     try:
         locale.setlocale(locale.LC_ALL, 'zh_CN.UTF-8')
-    except:
+    except Exception:
         try:
             locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
-        except:
+        except Exception:
             pass
 
 """
@@ -35,7 +36,6 @@ import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox
 import ctypes
 import time
-from pathlib import Path
 import yaml
 import requests
 
@@ -59,11 +59,11 @@ def setup_environment():
         home_dir = os.path.expanduser('~')
         try:
             os.chdir(home_dir)
-        except:
+        except OSError:
             # Fallback: switch to executable directory
             try:
                 os.chdir(executable_dir)
-            except:
+            except OSError:
                 pass  # If both fail, continue running
     
     # Set TCL/TK library paths (if they exist)
@@ -132,7 +132,7 @@ def check_is_admin():
             return os.geteuid() == 0
         else:
             return False
-    except:
+    except Exception:
         return False
 
 
@@ -146,7 +146,7 @@ def run_as_admin():
             sys.exit(0)
         elif os.name == 'posix':  # Unix/Linux/macOS
             print("此程序需要管理员权限才能运行。")
-            print(f"请使用以下命令重新运行：")
+            print("请使用以下命令重新运行：")
             print(f"sudo {sys.executable} {' '.join(sys.argv)}")
             sys.exit(1)
         else:
@@ -273,14 +273,14 @@ def test_model_connection(config_group, log_func=print):
                         log_func(f"   模型ID: {model_info['id']}")
                     if 'object' in model_info:
                         log_func(f"   对象类型: {model_info['object']}")
-                except:
+                except Exception:
                     log_func("   (响应解析成功，但无法获取详细信息)")
             else:
                 log_func(f"❌ 模型测试失败: HTTP {response.status_code}")
                 try:
                     error_info = response.text[:200]
                     log_func(f"   错误信息: {error_info}")
-                except:
+                except Exception:
                     log_func("   (无法获取错误详情)")
                     
         except requests.exceptions.Timeout:
@@ -342,14 +342,14 @@ def test_chat_completion(config_group, log_func=print):
                     if 'usage' in completion_info:
                         usage = completion_info['usage']
                         log_func(f"   消耗tokens: {usage.get('total_tokens', '未知')}")
-                except:
+                except Exception:
                     log_func("   (响应成功，但无法解析详细信息)")
             else:
                 log_func(f"❌ 模型测活失败: HTTP {response.status_code}")
                 try:
                     error_info = response.text[:200]
                     log_func(f"   错误信息: {error_info}")
-                except:
+                except Exception:
                     log_func("   (无法获取错误详情)")
                     
         except requests.exceptions.Timeout:
@@ -369,7 +369,7 @@ def create_main_window():
     if sys.platform == 'darwin' and os.getcwd() == '/':
         try:
             os.chdir(os.path.expanduser('~'))
-        except:
+        except OSError:
             pass
     
     window = tk.Tk()
@@ -1482,7 +1482,7 @@ def main():
                 f.write(error_msg)
                 f.write(f"Working directory: {os.getcwd()}\n")
                 f.write(f"Traceback:\n{traceback.format_exc()}\n")
-        except:
+        except Exception:
             pass
         
         # 在 macOS 上，如果是从 Finder 启动，显示错误对话框
@@ -1490,7 +1490,7 @@ def main():
             try:
                 import tkinter.messagebox as msgbox
                 msgbox.showerror("MTGA GUI Error", error_msg)
-            except:
+            except Exception:
                 pass
         
         # 退出程序

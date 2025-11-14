@@ -334,7 +334,7 @@ def generate_server_cert(resource_manager, domain="api.openai.com", log_func=pri
     log_func(f"证书 {domain}.crt 生成成功 (大小: {file_size} bytes)")
     log_func(f"私钥 {domain}.key 生成成功")
     log_func("")
-    log_func(f"=== 服务器证书生成完成 ===")
+    log_func("=== 服务器证书生成完成 ===")
     return True
 
 

@@ -160,7 +160,7 @@ def install_ca_cert_macos(ca_cert_file, log_func=print):
                 try:
                     subprocess.run(['open', '-a', 'Keychain Access'], check=False)
                     log_func("已尝试自动打开钥匙串访问应用")
-                except:
+                except Exception:
                     log_func("无法自动打开钥匙串访问应用，请手动打开")
                 
                 return True
@@ -193,7 +193,7 @@ def install_ca_cert_macos(ca_cert_file, log_func=print):
                 try:
                     subprocess.run(['open', ca_cert_file], check=False)
                     log_func(f"已尝试自动打开证书文件: {ca_cert_file}")
-                except:
+                except Exception:
                     log_func("无法自动打开证书文件，请手动打开")
                 
                 return True

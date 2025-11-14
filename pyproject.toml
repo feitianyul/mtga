@@ -55,6 +55,16 @@ dev = [
     "ruff>=0.14.4",
 ]
 
+[tool.pyright]
+pythonVersion = "3.13"
+exclude = ["archive", ".uv_cache", ".venv"]
+venvPath = "."
+venv = ".venv"
+
+[tool.ruff]
+target-version = "py313"
+extend-exclude = ["archive"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
 
