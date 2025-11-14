@@ -50,7 +50,10 @@ mac-build = [
 mtga-gui = "mtga_gui:gui"
 
 [dependency-groups]
-dev = []
+dev = [
+    "pyright>=1.1.407",
+    "ruff>=0.14.4",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
