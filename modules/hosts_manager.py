@@ -307,14 +307,14 @@ def open_hosts_file(log_func=print):
         return False
 
 
-def modify_hosts_file(domain="api.openai.com", action="add", ip="127.0.0.1", log_func=print):
+def modify_hosts_file(domain="api.openai.com", action="add", ip=("127.0.0.1", "::1"), log_func=print):
     """
     修改 hosts 文件的主函数
     
     参数:
         domain: 域名
         action: 操作类型 ("add", "remove", "backup", "restore")
-        ip: IP 地址（仅在 action="add" 时使用）
+        ip: 单个 IP 字符串或可迭代的多个 IP（仅在 action="add" 时使用）
         log_func: 日志输出函数
         
     返回:
@@ -334,7 +334,20 @@ def modify_hosts_file(domain="api.openai.com", action="add", ip="127.0.0.1", log
     elif action == "restore":
         return restore_hosts_file(log_func)
     elif action == "add":
-        return add_hosts_entry(domain, ip, log_func)
+        if isinstance(ip, (list, tuple, set)):
+            ips = list(ip)
+        elif ip is None:
+            ips = []
+        else:
+            ips = [ip]
+        
+        results = []
+        for ip_addr in ips:
+            if not ip_addr:
+                continue
+            results.append(add_hosts_entry(domain, ip_addr, log_func))
+        
+        return all(results) if results else True
     elif action == "remove":
         return remove_hosts_entry(domain, log_func)
     else:

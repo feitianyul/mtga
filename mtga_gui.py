@@ -1012,7 +1012,8 @@ def create_main_window():
             action_names = {'add': '修改', 'backup': '备份', 'restore': '还原'}
             action_name = action_names.get(action, action)
             log(f"开始{action_name} hosts文件...")
-            if modify_hosts_file(action=action, log_func=log):
+            ip_tuple = ("127.0.0.1", "::1")
+            if modify_hosts_file(action=action, ip=ip_tuple, log_func=log):
                 log(f"✅ hosts文件{action_name}完成")
             else:
                 log(f"❌ hosts文件{action_name}失败")
