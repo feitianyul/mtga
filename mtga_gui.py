@@ -374,7 +374,7 @@ def create_main_window():
     
     window = tk.Tk()
     window.title("MTGA GUI")
-    window.geometry("1250x700")
+    window.geometry("1250x750")
     window.resizable(True, True)
     
     # 设置窗口图标
@@ -1326,18 +1326,41 @@ def create_main_window():
         create_tooltip(btn_clear, "删除所有用户数据（保留历史备份）\n清除内容：配置文件、SSL证书、hosts备份\n保留内容：backups文件夹及其历史备份")
     
     # 关于标签页
-    about_tab = ttk.Frame(notebook)
+    style = ttk.Style()
+    style.configure('About.TFrame', background='#f0f0f0')
+    about_tab = ttk.Frame(notebook, style='About.TFrame')
     notebook.add(about_tab, text="关于")
     
-    about_text = "MTGA GUI v1.2.0\n\n"
-    about_text += "版本亮点：\n"
-    about_text += "• 重构模型映射架构：使用统一映射模型ID，代理支持模型ID映射与MTGA鉴权，全局配置支持映射模型ID和鉴权Key\n"
-    about_text += "• 配置组管理优化：名称改为可选，API URL、实际模型ID、API Key改为必填，移除目标模型ID字段并保留旧配置兼容\n"
-    about_text += "• 新增自动化测试：保存配置后自动拉取模型信息，支持聊天补全测活，提供响应内容与token消耗日志\n"
-    about_text += "• 增强用户体验：增加测活按钮与提示，异步测试避免UI阻塞，API Key默认掩码显示\n"
-    
-    about_label = ttk.Label(about_tab, text=about_text, justify=tk.LEFT, wraplength=550)
-    about_label.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+    about_title = "MTGA GUI v1.2.0"
+    about_body = "版本亮点：\n"
+    about_body += "• 重构模型映射架构：使用统一映射模型ID，代理支持模型ID映射与MTGA鉴权，全局配置支持映射模型ID和鉴权Key\n"
+    about_body += "• 配置组管理优化：名称改为可选，API URL、实际模型ID、API Key改为必填，移除目标模型ID字段并保留旧配置兼容\n"
+    about_body += "• 新增自动化测试：保存配置后自动拉取模型信息，支持聊天补全测活，提供响应内容与token消耗日志\n"
+    about_body += "• 增强用户体验：增加测活按钮与提示，异步测试避免UI阻塞，API Key默认掩码显示\n"
+
+    # 使用带滚动条的文本组件显示关于信息，减少标签页的最小高度
+    about_text_widget = scrolledtext.ScrolledText(
+        about_tab,
+        height=5,
+        wrap='none',
+        background='#f0f0f0',
+        relief='flat',
+        borderwidth=0,
+        highlightthickness=0
+    )
+    about_text_widget.pack(fill=tk.BOTH, expand=True, padx=5, pady=(5, 0))
+    # 添加水平滚动条
+    about_x_scroll = ttk.Scrollbar(about_tab, orient=tk.HORIZONTAL, command=about_text_widget.xview)
+    about_text_widget.configure(xscrollcommand=about_x_scroll.set)
+    about_x_scroll.pack(fill=tk.X, padx=5, pady=(0, 5))
+    from tkinter import font as tkfont
+    default_font = tkfont.nametofont(about_text_widget.cget("font"))
+    bold_font = default_font.copy()
+    bold_font.configure(weight="bold")
+    about_text_widget.tag_config("h2", font=("Microsoft YaHei", 10, "bold"), background="#f0f0f0")
+    about_text_widget.insert(tk.END, about_title + "\n\n", "h2")
+    about_text_widget.insert(tk.END, about_body)
+    about_text_widget.config(state='disabled')
     
     # 一键启动按钮
     def start_all_task():
