@@ -1,19 +1,21 @@
-# -*- coding: utf-8 -*-
 """
 hosts 文件管理模块
 处理 hosts 文件的备份、修改、还原等操作
 """
 
 import os
-import sys
 import shutil
 import subprocess
+import sys
+import tempfile
+from contextlib import suppress
+
 from .resource_manager import ResourceManager
 
 
 def get_hosts_file_path():
     """获取 hosts 文件路径"""
-    if os.name == 'nt':  # Windows
+    if os.name == "nt":  # Windows
         return r"C:\Windows\System32\drivers\etc\hosts"
     else:  # Unix/Linux/macOS
         return "/etc/hosts"
@@ -27,36 +29,36 @@ def get_backup_file_path():
 
 def detect_file_encoding(file_path):
     """检测文件编码"""
-    encodings = ['utf-8', 'gbk', 'gb2312', 'latin1', 'utf-16']
+    encodings = ["utf-8", "gbk", "gb2312", "latin1", "utf-16"]
     for enc in encodings:
         try:
-            with open(file_path, 'r', encoding=enc) as f:
+            with open(file_path, encoding=enc) as f:
                 f.read()
             return enc
         except UnicodeDecodeError:
             continue
-    return 'utf-8'  # 默认编码
+    return "utf-8"  # 默认编码
 
 
 def backup_hosts_file(log_func=print):
     """
     备份 hosts 文件
-    
+
     参数:
         log_func: 日志输出函数
-        
+
     返回:
         成功返回 True，失败返回 False
     """
     hosts_file = get_hosts_file_path()
     backup_file = get_backup_file_path()
-    
+
     log_func("开始备份 hosts 文件...")
-    
+
     if not os.path.exists(hosts_file):
         log_func(f"错误: hosts 文件不存在: {hosts_file}")
         return False
-    
+
     try:
         shutil.copy2(hosts_file, backup_file)
         log_func(f"hosts 文件已备份到: {backup_file}")
@@ -69,22 +71,22 @@ def backup_hosts_file(log_func=print):
 def restore_hosts_file(log_func=print):
     """
     还原 hosts 文件
-    
+
     参数:
         log_func: 日志输出函数
-        
+
     返回:
         成功返回 True，失败返回 False
     """
     hosts_file = get_hosts_file_path()
     backup_file = get_backup_file_path()
-    
+
     log_func("开始还原 hosts 文件...")
-    
+
     if not os.path.exists(backup_file):
         log_func(f"错误: 备份文件不存在: {backup_file}")
         return False
-    
+
     try:
         shutil.copy2(backup_file, hosts_file)
         log_func("hosts 文件已还原")
@@ -97,30 +99,32 @@ def restore_hosts_file(log_func=print):
 def write_hosts_file_with_permission(hosts_file, content, encoding, log_func=print):
     """
     使用适当的权限写入 hosts 文件
-    
+
     参数:
         hosts_file: hosts 文件路径
         content: 要写入的内容
         encoding: 文件编码
         log_func: 日志输出函数
-        
+
     返回:
         成功返回 True，失败返回 False
     """
-    if sys.platform == 'darwin':
+    if sys.platform == "darwin":
         # macOS: 使用 osascript 请求管理员权限
-        import tempfile
-        
         # 创建临时文件
-        with tempfile.NamedTemporaryFile(mode='w', encoding=encoding, delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(mode="w", encoding=encoding, delete=False) as temp_file:
             temp_file.write(content)
             temp_path = temp_file.name
-        
+
         try:
             # 使用 osascript 复制文件（需要管理员权限）
-            cmd = f'''osascript -e 'do shell script "cp \\"{temp_path}\\" \\"{hosts_file}\\"" with administrator privileges' '''
-            result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-            
+            script = (
+                f'do shell script "cp \\"{temp_path}\\" \\"{hosts_file}\\"" '
+                "with administrator privileges"
+            )
+            cmd = ["osascript", "-e", script]
+            result = subprocess.run(cmd, check=False, capture_output=True, text=True)
+
             if result.returncode == 0:
                 log_func("✅ hosts 文件写入成功")
                 return True
@@ -132,14 +136,12 @@ def write_hosts_file_with_permission(hosts_file, content, encoding, log_func=pri
                 return False
         finally:
             # 清理临时文件
-            try:
+            with suppress(OSError):
                 os.remove(temp_path)
-            except OSError:
-                pass
     else:
         # Windows 和其他系统：直接写入
         try:
-            with open(hosts_file, 'w', encoding=encoding) as f:
+            with open(hosts_file, "w", encoding=encoding) as f:
                 f.write(content)
             return True
         except PermissionError:
@@ -150,56 +152,56 @@ def write_hosts_file_with_permission(hosts_file, content, encoding, log_func=pri
 def add_hosts_entry(domain, ip="127.0.0.1", log_func=print):
     """
     添加 hosts 条目
-    
+
     参数:
         domain: 域名
         ip: IP 地址
         log_func: 日志输出函数
-        
+
     返回:
         成功返回 True，失败返回 False
     """
     hosts_file = get_hosts_file_path()
     backup_file = get_backup_file_path()
-    
+
     log_func(f"开始添加 hosts 条目: {ip} {domain}")
-    
+
     if not os.path.exists(hosts_file):
         log_func(f"错误: hosts 文件不存在: {hosts_file}")
         return False
-    
+
     try:
         # 先备份（如果备份文件不存在）
         if not os.path.exists(backup_file):
             shutil.copy2(hosts_file, backup_file)
             log_func(f"hosts 文件已自动备份到: {backup_file}")
-        
+
         # 检测文件编码
         encoding = detect_file_encoding(hosts_file)
         log_func(f"检测到 hosts 文件编码: {encoding}")
-        
+
         # 读取 hosts 文件内容
-        with open(hosts_file, 'r', encoding=encoding, errors='replace') as f:
+        with open(hosts_file, encoding=encoding, errors="replace") as f:
             content = f.read()
-        
+
         # 构造要添加的内容
         hosts_entry = f"{ip} {domain}"
-        
+
         # 检查是否已经包含该条目
         if hosts_entry in content:
             log_func("hosts 文件已包含该条目，无需修改")
             return True
-        
+
         # 添加条目到内容
         content += f"\n# Added by MTGA GUI\n{hosts_entry}\n"
-        
+
         # 使用权限写入
         if write_hosts_file_with_permission(hosts_file, content, encoding, log_func):
             log_func("hosts 文件修改成功！")
             return True
         else:
             return False
-        
+
     except Exception as e:
         log_func(f"修改 hosts 文件失败: {e}")
         return False
@@ -208,36 +210,36 @@ def add_hosts_entry(domain, ip="127.0.0.1", log_func=print):
 def remove_hosts_entry(domain, log_func=print):
     """
     删除 hosts 条目
-    
+
     参数:
         domain: 要删除的域名
         log_func: 日志输出函数
-        
+
     返回:
         成功返回 True，失败返回 False
     """
     hosts_file = get_hosts_file_path()
-    
+
     log_func(f"开始删除 hosts 条目: {domain}")
-    
+
     if not os.path.exists(hosts_file):
         log_func(f"错误: hosts 文件不存在: {hosts_file}")
         return False
-    
+
     try:
         # 检测文件编码
         encoding = detect_file_encoding(hosts_file)
         log_func(f"检测到 hosts 文件编码: {encoding}")
-        
-        with open(hosts_file, 'r', encoding=encoding, errors='replace') as f:
+
+        with open(hosts_file, encoding=encoding, errors="replace") as f:
             content = f.read()
-        
+
         # 查找并删除包含域名的行
         lines = content.splitlines()
         new_lines = []
         skip_next = False
         removed_count = 0
-        
+
         for line in lines:
             if "Added by MTGA GUI" in line:
                 skip_next = True
@@ -247,19 +249,19 @@ def remove_hosts_entry(domain, log_func=print):
                 removed_count += 1
                 continue
             new_lines.append(line)
-        
+
         if removed_count > 0:
             # 写回文件（使用权限）
-            new_content = '\n'.join(new_lines)
+            new_content = "\n".join(new_lines)
             if write_hosts_file_with_permission(hosts_file, new_content, encoding, log_func):
                 log_func(f"hosts 文件已重置，删除了 {removed_count} 个 {domain} 条目")
             else:
                 return False
         else:
             log_func(f"hosts 文件中未找到 {domain} 条目")
-        
+
         return True
-        
+
     except Exception as e:
         log_func(f"删除 hosts 条目失败: {e}")
         return False
@@ -268,27 +270,27 @@ def remove_hosts_entry(domain, log_func=print):
 def open_hosts_file(log_func=print):
     """
     根据平台打开 hosts 文件
-    
+
     参数:
         log_func: 日志输出函数
-        
+
     返回:
         成功返回 True，失败返回 False
     """
     hosts_file = get_hosts_file_path()
-    
+
     try:
-        if os.name == 'nt':  # Windows
+        if os.name == "nt":  # Windows
             # Windows 使用记事本打开
-            subprocess.run(['notepad', hosts_file], check=True)
+            subprocess.run(["notepad", hosts_file], check=True)
             log_func("已使用记事本打开 hosts 文件")
-        elif sys.platform == 'darwin':  # macOS
+        elif sys.platform == "darwin":  # macOS
             # macOS 使用默认文本编辑器打开
-            subprocess.run(['open', '-t', hosts_file], check=True)
+            subprocess.run(["open", "-t", hosts_file], check=True)
             log_func("已使用默认文本编辑器打开 hosts 文件")
         else:  # Linux
             # Linux 尝试使用常见的文本编辑器
-            editors = ['gedit', 'nano', 'vim']
+            editors = ["gedit", "nano", "vim"]
             for editor in editors:
                 try:
                     subprocess.run([editor, hosts_file], check=True)
@@ -296,39 +298,40 @@ def open_hosts_file(log_func=print):
                     return True
                 except (subprocess.CalledProcessError, FileNotFoundError):
                     continue
-            else:
-                log_func("未找到合适的文本编辑器")
-                return False
-        
+            log_func("未找到合适的文本编辑器")
+            return False
+
         return True
-        
+
     except Exception as e:
         log_func(f"打开 hosts 文件失败: {e}")
         return False
 
 
-def modify_hosts_file(domain="api.openai.com", action="add", ip=("127.0.0.1", "::1"), log_func=print):
+def modify_hosts_file(
+    domain="api.openai.com", action="add", ip=("127.0.0.1", "::1"), log_func=print
+):
     """
     修改 hosts 文件的主函数
-    
+
     参数:
         domain: 域名
         action: 操作类型 ("add", "remove", "backup", "restore")
         ip: 单个 IP 字符串或可迭代的多个 IP（仅在 action="add" 时使用）
         log_func: 日志输出函数
-        
+
     返回:
         成功返回 True，失败返回 False
     """
     action_names = {
-        'add': '添加条目',
-        'remove': '删除条目', 
-        'backup': '备份文件',
-        'restore': '还原文件'
+        "add": "添加条目",
+        "remove": "删除条目",
+        "backup": "备份文件",
+        "restore": "还原文件",
     }
-    
+
     log_func(f"开始执行 hosts 文件操作: {action_names.get(action, action)}")
-    
+
     if action == "backup":
         return backup_hosts_file(log_func)
     elif action == "restore":
@@ -340,13 +343,13 @@ def modify_hosts_file(domain="api.openai.com", action="add", ip=("127.0.0.1", ":
             ips = []
         else:
             ips = [ip]
-        
+
         results = []
         for ip_addr in ips:
             if not ip_addr:
                 continue
             results.append(add_hosts_entry(domain, ip_addr, log_func))
-        
+
         return all(results) if results else True
     elif action == "remove":
         return remove_hosts_entry(domain, log_func)

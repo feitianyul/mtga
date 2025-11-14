@@ -1,25 +1,34 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 # ruff: noqa: E402
 
 # 在最早阶段设置 UTF-8 编码环境变量 - 必须在任何导入之前
-import os
-import sys
+import ctypes
+import glob
 import io
-os.environ.setdefault('LANG', 'zh_CN.UTF-8')
-os.environ.setdefault('LC_ALL', 'zh_CN.UTF-8') 
-os.environ.setdefault('PYTHONIOENCODING', 'utf-8')
-
-# 设置 Python locale
 import locale
-if sys.platform == 'darwin':
+import os
+import shutil
+import sys
+import tkinter as tk
+import traceback
+from contextlib import suppress
+from datetime import datetime
+from tkinter import font as tkfont
+from tkinter import messagebox, scrolledtext, ttk
+
+import requests
+import yaml
+
+os.environ.setdefault("LANG", "zh_CN.UTF-8")
+os.environ.setdefault("LC_ALL", "zh_CN.UTF-8")
+os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+
+if sys.platform == "darwin":
     try:
-        locale.setlocale(locale.LC_ALL, 'zh_CN.UTF-8')
+        locale.setlocale(locale.LC_ALL, "zh_CN.UTF-8")
     except Exception:
-        try:
-            locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
-        except Exception:
-            pass
+        with suppress(Exception):
+            locale.setlocale(locale.LC_ALL, "en_US.UTF-8")
 
 """
 MTGA GUI - 重构版本
@@ -31,50 +40,42 @@ MTGA GUI - 重构版本
 3. 修改 hosts 文件
 4. 启动代理服务器（线程模式）
 """
-import threading
-import tkinter as tk
-from tkinter import ttk, scrolledtext, messagebox
-import ctypes
-import time
-import yaml
-import requests
+
 
 # Setup environment (fixes macOS Tkinter functionality)
 def setup_environment():
-    """Set necessary environment variables, especially for fixing Tkinter on macOS after Nuitka packaging"""
-    if sys.platform != 'darwin':  # Not macOS, return directly
+    """Prepare Tkinter environment variables for macOS builds."""
+    if sys.platform != "darwin":  # Not macOS, return directly
         return
-    
+
     # Check if in packaged environment
-    if not (getattr(sys, 'frozen', False) or 'MTGA_GUI' in sys.executable):
+    if not (getattr(sys, "frozen", False) or "MTGA_GUI" in sys.executable):
         return  # Development environment doesn't need special handling
-    
+
     # Nuitka packaged environment
     executable_dir = os.path.dirname(sys.executable)
-    
+
     # Switch working directory - this is critical
     # When launched from Finder on macOS, working directory is "/", must switch
-    if os.getcwd() == '/':
+    if os.getcwd() == "/":
         # Prefer switching to user home directory (safer)
-        home_dir = os.path.expanduser('~')
+        home_dir = os.path.expanduser("~")
         try:
             os.chdir(home_dir)
         except OSError:
-            # Fallback: switch to executable directory
-            try:
+            with suppress(OSError):
                 os.chdir(executable_dir)
-            except OSError:
-                pass  # If both fail, continue running
-    
+
     # Set TCL/TK library paths (if they exist)
-    tcl_library = os.path.join(executable_dir, 'tcl-files')
-    tk_library = os.path.join(executable_dir, 'tk-files')
-    
+    tcl_library = os.path.join(executable_dir, "tcl-files")
+    tk_library = os.path.join(executable_dir, "tk-files")
+
     if os.path.exists(tcl_library):
-        os.environ['TCL_LIBRARY'] = tcl_library
-    
+        os.environ["TCL_LIBRARY"] = tcl_library
+
     if os.path.exists(tk_library):
-        os.environ['TK_LIBRARY'] = tk_library
+        os.environ["TK_LIBRARY"] = tk_library
+
 
 # Call setup_environment before importing other modules
 setup_environment()
@@ -96,22 +97,31 @@ def ensure_utf8_stdio():
             if buffer is None:
                 continue
             try:
-                new_stream = io.TextIOWrapper(buffer, encoding="utf-8", errors="replace", line_buffering=True)
+                new_stream = io.TextIOWrapper(
+                    buffer, encoding="utf-8", errors="replace", line_buffering=True
+                )
             except Exception:
                 continue
             setattr(sys, name, new_stream)
         except Exception:
             pass
 
+
 ensure_utf8_stdio()
 
 # 导入自定义模块
 try:
-    from modules.resource_manager import ResourceManager, is_packaged, get_user_data_dir
     from modules.cert_generator import generate_certificates
     from modules.cert_installer import install_ca_cert
     from modules.hosts_manager import modify_hosts_file, open_hosts_file
     from modules.proxy_server import ProxyServer
+    from modules.resource_manager import (
+        ResourceManager,
+        copy_template_files,
+        get_user_data_dir,
+        is_packaged,
+    )
+    from modules.thread_manager import ThreadManager
 except ImportError as e:
     print(f"导入模块失败: {e}")
     print("请确保 modules 目录及其模块文件存在")
@@ -121,14 +131,29 @@ except ImportError as e:
 # 全局变量
 proxy_server_instance = None
 resource_manager = ResourceManager()
+thread_manager = ThreadManager()
+
+HTTP_OK = 200
+CONTENT_PREVIEW_LEN = 50
+API_KEY_VISIBLE_CHARS = 4
+
+
+def get_proxy_instance():
+    """读取当前代理实例"""
+    return globals().get("proxy_server_instance")
+
+
+def set_proxy_instance(instance):
+    """更新当前代理实例"""
+    globals()["proxy_server_instance"] = instance
 
 
 def check_is_admin():
     """检查是否具有管理员权限"""
     try:
-        if os.name == 'nt':  # Windows
+        if os.name == "nt":  # Windows
             return ctypes.windll.shell32.IsUserAnAdmin()
-        elif os.name == 'posix':  # Unix/Linux/macOS
+        elif os.name == "posix":  # Unix/Linux/macOS
             return os.geteuid() == 0
         else:
             return False
@@ -139,12 +164,12 @@ def check_is_admin():
 def run_as_admin():
     """请求管理员权限并重启脚本"""
     if not check_is_admin():
-        if os.name == 'nt':  # Windows
+        if os.name == "nt":  # Windows
             ctypes.windll.shell32.ShellExecuteW(
                 None, "runas", sys.executable, " ".join(sys.argv), None, 1
             )
             sys.exit(0)
-        elif os.name == 'posix':  # Unix/Linux/macOS
+        elif os.name == "posix":  # Unix/Linux/macOS
             print("此程序需要管理员权限才能运行。")
             print("请使用以下命令重新运行：")
             print(f"sudo {sys.executable} {' '.join(sys.argv)}")
@@ -157,11 +182,11 @@ def run_as_admin():
 def check_environment():
     """检查运行环境"""
     missing_resources = resource_manager.check_resources()
-    
+
     if missing_resources:
         error_msg = "环境检查失败，缺少以下资源:\n" + "\n".join(missing_resources)
         return False, error_msg
-    
+
     return True, "环境检查通过"
 
 
@@ -173,11 +198,11 @@ def load_config_groups():
     """从配置文件加载配置组"""
     try:
         if os.path.exists(CONFIG_FILE):
-            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+            with open(CONFIG_FILE, encoding="utf-8") as f:
                 config = yaml.safe_load(f)
-                if config and 'config_groups' in config:
-                    config_groups = config['config_groups']
-                    current_index = config.get('current_config_index', 0)
+                if config and "config_groups" in config:
+                    config_groups = config["config_groups"]
+                    current_index = config.get("current_config_index", 0)
                     return config_groups, current_index
     except Exception:
         pass
@@ -188,15 +213,15 @@ def load_global_config():
     """从配置文件加载全局配置"""
     try:
         if os.path.exists(CONFIG_FILE):
-            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+            with open(CONFIG_FILE, encoding="utf-8") as f:
                 config = yaml.safe_load(f)
                 if config:
-                    mapped_model_id = config.get('mapped_model_id', '')
-                    mtga_auth_key = config.get('mtga_auth_key', '')
+                    mapped_model_id = config.get("mapped_model_id", "")
+                    mtga_auth_key = config.get("mtga_auth_key", "")
                     return mapped_model_id, mtga_auth_key
     except Exception:
         pass
-    return '', ''
+    return "", ""
 
 
 def save_config_groups(config_groups, current_index=0, mapped_model_id=None, mtga_auth_key=None):
@@ -205,27 +230,30 @@ def save_config_groups(config_groups, current_index=0, mapped_model_id=None, mtg
         # 首先读取现有配置，保留其他字段
         config_data = {}
         if os.path.exists(CONFIG_FILE):
-            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+            with open(CONFIG_FILE, encoding="utf-8") as f:
                 config_data = yaml.safe_load(f) or {}
-        
+
         # 更新配置组和索引
-        config_data['config_groups'] = config_groups
-        config_data['current_config_index'] = current_index
-        
+        config_data["config_groups"] = config_groups
+        config_data["current_config_index"] = current_index
+
         # 更新全局配置（如果提供）
         if mapped_model_id is not None:
-            config_data['mapped_model_id'] = mapped_model_id
+            config_data["mapped_model_id"] = mapped_model_id
         if mtga_auth_key is not None:
-            config_data['mtga_auth_key'] = mtga_auth_key
-        
+            config_data["mtga_auth_key"] = mtga_auth_key
+
         os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
-        
-        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-            yaml.dump(config_data, f, 
-                     default_flow_style=False, 
-                     allow_unicode=True, 
-                     indent=2,
-                     sort_keys=False)
+
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            yaml.dump(
+                config_data,
+                f,
+                default_flow_style=False,
+                allow_unicode=True,
+                indent=2,
+                sort_keys=False,
+            )
         return True
     except Exception:
         return False
@@ -241,37 +269,38 @@ def get_current_config():
 
 def test_model_connection(config_group, log_func=print):
     """测试模型连接（GET /v1/models/{模型id}）"""
+
     def run_test():
-        model_id = '未知模型'  # 提前初始化，避免未绑定问题
+        model_id = "未知模型"  # 提前初始化，避免未绑定问题
         try:
-            api_url = config_group.get('api_url', '').rstrip('/')
-            model_id = config_group.get('model_id', '')
-            api_key = config_group.get('api_key', '')
-            
+            api_url = config_group.get("api_url", "").rstrip("/")
+            model_id = config_group.get("model_id", "")
+            api_key = config_group.get("api_key", "")
+
             if not api_url or not model_id:
                 log_func("测试失败: API URL或模型ID为空")
                 return
-            
+
             # 构建测试URL
             test_url = f"{api_url}/v1/models/{model_id}"
-            
+
             # 准备请求头
             headers = {}
             if api_key:
-                headers['Authorization'] = f'Bearer {api_key}'
-            
+                headers["Authorization"] = f"Bearer {api_key}"
+
             log_func(f"正在测试模型连接: {test_url}")
-            
+
             # 发送GET请求测试模型
             response = requests.get(test_url, headers=headers, timeout=10)
-            
-            if response.status_code == 200:
+
+            if response.status_code == HTTP_OK:
                 log_func(f"✅ 模型测试成功: {model_id}")
                 try:
                     model_info = response.json()
-                    if 'id' in model_info:
+                    if "id" in model_info:
                         log_func(f"   模型ID: {model_info['id']}")
-                    if 'object' in model_info:
+                    if "object" in model_info:
                         log_func(f"   对象类型: {model_info['object']}")
                 except Exception:
                     log_func("   (响应解析成功，但无法获取详细信息)")
@@ -282,65 +311,69 @@ def test_model_connection(config_group, log_func=print):
                     log_func(f"   错误信息: {error_info}")
                 except Exception:
                     log_func("   (无法获取错误详情)")
-                    
+
         except requests.exceptions.Timeout:
             log_func(f"❌ 模型测试超时: {model_id}")
         except requests.exceptions.RequestException as e:
             log_func(f"❌ 模型测试网络错误: {str(e)}")
         except Exception as e:
             log_func(f"❌ 模型测试意外错误: {str(e)}")
-    
-    # 在后台线程中运行测试，避免阻塞UI
-    threading.Thread(target=run_test, daemon=True).start()
+
+    # 交给统一线程管理器调度，避免阻塞UI且保留状态
+    thread_manager.run("test_model_connection", run_test)
 
 
 def test_chat_completion(config_group, log_func=print):
     """测试聊天补全连接（POST /v1/chat/completions）"""
+
     def run_test():
-        model_id = '未知模型'  # 提前初始化，避免未绑定问题
+        model_id = "未知模型"  # 提前初始化，避免未绑定问题
         try:
-            api_url = config_group.get('api_url', '').rstrip('/')
-            model_id = config_group.get('model_id', '')
-            api_key = config_group.get('api_key', '')
-            
+            api_url = config_group.get("api_url", "").rstrip("/")
+            model_id = config_group.get("model_id", "")
+            api_key = config_group.get("api_key", "")
+
             if not api_url or not model_id:
                 log_func("测活失败: API URL或模型ID为空")
                 return
-            
+
             # 构建测试URL
             test_url = f"{api_url}/v1/chat/completions"
-            
+
             # 准备请求头
-            headers = {
-                'Content-Type': 'application/json'
-            }
+            headers = {"Content-Type": "application/json"}
             if api_key:
-                headers['Authorization'] = f'Bearer {api_key}'
-            
+                headers["Authorization"] = f"Bearer {api_key}"
+
             # 准备测试数据（最小输入）
             test_data = {
                 "model": model_id,
-                "messages": [
-                    {"role": "user", "content": "1"}
-                ],
+                "messages": [{"role": "user", "content": "1"}],
                 "max_tokens": 1,
-                "temperature": 0
+                "temperature": 0,
             }
-            
+
             log_func(f"正在测活模型: {model_id} (会消耗少量tokens)")
-            
+
             # 发送POST请求测试聊天补全
             response = requests.post(test_url, json=test_data, headers=headers, timeout=30)
-            
-            if response.status_code == 200:
+
+            if response.status_code == HTTP_OK:
                 log_func(f"✅ 模型测活成功: {model_id}")
                 try:
                     completion_info = response.json()
-                    if 'choices' in completion_info and completion_info['choices']:
-                        content = completion_info['choices'][0].get('message', {}).get('content', '').strip()
-                        log_func(f"   响应内容: {content[:50]}{'...' if len(content) > 50 else ''}")
-                    if 'usage' in completion_info:
-                        usage = completion_info['usage']
+                    if "choices" in completion_info and completion_info["choices"]:
+                        content = (
+                            completion_info["choices"][0]
+                            .get("message", {})
+                            .get("content", "")
+                            .strip()
+                        )
+                        preview = content[:CONTENT_PREVIEW_LEN]
+                        suffix = "..." if len(content) > CONTENT_PREVIEW_LEN else ""
+                        log_func(f"   响应内容: {preview}{suffix}")
+                    if "usage" in completion_info:
+                        usage = completion_info["usage"]
                         log_func(f"   消耗tokens: {usage.get('total_tokens', '未知')}")
                 except Exception:
                     log_func("   (响应成功，但无法解析详细信息)")
@@ -351,75 +384,71 @@ def test_chat_completion(config_group, log_func=print):
                     log_func(f"   错误信息: {error_info}")
                 except Exception:
                     log_func("   (无法获取错误详情)")
-                    
+
         except requests.exceptions.Timeout:
             log_func(f"❌ 模型测活超时: {model_id}")
         except requests.exceptions.RequestException as e:
             log_func(f"❌ 模型测活网络错误: {str(e)}")
         except Exception as e:
             log_func(f"❌ 模型测活意外错误: {str(e)}")
-    
-    # 在后台线程中运行测试，避免阻塞UI
-    threading.Thread(target=run_test, daemon=True).start()
+
+    # 使用线程管理器调度任务
+    thread_manager.run("test_chat_completion", run_test)
 
 
-def create_main_window():
+def create_main_window():  # noqa: PLR0915
     """创建主窗口"""
     # 在 macOS 上，确保工作目录不是根目录
-    if sys.platform == 'darwin' and os.getcwd() == '/':
-        try:
-            os.chdir(os.path.expanduser('~'))
-        except OSError:
-            pass
-    
+    if sys.platform == "darwin" and os.getcwd() == "/":
+        with suppress(OSError):
+            os.chdir(os.path.expanduser("~"))
+
     window = tk.Tk()
     window.title("MTGA GUI")
     window.geometry("1250x750")
     window.resizable(True, True)
-    
+
     # 设置窗口图标
     try:
-        if os.name == 'nt':
+        if os.name == "nt":
             icon_path = resource_manager.get_icon_file("f0bb32_bg-black.ico")
             if os.path.exists(icon_path):
                 window.iconbitmap(icon_path)
     except Exception:
         pass
-    
+
     # 创建主框架
     main_frame = ttk.Frame(window, padding=10)
     main_frame.pack(fill=tk.BOTH, expand=True)
-    
+
     # 添加标题
     title_label = ttk.Label(
-        main_frame, 
-        text="MTGA - 代理服务器管理工具", 
-        font=("Arial", 16, "bold")
+        main_frame, text="MTGA - 代理服务器管理工具", font=("Arial", 16, "bold")
     )
     title_label.pack(pady=10)
-    
+
     # 创建左右分栏
     main_paned = ttk.PanedWindow(main_frame, orient=tk.HORIZONTAL)
     main_paned.pack(fill=tk.BOTH, expand=True, pady=5)
-    
+
     # 左侧功能区域
     left_frame = ttk.Frame(main_paned)
     main_paned.add(left_frame, weight=1000)
-    
+
     # 右侧日志区域
     right_frame = ttk.Frame(main_paned)
     main_paned.add(right_frame, weight=1)
-    
+
     # 创建日志文本框
     log_frame = ttk.LabelFrame(right_frame, text="日志")
     log_frame.pack(fill=tk.BOTH, expand=True)
     log_text = scrolledtext.ScrolledText(log_frame, height=10)
     log_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-    
+
     def log(message):
         """日志输出函数"""
         # 将 \\n 替换为真正的换行符
-        formatted_message = message.replace('\\n', '\n')
+        formatted_message = message.replace("\\n", "\n")
         log_text.insert(tk.END, f"{formatted_message}\n")
         log_text.see(tk.END)
         log_text.update()  # 强制更新显示
@@ -428,7 +457,53 @@ def create_main_window():
         except UnicodeEncodeError:
             fallback = formatted_message.encode("unicode_escape").decode("ascii", errors="replace")
             print(fallback)
-    
+
+    proxy_start_task_id = None
+    proxy_stop_task_id = None
+
+    def build_proxy_config():
+        """根据当前 UI 状态生成代理配置"""
+        current_config = get_current_config()
+        if not current_config:
+            log("❌ 错误: 没有可用的配置组")
+            return None
+        config = current_config.copy()
+        config["debug_mode"] = debug_mode_var.get()
+        config["stream_mode"] = stream_mode_combo.get() if stream_mode_var.get() else None
+        return config
+
+    def stop_proxy_instance(reason="stop", show_idle_message=False):
+        """统一停止代理实例，返回是否存在运行中的服务。"""
+        instance = get_proxy_instance()
+        if instance and instance.is_running():
+            if reason == "restart":
+                log("检测到代理服务器正在运行，正在停止旧实例...")
+            else:
+                log("正在停止代理服务器...")
+            try:
+                instance.stop()
+                log("✅ 代理服务器已停止")
+            except Exception as exc:  # noqa: BLE001
+                log(f"停止代理服务器时出错: {exc}")
+            finally:
+                set_proxy_instance(None)
+            return True
+        if show_idle_message:
+            log("代理服务器未运行")
+        return False
+
+    def start_proxy_instance(config, success_message="✅ 代理服务器启动成功"):
+        """启动代理实例并输出统一日志。"""
+        log("开始启动代理服务器...")
+        instance = ProxyServer(config, log_func=log)
+        set_proxy_instance(instance)
+        if instance.start():
+            log(success_message)
+            return True
+        log("❌ 代理服务器启动失败")
+        set_proxy_instance(None)
+        return False
+
     # 显示环境检查结果
     env_ok, env_msg = check_environment()
     if env_ok:
@@ -439,31 +514,31 @@ def create_main_window():
             log("🔧 运行在开发环境中")
     else:
         log(f"❌ {env_msg}")
-    
+
     # 配置组管理界面
     config_groups = []
     current_config_index = 0
     config_frame = ttk.LabelFrame(left_frame, text="代理服务器配置组")
     config_frame.pack(fill=tk.BOTH, expand=True, pady=5)
-    
+
     config_paned = ttk.PanedWindow(config_frame, orient=tk.HORIZONTAL)
     config_paned.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-    
+
     # 配置组列表
     config_list_frame = ttk.Frame(config_paned)
     config_paned.add(config_list_frame, weight=3)
-    
+
     # 配置组列表标题和刷新按钮
     list_header_frame = ttk.Frame(config_list_frame)
     list_header_frame.pack(fill=tk.X, padx=5, pady=(5, 0))
-    
+
     ttk.Label(list_header_frame, text="配置组列表:").pack(side=tk.LEFT)
-    
+
     def refresh_config_list():
         """刷新配置组列表"""
         refresh_config_tree()
         log("已刷新配置组列表")
-    
+
     # 测活按钮功能
     def test_selected_config():
         """测活选中的配置组"""
@@ -471,136 +546,151 @@ def create_main_window():
         if selected_index < 0:
             log("请先选择要测活的配置组")
             return
-        
+
         config_group = config_groups[selected_index]
         test_chat_completion(config_group, log)
-    
+
     # 测活按钮
     test_btn = ttk.Button(list_header_frame, text="测活", command=test_selected_config, width=6)
     test_btn.pack(side=tk.RIGHT, padx=5)
-    
+
     # 为测活按钮添加提示
     def create_tooltip_for_test():
         tooltip_window = None
-        
+
         def on_enter(event):
             nonlocal tooltip_window
             tooltip_window = tk.Toplevel()
             tooltip_window.wm_overrideredirect(True)
-            tooltip_window.wm_geometry(f"+{event.x_root+10}+{event.y_root+10}")
-            tooltip_window.configure(bg='lightyellow', relief='solid', bd=1)
-            label = tk.Label(tooltip_window, text="测试选中配置组的实际对话功能\n会发送最小请求并消耗少量tokens\n请确保配置正确后使用", 
-                           bg='lightyellow', font=('Arial', 9), wraplength=250)
+            tooltip_window.wm_geometry(f"+{event.x_root + 10}+{event.y_root + 10}")
+            tooltip_window.configure(bg="lightyellow", relief="solid", bd=1)
+            label = tk.Label(
+                tooltip_window,
+                text="测试选中配置组的实际对话功能\n会发送最小请求并消耗少量tokens\n请确保配置正确后使用",
+                bg="lightyellow",
+                font=("Arial", 9),
+                wraplength=250,
+            )
             label.pack()
-        
+
         def on_leave(event):
             nonlocal tooltip_window
             if tooltip_window:
                 tooltip_window.destroy()
                 tooltip_window = None
-        
-        test_btn.bind('<Enter>', on_enter)
-        test_btn.bind('<Leave>', on_leave)
-    
+
+        test_btn.bind("<Enter>", on_enter)
+        test_btn.bind("<Leave>", on_leave)
+
     create_tooltip_for_test()
-    
+
     refresh_btn = ttk.Button(list_header_frame, text="刷新", command=refresh_config_list, width=6)
     refresh_btn.pack(side=tk.RIGHT, padx=16)
-    
+
     # 为刷新按钮添加提示（修复 tooltip 属性问题）
     def create_tooltip_for_refresh():
         tooltip_window = None
-        
+
         def on_enter(event):
             nonlocal tooltip_window
             tooltip_window = tk.Toplevel()
             tooltip_window.wm_overrideredirect(True)
-            tooltip_window.wm_geometry(f"+{event.x_root+10}+{event.y_root+10}")
-            tooltip_window.configure(bg='lightyellow', relief='solid', bd=1)
-            label = tk.Label(tooltip_window, text="重新加载配置文件中的配置组\n用于同步外部修改或恢复意外更改", bg='lightyellow', font=('Arial', 9), wraplength=250)
+            tooltip_window.wm_geometry(f"+{event.x_root + 10}+{event.y_root + 10}")
+            tooltip_window.configure(bg="lightyellow", relief="solid", bd=1)
+            label = tk.Label(
+                tooltip_window,
+                text="重新加载配置文件中的配置组\n用于同步外部修改或恢复意外更改",
+                bg="lightyellow",
+                font=("Arial", 9),
+                wraplength=250,
+            )
             label.pack()
-        
+
         def on_leave(event):
             nonlocal tooltip_window
             if tooltip_window:
                 tooltip_window.destroy()
                 tooltip_window = None
-        
-        refresh_btn.bind('<Enter>', on_enter)
-        refresh_btn.bind('<Leave>', on_leave)
-    
+
+        refresh_btn.bind("<Enter>", on_enter)
+        refresh_btn.bind("<Leave>", on_leave)
+
     create_tooltip_for_refresh()
-    
+
     tree_frame = ttk.Frame(config_list_frame)
     tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-    
-    columns = ('序号', 'API URL', '实际模型ID', 'API Key')
-    config_tree = ttk.Treeview(tree_frame, columns=columns, show='headings', height=6)
-    
+
+    columns = ("序号", "API URL", "实际模型ID", "API Key")
+    config_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=6)
+
     # 滚动条
     v_scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=config_tree.yview)
     config_tree.configure(yscrollcommand=v_scrollbar.set)
     h_scrollbar = ttk.Scrollbar(tree_frame, orient=tk.HORIZONTAL, command=config_tree.xview)
     config_tree.configure(xscrollcommand=h_scrollbar.set)
-    
+
     # 设置列
-    config_tree.heading('序号', text='序号')
-    config_tree.heading('API URL', text='API URL')
-    config_tree.heading('实际模型ID', text='实际模型ID')
-    config_tree.heading('API Key', text='API Key')
-    
-    config_tree.column('序号', width=30, anchor=tk.CENTER)
-    config_tree.column('API URL', width=200)
-    config_tree.column('实际模型ID', width=120)
-    config_tree.column('API Key', width=120)
-    
-    config_tree.grid(row=0, column=0, sticky='nsew')
-    v_scrollbar.grid(row=0, column=1, sticky='ns')
-    h_scrollbar.grid(row=1, column=0, sticky='ew')
-    
+    config_tree.heading("序号", text="序号")
+    config_tree.heading("API URL", text="API URL")
+    config_tree.heading("实际模型ID", text="实际模型ID")
+    config_tree.heading("API Key", text="API Key")
+
+    config_tree.column("序号", width=30, anchor=tk.CENTER)
+    config_tree.column("API URL", width=200)
+    config_tree.column("实际模型ID", width=120)
+    config_tree.column("API Key", width=120)
+
+    config_tree.grid(row=0, column=0, sticky="nsew")
+    v_scrollbar.grid(row=0, column=1, sticky="ns")
+    h_scrollbar.grid(row=1, column=0, sticky="ew")
+
     tree_frame.grid_rowconfigure(0, weight=1)
     tree_frame.grid_columnconfigure(0, weight=1)
-    
+
     # 配置组操作按钮
     config_buttons_frame = ttk.Frame(config_paned)
     config_paned.add(config_buttons_frame, weight=1)
-    
+
     ttk.Label(config_buttons_frame, text="操作:").pack(anchor=tk.W, padx=5, pady=(5, 0))
-    
+
     def refresh_config_tree():
         """刷新配置组列表"""
         nonlocal config_groups, current_config_index
         config_groups, current_config_index = load_config_groups()
-        
+
         for item in config_tree.get_children():
             config_tree.delete(item)
-        
+
         for i, group in enumerate(config_groups):
             # 向下兼容：如果是旧配置还有target_model_id，显示它；否则显示API key的掩码版本
-            if 'target_model_id' in group:
+            if "target_model_id" in group:
                 # 旧配置兼容模式
-                fourth_col = group.get('target_model_id', '') or '(无)'
+                fourth_col = group.get("target_model_id", "") or "(无)"
             else:
                 # 新配置：显示API key的掩码版本
-                api_key = group.get('api_key', '')
+                api_key = group.get("api_key", "")
                 if api_key:
-                    fourth_col = f"{'*' * (len(api_key) - 4)}{api_key[-4:]}" if len(api_key) > 4 else "***"
+                    if len(api_key) > API_KEY_VISIBLE_CHARS:
+                        mask = "*" * (len(api_key) - API_KEY_VISIBLE_CHARS)
+                        suffix = api_key[-API_KEY_VISIBLE_CHARS:]
+                        fourth_col = f"{mask}{suffix}"
+                    else:
+                        fourth_col = "***"
                 else:
-                    fourth_col = '(无)'
-            
-            config_tree.insert('', 'end', values=(
-                i + 1,
-                group.get('api_url', ''),
-                group.get('model_id', ''),
-                fourth_col
-            ))
-        
+                    fourth_col = "(无)"
+
+            config_tree.insert(
+                "",
+                "end",
+                values=(i + 1, group.get("api_url", ""), group.get("model_id", ""), fourth_col),
+            )
+
         if config_groups and 0 <= current_config_index < len(config_groups):
             children = config_tree.get_children()
             if current_config_index < len(children):
                 config_tree.selection_set(children[current_config_index])
                 config_tree.focus(children[current_config_index])
-    
+
     def get_selected_index():
         """获取选中的配置组索引"""
         selection = config_tree.selection()
@@ -608,7 +698,7 @@ def create_main_window():
             item = selection[0]
             return config_tree.index(item)
         return -1
-    
+
     def on_config_select(event):
         """配置组选择事件"""
         nonlocal current_config_index
@@ -616,137 +706,140 @@ def create_main_window():
         if selected_index >= 0:
             current_config_index = selected_index
             save_config_groups(config_groups, current_config_index)
-    
-    config_tree.bind('<<TreeviewSelect>>', on_config_select)
-    
+
+    config_tree.bind("<<TreeviewSelect>>", on_config_select)
+
     # 配置组管理函数（简化版）
-    def add_config_group():
+    def add_config_group():  # noqa: PLR0915
         """新增配置组"""
+
         def save_new_config():
             name = name_var.get().strip()
             api_url = api_url_var.get().strip()
             model_id = model_id_var.get().strip()
             api_key = api_key_var.get().strip()
-            
+
             # 调整验证逻辑：API URL、实际模型ID、API Key是必填的
             if not api_url or not model_id or not api_key:
                 log("错误: API URL、实际模型ID和API Key都是必填项")
                 return
-            
+
             new_group = {
-                'name': name,  # 配置组名称改为可选
-                'api_url': api_url,
-                'model_id': model_id,  # 这是实际调用的模型ID
-                'api_key': api_key  # 新增API key字段
+                "name": name,  # 配置组名称改为可选
+                "api_url": api_url,
+                "model_id": model_id,  # 这是实际调用的模型ID
+                "api_key": api_key,  # 新增API key字段
             }
-            
+
             config_groups.append(new_group)
             if save_config_groups(config_groups, current_config_index):
                 display_name = name if name else f"配置组 {len(config_groups)}"
                 log(f"已添加配置组: {display_name}")
                 refresh_config_list()
                 add_window.destroy()
-                
+
                 # 保存后测试模型
                 test_model_connection(new_group, log)
             else:
                 log("保存配置组失败")
-        
+
         add_window = tk.Toplevel(window)
         add_window.title("新增配置组")
         add_window.geometry("450x300")  # 调整窗口大小以容纳新字段
         add_window.resizable(False, False)
         add_window.transient(window)
         add_window.grab_set()
-        
+
         # 居中显示
         add_window.update_idletasks()
         x = (add_window.winfo_screenwidth() // 2) - (add_window.winfo_width() // 2)
         y = (add_window.winfo_screenheight() // 2) - (add_window.winfo_height() // 2)
         add_window.geometry(f"+{x}+{y}")
-        
+
         main_frame = ttk.Frame(add_window, padding=10)
         main_frame.pack(fill=tk.BOTH, expand=True)
-        
+
         # 配置组名称（可选）
         ttk.Label(main_frame, text="配置组名称 (可选):").grid(row=0, column=0, sticky=tk.W, pady=5)
         name_var = tk.StringVar()
         name_entry = ttk.Entry(main_frame, textvariable=name_var, width=35)
         name_entry.grid(row=0, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
-        
+
         # API URL（必填）
         ttk.Label(main_frame, text="* API URL:").grid(row=1, column=0, sticky=tk.W, pady=5)
         api_url_var = tk.StringVar()
         api_url_entry = ttk.Entry(main_frame, textvariable=api_url_var, width=35)
         api_url_entry.grid(row=1, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
-        
+
         # 实际模型ID（必填）
         ttk.Label(main_frame, text="* 实际模型ID:").grid(row=2, column=0, sticky=tk.W, pady=5)
         model_id_var = tk.StringVar()
         model_id_entry = ttk.Entry(main_frame, textvariable=model_id_var, width=35)
         model_id_entry.grid(row=2, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
-        
+
         # API Key（必填）
         ttk.Label(main_frame, text="* API Key:").grid(row=3, column=0, sticky=tk.W, pady=5)
         api_key_var = tk.StringVar()
         api_key_entry = ttk.Entry(main_frame, textvariable=api_key_var, width=35, show="*")
         api_key_entry.grid(row=3, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
-        
+
         # 添加说明标签
-        info_label = ttk.Label(main_frame, text="* 为必填项", font=('Arial', 8), foreground='gray')
+        info_label = ttk.Label(main_frame, text="* 为必填项", font=("Arial", 8), foreground="gray")
         info_label.grid(row=4, column=0, columnspan=2, sticky=tk.W, pady=5)
-        
+
         button_frame = ttk.Frame(main_frame)
         button_frame.grid(row=5, column=0, columnspan=2, pady=20)
-        
+
         ttk.Button(button_frame, text="保存", command=save_new_config).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="取消", command=add_window.destroy).pack(side=tk.LEFT, padx=5)
-        
+
         main_frame.columnconfigure(1, weight=1)
         name_entry.focus()
-    
+
     # 配置组操作按钮
-    ttk.Button(config_buttons_frame, text="新增", command=add_config_group).pack(fill=tk.X, padx=5, pady=2)
-    
-    def edit_config_group():
+    ttk.Button(config_buttons_frame, text="新增", command=add_config_group).pack(
+        fill=tk.X, padx=5, pady=2
+    )
+
+    def edit_config_group():  # noqa: PLR0915
         """修改配置组"""
         selected_index = get_selected_index()
         if selected_index < 0:
             log("请先选择要修改的配置组")
             return
-        
+
         current_group = config_groups[selected_index]
-        
+
         def save_edited_config():
             name = name_var.get().strip()
             api_url = api_url_var.get().strip()
             model_id = model_id_var.get().strip()
             api_key = api_key_var.get().strip()
-            
+
             # 调整验证逻辑：API URL、实际模型ID、API Key是必填的
             if not api_url or not model_id or not api_key:
                 log("错误: API URL、实际模型ID和API Key都是必填项")
                 return
-            
+
             # 更新配置组
             config_groups[selected_index] = {
-                'name': name,  # 配置组名称改为可选
-                'api_url': api_url,
-                'model_id': model_id,  # 这是实际调用的模型ID
-                'api_key': api_key  # API key字段
+                "name": name,  # 配置组名称改为可选
+                "api_url": api_url,
+                "model_id": model_id,  # 这是实际调用的模型ID
+                "api_key": api_key,  # API key字段
             }
-            
+
             if save_config_groups(config_groups, current_config_index):
                 display_name = name if name else f"配置组 {selected_index + 1}"
                 log(f"已修改配置组: {display_name}")
                 refresh_config_list()
                 edit_window.destroy()
-                
+
                 # 保存后测试模型
                 test_model_connection(config_groups[selected_index], log)
             else:
                 log("保存配置组失败")
-        
+
         # 创建修改窗口
         edit_window = tk.Toplevel(window)
         edit_window.title("修改配置组")
@@ -754,101 +847,104 @@ def create_main_window():
         edit_window.resizable(False, False)
         edit_window.transient(window)
         edit_window.grab_set()
-        
+
         # 居中显示
         edit_window.update_idletasks()
         x = (edit_window.winfo_screenwidth() // 2) - (edit_window.winfo_width() // 2)
         y = (edit_window.winfo_screenheight() // 2) - (edit_window.winfo_height() // 2)
         edit_window.geometry(f"+{x}+{y}")
-        
+
         main_frame = ttk.Frame(edit_window, padding=10)
         main_frame.pack(fill=tk.BOTH, expand=True)
-        
+
         # 配置组名称（可选）
         ttk.Label(main_frame, text="配置组名称 (可选):").grid(row=0, column=0, sticky=tk.W, pady=5)
-        name_var = tk.StringVar(value=current_group.get('name', ''))
+        name_var = tk.StringVar(value=current_group.get("name", ""))
         name_entry = ttk.Entry(main_frame, textvariable=name_var, width=35)
         name_entry.grid(row=0, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
-        
+
         # API URL（必填）
         ttk.Label(main_frame, text="* API URL:").grid(row=1, column=0, sticky=tk.W, pady=5)
-        api_url_var = tk.StringVar(value=current_group.get('api_url', ''))
+        api_url_var = tk.StringVar(value=current_group.get("api_url", ""))
         api_url_entry = ttk.Entry(main_frame, textvariable=api_url_var, width=35)
         api_url_entry.grid(row=1, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
-        
+
         # 实际模型ID（必填）
         ttk.Label(main_frame, text="* 实际模型ID:").grid(row=2, column=0, sticky=tk.W, pady=5)
-        model_id_var = tk.StringVar(value=current_group.get('model_id', ''))
+        model_id_var = tk.StringVar(value=current_group.get("model_id", ""))
         model_id_entry = ttk.Entry(main_frame, textvariable=model_id_var, width=35)
         model_id_entry.grid(row=2, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
-        
+
         # API Key（必填）
         ttk.Label(main_frame, text="* API Key:").grid(row=3, column=0, sticky=tk.W, pady=5)
-        api_key_var = tk.StringVar(value=current_group.get('api_key', ''))
+        api_key_var = tk.StringVar(value=current_group.get("api_key", ""))
         api_key_entry = ttk.Entry(main_frame, textvariable=api_key_var, width=35, show="*")
         api_key_entry.grid(row=3, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
-        
+
         # 添加说明标签
-        info_label = ttk.Label(main_frame, text="* 为必填项", font=('Arial', 8), foreground='gray')
+        info_label = ttk.Label(main_frame, text="* 为必填项", font=("Arial", 8), foreground="gray")
         info_label.grid(row=4, column=0, columnspan=2, sticky=tk.W, pady=5)
-        
+
         button_frame = ttk.Frame(main_frame)
         button_frame.grid(row=5, column=0, columnspan=2, pady=20)
-        
+
         ttk.Button(button_frame, text="保存", command=save_edited_config).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="取消", command=edit_window.destroy).pack(side=tk.LEFT, padx=5)
-        
+        ttk.Button(button_frame, text="取消", command=edit_window.destroy).pack(
+            side=tk.LEFT, padx=5
+        )
+
         main_frame.columnconfigure(1, weight=1)
         name_entry.focus()
-    
+
     def delete_config_group():
         """删除配置组"""
         selected_index = get_selected_index()
         if selected_index < 0:
             log("请先选择要删除的配置组")
             return
-        
+
         if len(config_groups) <= 1:
             log("至少需要保留一个配置组")
             return
-        
-        group_name = config_groups[selected_index].get('name', f'配置组{selected_index + 1}')
-        
+
+        group_name = config_groups[selected_index].get("name", f"配置组{selected_index + 1}")
+
         # 确认删除
-        import tkinter.messagebox as msgbox
-        if msgbox.askyesno("确认删除", f"确定要删除配置组 '{group_name}' 吗？"):
+        if messagebox.askyesno("确认删除", f"确定要删除配置组 '{group_name}' 吗？"):
             del config_groups[selected_index]
-            
+
             # 调整当前选中索引
             nonlocal current_config_index
             if current_config_index >= len(config_groups):
                 current_config_index = len(config_groups) - 1
             elif current_config_index > selected_index:
                 current_config_index -= 1
-            
+
             if save_config_groups(config_groups, current_config_index):
                 log(f"已删除配置组: {group_name}")
                 refresh_config_list()
             else:
                 log("保存配置组失败")
-    
+
     def move_config_up():
         """上移配置组"""
         selected_index = get_selected_index()
         if selected_index <= 0:
             return
-        
+
         # 交换位置
-        config_groups[selected_index], config_groups[selected_index - 1] = \
-            config_groups[selected_index - 1], config_groups[selected_index]
-        
+        config_groups[selected_index], config_groups[selected_index - 1] = (
+            config_groups[selected_index - 1],
+            config_groups[selected_index],
+        )
+
         # 更新当前选中索引
         nonlocal current_config_index
         if current_config_index == selected_index:
             current_config_index = selected_index - 1
         elif current_config_index == selected_index - 1:
             current_config_index = selected_index
-        
+
         if save_config_groups(config_groups, current_config_index):
             refresh_config_list()
             # 保持选中状态
@@ -858,24 +954,26 @@ def create_main_window():
                 config_tree.focus(children[selected_index - 1])
         else:
             log("保存配置组失败")
-    
+
     def move_config_down():
         """下移配置组"""
         selected_index = get_selected_index()
         if selected_index < 0 or selected_index >= len(config_groups) - 1:
             return
-        
+
         # 交换位置
-        config_groups[selected_index], config_groups[selected_index + 1] = \
-            config_groups[selected_index + 1], config_groups[selected_index]
-        
+        config_groups[selected_index], config_groups[selected_index + 1] = (
+            config_groups[selected_index + 1],
+            config_groups[selected_index],
+        )
+
         # 更新当前选中索引
         nonlocal current_config_index
         if current_config_index == selected_index:
             current_config_index = selected_index + 1
         elif current_config_index == selected_index + 1:
             current_config_index = selected_index
-        
+
         if save_config_groups(config_groups, current_config_index):
             refresh_config_list()
             # 保持选中状态
@@ -885,19 +983,27 @@ def create_main_window():
                 config_tree.focus(children[selected_index + 1])
         else:
             log("保存配置组失败")
-    
-    ttk.Button(config_buttons_frame, text="修改", command=edit_config_group).pack(fill=tk.X, padx=5, pady=2)
-    ttk.Button(config_buttons_frame, text="删除", command=delete_config_group).pack(fill=tk.X, padx=5, pady=2)
-    ttk.Button(config_buttons_frame, text="上移", command=move_config_up).pack(fill=tk.X, padx=5, pady=2)
-    ttk.Button(config_buttons_frame, text="下移", command=move_config_down).pack(fill=tk.X, padx=5, pady=2)
-    
+
+    ttk.Button(config_buttons_frame, text="修改", command=edit_config_group).pack(
+        fill=tk.X, padx=5, pady=2
+    )
+    ttk.Button(config_buttons_frame, text="删除", command=delete_config_group).pack(
+        fill=tk.X, padx=5, pady=2
+    )
+    ttk.Button(config_buttons_frame, text="上移", command=move_config_up).pack(
+        fill=tk.X, padx=5, pady=2
+    )
+    ttk.Button(config_buttons_frame, text="下移", command=move_config_down).pack(
+        fill=tk.X, padx=5, pady=2
+    )
+
     # 初始化配置组列表
     refresh_config_list()
-    
+
     # 全局配置框架
     global_config_frame = ttk.LabelFrame(left_frame, text="全局配置")
     global_config_frame.pack(fill=tk.X, padx=5, pady=5)
-    
+
     # 映射模型ID配置
     mapped_model_frame = ttk.Frame(global_config_frame)
     mapped_model_frame.pack(fill=tk.X, padx=5, pady=2)
@@ -905,7 +1011,7 @@ def create_main_window():
     mapped_model_var = tk.StringVar()
     mapped_model_entry = ttk.Entry(mapped_model_frame, textvariable=mapped_model_var, width=25)
     mapped_model_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 0))
-    
+
     # MTGA鉴权key配置
     mtga_auth_frame = ttk.Frame(global_config_frame)
     mtga_auth_frame.pack(fill=tk.X, padx=5, pady=2)
@@ -913,27 +1019,27 @@ def create_main_window():
     mtga_auth_var = tk.StringVar()
     mtga_auth_entry = ttk.Entry(mtga_auth_frame, textvariable=mtga_auth_var, width=25, show="*")
     mtga_auth_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 0))
-    
+
     # 加载并初始化全局配置
     def load_global_config_values():
         """加载并设置全局配置值到GUI"""
         mapped_model_id, mtga_auth_key = load_global_config()
         mapped_model_var.set(mapped_model_id)
         mtga_auth_var.set(mtga_auth_key)
-    
+
     def save_global_config_values():
         """保存全局配置值"""
         mapped_model_id = mapped_model_var.get().strip()
         mtga_auth_key = mtga_auth_var.get().strip()
-        
+
         # 验证必填字段
         if not mapped_model_id or not mtga_auth_key:
             log("错误: 映射模型ID和MTGA鉴权Key都是必填项")
             return False
-        
+
         # 获取当前配置组信息
         config_groups, current_config_index = load_config_groups()
-        
+
         # 保存全局配置
         if save_config_groups(config_groups, current_config_index, mapped_model_id, mtga_auth_key):
             log("全局配置已保存")
@@ -941,54 +1047,63 @@ def create_main_window():
         else:
             log("保存全局配置失败")
             return False
-    
+
     # 初始化全局配置值
     load_global_config_values()
-    
+
     # 为全局配置添加保存按钮
-    global_save_btn = ttk.Button(global_config_frame, text="保存全局配置", command=save_global_config_values)
+    global_save_btn = ttk.Button(
+        global_config_frame, text="保存全局配置", command=save_global_config_values
+    )
     global_save_btn.pack(pady=5)
-    
+
     # 调试模式复选框
     debug_mode_var = tk.BooleanVar(value=False)
     debug_mode_check = ttk.Checkbutton(left_frame, text="开启调试模式", variable=debug_mode_var)
     debug_mode_check.pack(fill=tk.X, padx=5, pady=2)
-    
+
     # 强制流模式选项
     stream_mode_frame = ttk.Frame(left_frame)
     stream_mode_frame.pack(fill=tk.X, padx=5, pady=2)
     stream_mode_var = tk.BooleanVar(value=False)
     stream_mode_check = ttk.Checkbutton(
-        stream_mode_frame, 
-        text="强制流模式:", 
+        stream_mode_frame,
+        text="强制流模式:",
         variable=stream_mode_var,
-        command=lambda: stream_mode_combo.config(state='readonly' if stream_mode_var.get() else 'disabled')
+        command=lambda: stream_mode_combo.config(
+            state="readonly" if stream_mode_var.get() else "disabled"
+        ),
     )
     stream_mode_check.pack(side=tk.LEFT)
-    stream_mode_combo = ttk.Combobox(stream_mode_frame, values=["true", "false"], state='disabled', width=10)
+    stream_mode_combo = ttk.Combobox(
+        stream_mode_frame, values=["true", "false"], state="disabled", width=10
+    )
     stream_mode_combo.pack(side=tk.LEFT, padx=(10, 0))  # 改为左对齐，减小间距
     stream_mode_combo.set("true")  # 默认值
-    
+
     # 功能标签页
     notebook = ttk.Notebook(left_frame)
     notebook.pack(fill=tk.BOTH, expand=True, pady=5)
-    
+
     # 证书管理标签页
     cert_tab = ttk.Frame(notebook)
     notebook.add(cert_tab, text="证书管理")
-    
+
     def generate_certs_task():
         """生成证书任务"""
+
         def task():
             log("开始生成证书...")
             if generate_certificates(log_func=log):
                 log("✅ 证书生成完成")
             else:
                 log("❌ 证书生成失败")
-        threading.Thread(target=task, daemon=True).start()
-    
+
+        thread_manager.run("cert_generate", task)
+
     def install_certs_task():
         """安装证书任务"""
+
         def task():
             log("开始安装CA证书...")
             # install_ca_cert 内部会处理权限请求
@@ -996,20 +1111,26 @@ def create_main_window():
                 log("✅ CA证书安装完成")
             else:
                 log("❌ CA证书安装失败")
-        threading.Thread(target=task, daemon=True).start()
-    
-    ttk.Button(cert_tab, text="生成CA和服务器证书", command=generate_certs_task).pack(fill=tk.X, padx=5, pady=5)
-    ttk.Button(cert_tab, text="安装CA证书", command=install_certs_task).pack(fill=tk.X, padx=5, pady=5)
-    
+
+        thread_manager.run("cert_install", task)
+
+    ttk.Button(cert_tab, text="生成CA和服务器证书", command=generate_certs_task).pack(
+        fill=tk.X, padx=5, pady=5
+    )
+    ttk.Button(cert_tab, text="安装CA证书", command=install_certs_task).pack(
+        fill=tk.X, padx=5, pady=5
+    )
+
     # hosts文件管理标签页
     hosts_tab = ttk.Frame(notebook)
     notebook.add(hosts_tab, text="hosts文件管理")
-    
+
     def modify_hosts_task(action="add"):
         """修改hosts文件任务"""
+
         def task():
             # 使用字典获取动作名称
-            action_names = {'add': '修改', 'backup': '备份', 'restore': '还原'}
+            action_names = {"add": "修改", "backup": "备份", "restore": "还原"}
             action_name = action_names.get(action, action)
             log(f"开始{action_name} hosts文件...")
             ip_tuple = ("127.0.0.1", "::1")
@@ -1017,191 +1138,175 @@ def create_main_window():
                 log(f"✅ hosts文件{action_name}完成")
             else:
                 log(f"❌ hosts文件{action_name}失败")
-        threading.Thread(target=task, daemon=True).start()
-    
+
+        thread_manager.run("hosts_manage", task)
+
     def open_hosts_task():
         """打开hosts文件任务"""
+
         def task():
             log("正在打开hosts文件...")
             if open_hosts_file(log_func=log):
                 log("✅ hosts文件已打开")
             else:
                 log("❌ 打开hosts文件失败")
-        threading.Thread(target=task, daemon=True).start()
-    
-    ttk.Button(hosts_tab, text="修改hosts文件", command=lambda: modify_hosts_task("add")).pack(fill=tk.X, padx=5, pady=5)
-    
+
+        thread_manager.run("hosts_open", task)
+
+    ttk.Button(hosts_tab, text="修改hosts文件", command=lambda: modify_hosts_task("add")).pack(
+        fill=tk.X, padx=5, pady=5
+    )
+
     hosts_buttons_frame = ttk.Frame(hosts_tab)
     hosts_buttons_frame.pack(fill=tk.X, padx=5, pady=5)
-    
-    ttk.Button(hosts_buttons_frame, text="备份hosts", command=lambda: modify_hosts_task("backup")).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=2)
-    ttk.Button(hosts_buttons_frame, text="还原hosts", command=lambda: modify_hosts_task("restore")).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=2)
-    
-    ttk.Button(hosts_tab, text="打开hosts文件", command=open_hosts_task).pack(fill=tk.X, padx=5, pady=5)
-    
+
+    ttk.Button(
+        hosts_buttons_frame, text="备份hosts", command=lambda: modify_hosts_task("backup")
+    ).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=2)
+    ttk.Button(
+        hosts_buttons_frame, text="还原hosts", command=lambda: modify_hosts_task("restore")
+    ).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=2)
+
+    ttk.Button(hosts_tab, text="打开hosts文件", command=open_hosts_task).pack(
+        fill=tk.X, padx=5, pady=5
+    )
+
     # 代理服务器标签页
     proxy_tab = ttk.Frame(notebook)
     notebook.add(proxy_tab, text="代理服务器操作")
-    
+
     def start_proxy_task():
         """启动代理服务器任务"""
+        nonlocal proxy_start_task_id, proxy_stop_task_id
+
         def task():
-            global proxy_server_instance
-            
-            # 如果已有实例在运行，先停止
-            if proxy_server_instance and proxy_server_instance.is_running():
-                log("检测到代理服务器正在运行，正在停止旧实例...")
-                try:
-                    proxy_server_instance.stop()
-                    time.sleep(1)  # 等待停止完成
-                    log("旧代理服务器实例已停止")
-                except Exception as e:
-                    log(f"停止旧代理服务器时出错: {e}")
-                proxy_server_instance = None
-            
-            current_config = get_current_config()
-            if not current_config:
-                log("❌ 错误: 没有可用的配置组")
+            config = build_proxy_config()
+            if not config:
                 return
-            
-            # 添加调试模式和流模式设置
-            config = current_config.copy()
-            config['debug_mode'] = debug_mode_var.get()
-            
-            # 处理强制流模式
-            if stream_mode_var.get():
-                stream_mode_value = stream_mode_combo.get()
-                config['stream_mode'] = stream_mode_value
+            stream_mode_value = config.get("stream_mode")
+            if stream_mode_value is not None:
                 log(f"启用强制流模式: {stream_mode_value}")
-            else:
-                config['stream_mode'] = None
-            
-            log("开始启动代理服务器...")
-            proxy_server_instance = ProxyServer(config, log_func=log)
-            if proxy_server_instance.start():
-                log("✅ 代理服务器启动成功")
-            else:
-                log("❌ 代理服务器启动失败")
-                proxy_server_instance = None
-        
-        threading.Thread(target=task, daemon=True).start()
-    
+            stop_proxy_instance(reason="restart")
+            start_proxy_instance(config)
+
+        wait_targets = [proxy_stop_task_id] if proxy_stop_task_id else None
+        proxy_start_task_id = thread_manager.run(
+            "proxy_start",
+            task,
+            wait_for=wait_targets,
+        )
+
     def stop_proxy_task():
         """停止代理服务器任务"""
+        nonlocal proxy_stop_task_id, proxy_start_task_id
+
         def task():
-            global proxy_server_instance
-            if proxy_server_instance and proxy_server_instance.is_running():
-                log("正在停止代理服务器...")
-                try:
-                    proxy_server_instance.stop()
-                    proxy_server_instance = None
-                    log("✅ 代理服务器已停止")
-                except Exception as e:
-                    log(f"停止代理服务器时出错: {e}")
-            else:
-                log("代理服务器未运行")
-        
-        threading.Thread(target=task, daemon=True).start()
-    
-    ttk.Button(proxy_tab, text="启动代理服务器", command=start_proxy_task).pack(fill=tk.X, padx=5, pady=5)
-    ttk.Button(proxy_tab, text="停止代理服务器", command=stop_proxy_task).pack(fill=tk.X, padx=5, pady=5)
-    
+            stop_proxy_instance(show_idle_message=True)
+
+        wait_targets = [proxy_start_task_id] if proxy_start_task_id else None
+        proxy_stop_task_id = thread_manager.run(
+            "proxy_stop",
+            task,
+            wait_for=wait_targets,
+        )
+
+    ttk.Button(proxy_tab, text="启动代理服务器", command=start_proxy_task).pack(
+        fill=tk.X, padx=5, pady=5
+    )
+    ttk.Button(proxy_tab, text="停止代理服务器", command=stop_proxy_task).pack(
+        fill=tk.X, padx=5, pady=5
+    )
+
     # 用户数据管理标签页（仅在单文件模式下显示）
     if is_packaged():
         data_mgmt_tab = ttk.Frame(notebook)
         notebook.add(data_mgmt_tab, text="用户数据管理")
-        
+
         def open_user_data_directory():
             """打开用户数据目录"""
             try:
                 user_data_dir = get_user_data_dir()
-                if os.name == 'nt':  # Windows
+                if os.name == "nt":  # Windows
                     os.startfile(user_data_dir)
-                elif sys.platform == 'darwin':  # macOS
+                elif sys.platform == "darwin":  # macOS
                     os.system(f'open "{user_data_dir}"')
                 else:  # Linux
                     os.system(f'xdg-open "{user_data_dir}"')
                 log(f"已打开用户数据目录: {user_data_dir}")
             except Exception as e:
                 log(f"打开用户数据目录失败: {e}")
-        
+
         def backup_user_data():
             """备份用户数据"""
             try:
-                import shutil
-                from datetime import datetime
-                
                 user_data_dir = get_user_data_dir()
-                backup_base_dir = os.path.join(user_data_dir, 'backups')
-                
+                backup_base_dir = os.path.join(user_data_dir, "backups")
+
                 # 创建备份基础目录
                 os.makedirs(backup_base_dir, exist_ok=True)
-                
+
                 # 生成时间戳文件夹名
-                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                backup_dir = os.path.join(backup_base_dir, f'backup_{timestamp}')
-                
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                backup_dir = os.path.join(backup_base_dir, f"backup_{timestamp}")
+
                 # 复制除备份文件夹外的所有文件和文件夹
                 items_to_backup = []
                 for item in os.listdir(user_data_dir):
                     item_path = os.path.join(user_data_dir, item)
-                    if item != 'backups':  # 排除备份文件夹本身
+                    if item != "backups":  # 排除备份文件夹本身
                         items_to_backup.append((item, item_path))
-                
+
                 if items_to_backup:
                     os.makedirs(backup_dir, exist_ok=True)
-                    
+
                     for item_name, item_path in items_to_backup:
                         dest_path = os.path.join(backup_dir, item_name)
                         if os.path.isfile(item_path):
                             shutil.copy2(item_path, dest_path)
                         elif os.path.isdir(item_path):
                             shutil.copytree(item_path, dest_path)
-                    
+
                     log(f"✅ 用户数据备份成功: {backup_dir}")
                     log(f"备份了 {len(items_to_backup)} 个项目")
                 else:
                     log("没有需要备份的用户数据")
-                    
+
             except Exception as e:
                 log(f"❌ 备份用户数据失败: {e}")
-        
+
         def clear_user_data():
             """清除用户数据（保留备份文件夹）"""
             try:
-                import shutil
-                from modules.resource_manager import copy_template_files
-                
                 # 确认对话框
                 result = messagebox.askyesno(
                     "确认清除",
                     "此操作将删除所有用户数据（配置文件、证书等），但保留备份文件夹。\n\n确定要继续吗？",
-                    icon='warning'
+                    icon="warning",
                 )
-                
+
                 if not result:
                     log("用户取消了清除操作")
                     return
-                
+
                 user_data_dir = get_user_data_dir()
-                
+
                 # 删除除备份文件夹外的所有文件和文件夹
                 items_to_remove = []
                 for item in os.listdir(user_data_dir):
-                    if item != 'backups':  # 保留备份文件夹
+                    if item != "backups":  # 保留备份文件夹
                         item_path = os.path.join(user_data_dir, item)
                         items_to_remove.append((item, item_path))
-                
+
                 if items_to_remove:
-                    for item_name, item_path in items_to_remove:
+                    for _item_name, item_path in items_to_remove:
                         if os.path.isfile(item_path):
                             os.remove(item_path)
                         elif os.path.isdir(item_path):
                             shutil.rmtree(item_path)
-                    
+
                     log(f"✅ 用户数据清除成功，删除了 {len(items_to_remove)} 个项目")
                     log("备份文件夹已保留")
-                    
+
                     # 清除数据后复制模板文件
                     log("正在复制模板文件...")
                     copied_files = copy_template_files()
@@ -1211,255 +1316,255 @@ def create_main_window():
                         log("模板文件已存在或复制完成")
                 else:
                     log("没有需要清除的用户数据")
-                    
+
             except Exception as e:
                 log(f"❌ 清除用户数据失败: {e}")
-        
+
         def restore_user_data():
             """从最新备份还原用户数据"""
             try:
-                import shutil
-                import glob
-                
                 user_data_dir = get_user_data_dir()
-                backup_base_dir = os.path.join(user_data_dir, 'backups')
-                
+                backup_base_dir = os.path.join(user_data_dir, "backups")
+
                 # 检查是否存在备份
                 if not os.path.exists(backup_base_dir):
                     log("❌ 没有找到备份文件夹")
                     messagebox.showwarning("无备份", "没有找到备份文件夹，无法执行还原操作。")
                     return
-                
+
                 # 查找所有备份文件夹
-                backup_pattern = os.path.join(backup_base_dir, 'backup_*')
+                backup_pattern = os.path.join(backup_base_dir, "backup_*")
                 backup_folders = glob.glob(backup_pattern)
-                
+
                 if not backup_folders:
                     log("❌ 没有找到任何备份")
                     messagebox.showwarning("无备份", "没有找到任何备份文件，无法执行还原操作。")
                     return
-                
+
                 # 找到最新的备份（按文件夹名排序，时间戳格式保证了字典序就是时间序）
                 latest_backup = max(backup_folders, key=lambda x: os.path.basename(x))
                 backup_name = os.path.basename(latest_backup)
-                
+
                 # 确认对话框
                 result = messagebox.askyesno(
                     "确认还原",
                     f"将从最新备份还原数据：\n{backup_name}\n\n此操作将覆盖当前的配置文件、证书等数据。\n\n确定要继续吗？",
-                    icon='question'
+                    icon="question",
                 )
-                
+
                 if not result:
                     log("用户取消了还原操作")
                     return
-                
+
                 # 执行还原操作
                 restored_count = 0
                 for item in os.listdir(latest_backup):
                     src_path = os.path.join(latest_backup, item)
                     dest_path = os.path.join(user_data_dir, item)
-                    
+
                     # 如果目标已存在，先删除
                     if os.path.exists(dest_path):
                         if os.path.isfile(dest_path):
                             os.remove(dest_path)
                         elif os.path.isdir(dest_path):
                             shutil.rmtree(dest_path)
-                    
+
                     # 复制文件或目录
                     if os.path.isfile(src_path):
                         shutil.copy2(src_path, dest_path)
                     elif os.path.isdir(src_path):
                         shutil.copytree(src_path, dest_path)
-                    
+
                     restored_count += 1
-                
+
                 log(f"✅ 数据还原成功，从备份 {backup_name} 还原了 {restored_count} 个项目")
-                messagebox.showinfo("还原成功", f"数据还原完成！\n\n从备份：{backup_name}\n还原项目：{restored_count} 个")
-                
+                messagebox.showinfo(
+                    "还原成功",
+                    f"数据还原完成！\n\n从备份：{backup_name}\n还原项目：{restored_count} 个",
+                )
+
             except Exception as e:
                 log(f"❌ 还原用户数据失败: {e}")
                 messagebox.showerror("还原失败", f"还原操作失败：\n{e}")
-        
+
         # 按钮区域（仅包含按钮）
         button_frame = ttk.Frame(data_mgmt_tab)
         button_frame.pack(fill=tk.X, padx=5, pady=5)
-        
+
         # 创建带提示的按钮（修复 tooltip 属性问题）
         def create_tooltip(widget, text):
             """为控件创建悬浮提示"""
             tooltip_window = None
-            
+
             def on_enter(event):
                 nonlocal tooltip_window
                 tooltip_window = tk.Toplevel()
                 tooltip_window.wm_overrideredirect(True)
-                tooltip_window.wm_geometry(f"+{event.x_root+10}+{event.y_root+10}")
-                tooltip_window.configure(bg='lightyellow', relief='solid', bd=1)
-                label = tk.Label(tooltip_window, text=text, bg='lightyellow', font=('Arial', 9), wraplength=300)
+                tooltip_window.wm_geometry(f"+{event.x_root + 10}+{event.y_root + 10}")
+                tooltip_window.configure(bg="lightyellow", relief="solid", bd=1)
+                label = tk.Label(
+                    tooltip_window, text=text, bg="lightyellow", font=("Arial", 9), wraplength=300
+                )
                 label.pack()
-            
+
             def on_leave(event):
                 nonlocal tooltip_window
                 if tooltip_window:
                     tooltip_window.destroy()
                     tooltip_window = None
-            
-            widget.bind('<Enter>', on_enter)
-            widget.bind('<Leave>', on_leave)
-        
+
+            widget.bind("<Enter>", on_enter)
+            widget.bind("<Leave>", on_leave)
+
         # 创建按钮并添加提示
         btn_open = ttk.Button(button_frame, text="打开目录", command=open_user_data_directory)
         btn_open.pack(fill=tk.X, pady=2)
-        create_tooltip(btn_open, "使用系统文件管理器打开用户数据目录\nWindows: %APPDATA%\\MTGA\\\nmacOS/Linux: ~/.mtga/")
-        
+        create_tooltip(
+            btn_open,
+            "使用系统文件管理器打开用户数据目录\nWindows: %APPDATA%\\MTGA\\\nmacOS/Linux: ~/.mtga/",
+        )
+
         btn_backup = ttk.Button(button_frame, text="备份数据", command=backup_user_data)
         btn_backup.pack(fill=tk.X, pady=2)
-        create_tooltip(btn_backup, "创建带时间戳的完整数据备份\n备份内容：配置文件、SSL证书、hosts备份\n备份位置：用户数据目录/backups/backup_时间戳/")
-        
+        create_tooltip(
+            btn_backup,
+            "创建带时间戳的完整数据备份\n备份内容：配置文件、SSL证书、hosts备份\n备份位置：用户数据目录/backups/backup_时间戳/",
+        )
+
         btn_restore = ttk.Button(button_frame, text="还原数据", command=restore_user_data)
         btn_restore.pack(fill=tk.X, pady=2)
-        create_tooltip(btn_restore, "从最新备份恢复用户数据（覆盖现有数据）\n自动选择最新时间戳的备份进行还原\n注意：此操作会覆盖当前的配置和证书")
-        
+        create_tooltip(
+            btn_restore,
+            "从最新备份恢复用户数据（覆盖现有数据）\n自动选择最新时间戳的备份进行还原\n注意：此操作会覆盖当前的配置和证书",
+        )
+
         btn_clear = ttk.Button(button_frame, text="清除数据", command=clear_user_data)
         btn_clear.pack(fill=tk.X, pady=2)
-        create_tooltip(btn_clear, "删除所有用户数据（保留历史备份）\n清除内容：配置文件、SSL证书、hosts备份\n保留内容：backups文件夹及其历史备份")
-    
+        create_tooltip(
+            btn_clear,
+            "删除所有用户数据（保留历史备份）\n清除内容：配置文件、SSL证书、hosts备份\n保留内容：backups文件夹及其历史备份",
+        )
+
     # 关于标签页
     style = ttk.Style()
-    style.configure('About.TFrame', background='#f0f0f0')
-    about_tab = ttk.Frame(notebook, style='About.TFrame')
+    style.configure("About.TFrame", background="#f0f0f0")
+    about_tab = ttk.Frame(notebook, style="About.TFrame")
     notebook.add(about_tab, text="关于")
-    
+
     about_title = "MTGA GUI v1.2.0"
-    about_body = "版本亮点：\n"
-    about_body += "• 重构模型映射架构：使用统一映射模型ID，代理支持模型ID映射与MTGA鉴权，全局配置支持映射模型ID和鉴权Key\n"
-    about_body += "• 配置组管理优化：名称改为可选，API URL、实际模型ID、API Key改为必填，移除目标模型ID字段并保留旧配置兼容\n"
-    about_body += "• 新增自动化测试：保存配置后自动拉取模型信息，支持聊天补全测活，提供响应内容与token消耗日志\n"
-    about_body += "• 增强用户体验：增加测活按钮与提示，异步测试避免UI阻塞，API Key默认掩码显示\n"
+    about_points = [
+        (
+            "• 重构模型映射架构：使用统一映射模型ID，代理支持模型ID映射与MTGA鉴权，"
+            "全局配置支持映射模型ID和鉴权Key"
+        ),
+        (
+            "• 配置组管理优化：名称改为可选，API URL、实际模型ID、API Key改为必填，"
+            "移除目标模型ID字段并保留旧配置兼容"
+        ),
+        (
+            "• 新增自动化测试：保存配置后自动拉取模型信息，支持聊天补全测活，提供响应内容与"
+            "token消耗日志"
+        ),
+        ("• 增强用户体验：增加测活按钮与提示，异步测试避免UI阻塞，API Key默认掩码显示"),
+    ]
+    about_body = "版本亮点：\n" + "\n".join(about_points) + "\n"
 
     # 使用带滚动条的文本组件显示关于信息，减少标签页的最小高度
     about_text_widget = scrolledtext.ScrolledText(
         about_tab,
         height=5,
-        wrap='none',
-        background='#f0f0f0',
-        relief='flat',
+        wrap="none",
+        background="#f0f0f0",
+        relief="flat",
         borderwidth=0,
-        highlightthickness=0
+        highlightthickness=0,
     )
     about_text_widget.pack(fill=tk.BOTH, expand=True, padx=5, pady=(5, 0))
     # 添加水平滚动条
     about_x_scroll = ttk.Scrollbar(about_tab, orient=tk.HORIZONTAL, command=about_text_widget.xview)
     about_text_widget.configure(xscrollcommand=about_x_scroll.set)
     about_x_scroll.pack(fill=tk.X, padx=5, pady=(0, 5))
-    from tkinter import font as tkfont
     default_font = tkfont.nametofont(about_text_widget.cget("font"))
     bold_font = default_font.copy()
     bold_font.configure(weight="bold")
     about_text_widget.tag_config("h2", font=("Microsoft YaHei", 10, "bold"), background="#f0f0f0")
     about_text_widget.insert(tk.END, about_title + "\n\n", "h2")
     about_text_widget.insert(tk.END, about_body)
-    about_text_widget.config(state='disabled')
-    
+    about_text_widget.config(state="disabled")
+
     # 一键启动按钮
     def start_all_task():
         """一键启动全部服务"""
+        nonlocal proxy_start_task_id, proxy_stop_task_id
+
         def task():
+            thread_manager.wait(proxy_start_task_id)
+            thread_manager.wait(proxy_stop_task_id)
+
             current_config = get_current_config()
             if not current_config:
                 log("❌ 错误: 没有可用的配置组")
                 return
-            
+
             log("=== 开始一键启动全部服务 ===")
-            
+
             # 1. 生成证书
             log("步骤 1/4: 生成证书")
             if not generate_certificates(log_func=log):
                 log("❌ 生成证书失败，无法继续")
                 return
-            
+
             # 2. 安装CA证书
             log("步骤 2/4: 安装CA证书")
             if not install_ca_cert(log_func=log):
                 log("❌ 安装CA证书失败，无法继续")
                 return
-            
+
             # 3. 修改hosts文件
             log("步骤 3/4: 修改hosts文件")
             if not modify_hosts_file(log_func=log):
                 log("❌ 修改hosts文件失败，无法继续")
                 return
-            
+
             # 4. 启动代理服务器（macOS需要手动）
-            if sys.platform == 'darwin':
+            if sys.platform == "darwin":
                 log("步骤 4/4: macOS平台需要手动启动代理服务器")
                 log("⚠️  证书安装后需要用户手动确认信任设置")
                 log("📋  证书信任设置完成后，点击 '启动代理服务器' 按钮")
                 log("✅ 准备工作已完成")
             else:
                 log("步骤 4/4: 启动代理服务器")
-                global proxy_server_instance
-                
-                # 如果已有实例在运行，先停止
-                if proxy_server_instance and proxy_server_instance.is_running():
-                    log("检测到代理服务器正在运行，正在停止旧实例...")
-                    try:
-                        proxy_server_instance.stop()
-                        time.sleep(1)  # 等待停止完成
-                        log("旧代理服务器实例已停止")
-                    except Exception as e:
-                        log(f"停止旧代理服务器时出错: {e}")
-                    proxy_server_instance = None
-                
-                config = current_config.copy()
-                config['debug_mode'] = debug_mode_var.get()
-                
-                # 处理强制流模式
-                if stream_mode_var.get():
-                    stream_mode_value = stream_mode_combo.get()
-                    config['stream_mode'] = stream_mode_value
+                config = build_proxy_config()
+                if not config:
+                    return
+                stream_mode_value = config.get("stream_mode")
+                if stream_mode_value is not None:
                     log(f"启用强制流模式: {stream_mode_value}")
-                else:
-                    config['stream_mode'] = None
-                
-                proxy_server_instance = ProxyServer(config, log_func=log)
-                if proxy_server_instance.start():
-                    log("✅ 全部服务启动成功")
-                else:
-                    log("❌ 代理服务器启动失败")
-                    proxy_server_instance = None
-        
-        threading.Thread(target=task, daemon=True).start()
-    
-    start_button = ttk.Button(
-        left_frame, 
-        text="一键启动全部服务", 
-        command=start_all_task
-    )
+                stop_proxy_instance(reason="restart")
+                if start_proxy_instance(config, success_message="✅ 全部服务启动成功"):
+                    return
+                log("❌ 全部服务启动失败：代理服务器未能启动")
+
+        thread_manager.run("start_all", task)
+
+    start_button = ttk.Button(left_frame, text="一键启动全部服务", command=start_all_task)
     start_button.pack(fill=tk.X, pady=10)
-    
+
     # 窗口关闭处理
     def on_closing():
-        global proxy_server_instance
-        if proxy_server_instance and proxy_server_instance.is_running():
-            log("检测到代理服务器正在运行，正在停止...")
-            try:
-                proxy_server_instance.stop()
-                # 等待一小段时间确保停止完成
-                time.sleep(1)
-                proxy_server_instance = None
-                log("代理服务器已停止，程序即将退出")
-            except Exception as e:
-                log(f"停止代理服务器时出错: {e}")
+        nonlocal proxy_start_task_id, proxy_stop_task_id
+        thread_manager.wait(proxy_start_task_id, timeout=5)
+        thread_manager.wait(proxy_stop_task_id, timeout=5)
+        stopped = stop_proxy_instance()
+        if stopped:
+            log("代理服务器已停止，程序即将退出")
         window.destroy()
-    
+
     window.protocol("WM_DELETE_WINDOW", on_closing)
-    
+
     log("MTGA GUI 已启动")
     log("请选择操作或直接使用一键启动...")
-    
+
     return window
 
 
@@ -1467,7 +1572,7 @@ def main():
     """主函数"""
     # 不再在启动时检查管理员权限
     # 只在需要时（安装证书）请求权限
-    
+
     try:
         # 创建并运行GUI
         root = create_main_window()
@@ -1475,25 +1580,18 @@ def main():
     except Exception as e:
         # 如果 GUI 创建失败，至少尝试记录错误
         error_msg = f"GUI initialization failed: {e}\n"
-        try:
-            # 尝试写入错误日志
-            import traceback
-            error_file = os.path.join(os.path.expanduser('~'), 'mtga_gui_error.log')
-            with open(error_file, 'w') as f:
+        with suppress(Exception):
+            error_file = os.path.join(os.path.expanduser("~"), "mtga_gui_error.log")
+            with open(error_file, "w") as f:
                 f.write(error_msg)
                 f.write(f"Working directory: {os.getcwd()}\n")
                 f.write(f"Traceback:\n{traceback.format_exc()}\n")
-        except Exception:
-            pass
-        
+
         # 在 macOS 上，如果是从 Finder 启动，显示错误对话框
-        if sys.platform == 'darwin':
-            try:
-                import tkinter.messagebox as msgbox
-                msgbox.showerror("MTGA GUI Error", error_msg)
-            except Exception:
-                pass
-        
+        if sys.platform == "darwin":
+            with suppress(Exception):
+                messagebox.showerror("MTGA GUI Error", error_msg)
+
         # 退出程序
         sys.exit(1)
 
