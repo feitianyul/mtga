@@ -458,6 +458,34 @@ def create_main_window():  # noqa: PLR0915
             fallback = formatted_message.encode("unicode_escape").decode("ascii", errors="replace")
             print(fallback)
 
+    def create_tooltip(widget, text, wraplength=300):
+        """为控件创建可复用悬浮提示"""
+        tooltip_window = None
+
+        def on_enter(event):
+            nonlocal tooltip_window
+            tooltip_window = tk.Toplevel()
+            tooltip_window.wm_overrideredirect(True)
+            tooltip_window.wm_geometry(f"+{event.x_root + 10}+{event.y_root + 10}")
+            tooltip_window.configure(bg="lightyellow", relief="solid", bd=1)
+            label = tk.Label(
+                tooltip_window,
+                text=text,
+                bg="lightyellow",
+                font=("Arial", 9),
+                wraplength=wraplength,
+            )
+            label.pack()
+
+        def on_leave(event):
+            nonlocal tooltip_window
+            if tooltip_window:
+                tooltip_window.destroy()
+                tooltip_window = None
+
+        widget.bind("<Enter>", on_enter)
+        widget.bind("<Leave>", on_leave)
+
     proxy_start_task_id = None
     proxy_stop_task_id = None
 
@@ -560,68 +588,20 @@ def create_main_window():  # noqa: PLR0915
     test_btn = ttk.Button(list_header_frame, text="测活", command=test_selected_config, width=6)
     test_btn.pack(side=tk.RIGHT, padx=5)
 
-    # 为测活按钮添加提示
-    def create_tooltip_for_test():
-        tooltip_window = None
-
-        def on_enter(event):
-            nonlocal tooltip_window
-            tooltip_window = tk.Toplevel()
-            tooltip_window.wm_overrideredirect(True)
-            tooltip_window.wm_geometry(f"+{event.x_root + 10}+{event.y_root + 10}")
-            tooltip_window.configure(bg="lightyellow", relief="solid", bd=1)
-            label = tk.Label(
-                tooltip_window,
-                text="测试选中配置组的实际对话功能\n会发送最小请求并消耗少量tokens\n请确保配置正确后使用",
-                bg="lightyellow",
-                font=("Arial", 9),
-                wraplength=250,
-            )
-            label.pack()
-
-        def on_leave(event):
-            nonlocal tooltip_window
-            if tooltip_window:
-                tooltip_window.destroy()
-                tooltip_window = None
-
-        test_btn.bind("<Enter>", on_enter)
-        test_btn.bind("<Leave>", on_leave)
-
-    create_tooltip_for_test()
+    create_tooltip(
+        test_btn,
+        "测试选中配置组的实际对话功能\n会发送最小请求并消耗少量tokens\n请确保配置正确后使用",
+        wraplength=250,
+    )
 
     refresh_btn = ttk.Button(list_header_frame, text="刷新", command=refresh_config_list, width=6)
     refresh_btn.pack(side=tk.RIGHT, padx=16)
 
-    # 为刷新按钮添加提示（修复 tooltip 属性问题）
-    def create_tooltip_for_refresh():
-        tooltip_window = None
-
-        def on_enter(event):
-            nonlocal tooltip_window
-            tooltip_window = tk.Toplevel()
-            tooltip_window.wm_overrideredirect(True)
-            tooltip_window.wm_geometry(f"+{event.x_root + 10}+{event.y_root + 10}")
-            tooltip_window.configure(bg="lightyellow", relief="solid", bd=1)
-            label = tk.Label(
-                tooltip_window,
-                text="重新加载配置文件中的配置组\n用于同步外部修改或恢复意外更改",
-                bg="lightyellow",
-                font=("Arial", 9),
-                wraplength=250,
-            )
-            label.pack()
-
-        def on_leave(event):
-            nonlocal tooltip_window
-            if tooltip_window:
-                tooltip_window.destroy()
-                tooltip_window = None
-
-        refresh_btn.bind("<Enter>", on_enter)
-        refresh_btn.bind("<Leave>", on_leave)
-
-    create_tooltip_for_refresh()
+    create_tooltip(
+        refresh_btn,
+        "重新加载配置文件中的配置组\n用于同步外部修改或恢复意外更改",
+        wraplength=250,
+    )
 
     tree_frame = ttk.Frame(config_list_frame)
     tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
@@ -1396,31 +1376,6 @@ def create_main_window():  # noqa: PLR0915
         # 按钮区域（仅包含按钮）
         button_frame = ttk.Frame(data_mgmt_tab)
         button_frame.pack(fill=tk.X, padx=5, pady=5)
-
-        # 创建带提示的按钮（修复 tooltip 属性问题）
-        def create_tooltip(widget, text):
-            """为控件创建悬浮提示"""
-            tooltip_window = None
-
-            def on_enter(event):
-                nonlocal tooltip_window
-                tooltip_window = tk.Toplevel()
-                tooltip_window.wm_overrideredirect(True)
-                tooltip_window.wm_geometry(f"+{event.x_root + 10}+{event.y_root + 10}")
-                tooltip_window.configure(bg="lightyellow", relief="solid", bd=1)
-                label = tk.Label(
-                    tooltip_window, text=text, bg="lightyellow", font=("Arial", 9), wraplength=300
-                )
-                label.pack()
-
-            def on_leave(event):
-                nonlocal tooltip_window
-                if tooltip_window:
-                    tooltip_window.destroy()
-                    tooltip_window = None
-
-            widget.bind("<Enter>", on_enter)
-            widget.bind("<Leave>", on_leave)
 
         # 创建按钮并添加提示
         btn_open = ttk.Button(button_frame, text="打开目录", command=open_user_data_directory)
