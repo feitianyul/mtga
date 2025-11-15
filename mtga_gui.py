@@ -504,6 +504,12 @@ def create_main_window():  # noqa: PLR0915
         set_proxy_instance(None)
         return False
 
+    def stop_proxy_and_restore(show_idle_message=False):
+        """停止代理并恢复 hosts 记录"""
+        stopped = stop_proxy_instance(show_idle_message=show_idle_message)
+        modify_hosts_task("restore")
+        return stopped
+
     # 显示环境检查结果
     env_ok, env_msg = check_environment()
     if env_ok:
@@ -1201,7 +1207,7 @@ def create_main_window():  # noqa: PLR0915
         nonlocal proxy_stop_task_id, proxy_start_task_id
 
         def task():
-            stop_proxy_instance(show_idle_message=True)
+            stop_proxy_and_restore(show_idle_message=True)
 
         wait_targets = [proxy_start_task_id] if proxy_start_task_id else None
         proxy_stop_task_id = thread_manager.run(
@@ -1555,7 +1561,7 @@ def create_main_window():  # noqa: PLR0915
         nonlocal proxy_start_task_id, proxy_stop_task_id
         thread_manager.wait(proxy_start_task_id, timeout=5)
         thread_manager.wait(proxy_stop_task_id, timeout=5)
-        stopped = stop_proxy_instance()
+        stopped = stop_proxy_and_restore()
         if stopped:
             log("代理服务器已停止，程序即将退出")
         window.destroy()
