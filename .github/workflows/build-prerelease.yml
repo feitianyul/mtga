@@ -406,10 +406,10 @@ jobs:
 
           if [ "$RELEASE_TYPE" = "release" ]; then
             RELEASE_LABEL="正式发布版"
-            RELEASE_NAME="🎉 MTGA GUI v${VERSION}"
+            RELEASE_NAME="v${VERSION}"
           else
             RELEASE_LABEL="预发布版"
-            RELEASE_NAME="🚀 MTGA GUI v${VERSION}"
+            RELEASE_NAME="v${VERSIOv${VERSION}"
           fi
 
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
@@ -456,6 +456,23 @@ jobs:
           START_COMMIT_INPUT="${{ github.event.inputs.start_commit || '' }}"
           TARGET_COMMIT="${{ github.sha }}"
 
+          FEAT_TEMP=$(mktemp)
+          FIX_TEMP=$(mktemp)
+          trap 'rm -f "$FEAT_TEMP" "$FIX_TEMP"' EXIT
+
+          append_release_entry() {
+            local subject="$1"
+            local hash="$2"
+            if [ -z "$subject" ]; then
+              return
+            fi
+            if echo "$subject" | grep -Eq '^feat\b'; then
+              echo "- $subject ($hash)" >> "$FEAT_TEMP"
+            elif echo "$subject" | grep -Eq '^fix\b'; then
+              echo "- $subject ($hash)" >> "$FIX_TEMP"
+            fi
+          }
+
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             if [ -z "$START_COMMIT_INPUT" ]; then
               echo "❌ 手动触发工作流时必须填写起始提交哈希"
@@ -473,29 +490,32 @@ jobs:
               exit 1
             fi
 
-            : > release_notes.md
-
             START_SUBJECT=$(git show -s --format='%s' "$START_COMMIT")
-            if echo "$START_SUBJECT" | grep -Eq '^(feat|fix)\b'; then
-              echo "- $START_SUBJECT ($START_COMMIT)" >> release_notes.md
-            fi
+            append_release_entry "$START_SUBJECT" "$START_COMMIT"
 
             git log --format='%H%x09%s' --reverse "$START_COMMIT..$TARGET_COMMIT" | while IFS=$'\t' read -r HASH SUBJECT; do
-              if echo "$SUBJECT" | grep -Eq '^(feat|fix)\b'; then
-                echo "- $SUBJECT ($HASH)" >> release_notes.md
-              fi
+              append_release_entry "$SUBJECT" "$HASH"
             done
-
-            MATCH_TOTAL=$(grep -c '^- ' release_notes.md || true)
-            if [ "$MATCH_TOTAL" -eq 0 ]; then
-              echo "- 暂无匹配的 feat/fix 提交" >> release_notes.md
-            fi
           else
-            git show --no-patch --format='- %s' "${{ github.sha }}" > release_notes.md 2>/dev/null || true
-            if [ ! -s release_notes.md ]; then
-              printf '%s\n' "$TAG_NAME" > release_notes.md
-            fi
+            SUBJECT=$(git show -s --format='%s' "$TARGET_COMMIT" 2>/dev/null || true)
+            append_release_entry "$SUBJECT" "$TARGET_COMMIT"
           fi
+
+          {
+            echo "## :sparkles: 新功能"
+            if [ -s "$FEAT_TEMP" ]; then
+              cat "$FEAT_TEMP"
+            else
+              echo "- 暂无新功能"
+            fi
+            echo
+            echo "## :bug: 修复"
+            if [ -s "$FIX_TEMP" ]; then
+              cat "$FIX_TEMP"
+            else
+              echo "- 暂无修复"
+            fi
+          } > release_notes.md
 
           echo "RELEASE_NOTES<<EOF" >> $GITHUB_OUTPUT
           cat release_notes.md >> $GITHUB_OUTPUT
@@ -511,7 +531,6 @@ jobs:
           draft: false
           artifacts: |
             artifacts/windows-artifacts/*.exe
-            artifacts/macos-x64-artifacts/*.dmg
             artifacts/macos-arm64-artifacts/*.dmg
           token: ${{ secrets.GITHUB_TOKEN }}
 
