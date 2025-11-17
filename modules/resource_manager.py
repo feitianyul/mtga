@@ -45,16 +45,39 @@ def get_user_data_dir():
     return user_dir
 
 
+def _contains_packaged_resources(path):
+    """检查路径是否包含打包所需资源"""
+    if not path:
+        return False
+    resource_markers = ("ca", "openssl")
+    return any(os.path.exists(os.path.join(path, marker)) for marker in resource_markers)
+
+
 def get_program_resource_dir():
     """获取程序资源目录（临时目录，包含配置模板等）"""
     if is_packaged():
-        # Nuitka 单文件模式会将资源解压到一个临时目录
-        # 对于 macOS app bundle，资源始终在可执行文件所在目录
         exe_dir = os.path.dirname(sys.executable)
 
-        # macOS app bundle 的资源始终在 Contents/MacOS 目录下
-        # 无需检查文件是否存在，直接返回可执行文件目录
-        # 因为 Nuitka --standalone 模式会将所有资源放在这里
+        # macOS app bundle 的资源位于 Contents/MacOS 目录
+        if sys.platform == "darwin":
+            return exe_dir
+
+        candidates = []
+
+        # Nuitka 单文件模式会将资源解压到临时目录（__main__.__file__ 所在路径）
+        main_module = sys.modules.get("__main__")
+        main_file = getattr(main_module, "__file__", None) if main_module else None
+        if isinstance(main_file, str) and main_file:
+            candidates.append(os.path.dirname(main_file))
+
+        # 其次尝试可执行文件目录与当前工作目录
+        candidates.extend([exe_dir, os.getcwd()])
+
+        for path in candidates:
+            if _contains_packaged_resources(path):
+                return path
+
+        # 若未找到包含资源的目录，仍回退到可执行文件目录
         return exe_dir
     else:
         # 开发环境使用项目根目录
