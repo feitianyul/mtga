@@ -44,7 +44,15 @@ def _build_hosts_block(domain, ip_list):
     if not domain or not valid_ips:
         return ""
     entries = "\n".join(f"{ip} {domain}" for ip in valid_ips)
-    return f"\n{HOSTS_ENTRY_MARKER}\n{entries}\n"
+    return f"{HOSTS_ENTRY_MARKER}\n{entries}\n"
+
+
+def _append_hosts_block(content, hosts_block):
+    """在原有内容后追加 hosts 文本块，并保留一个空行分隔。"""
+    content = content.rstrip("\n")
+    if not content:
+        return hosts_block
+    return f"{content}\n\n{hosts_block}"
 
 
 def _remove_legacy_hosts_entries(content, domain):
@@ -87,9 +95,15 @@ def _remove_hosts_block_from_content(content, domain, ip_list):
     block_text = _build_hosts_block(domain, normalized_ips)
 
     if block_text:
-        while block_text in content:
-            content = content.replace(block_text, "\n", 1)
-            removed_entries += len(normalized_ips)
+        variants = [
+            ("\n\n" + block_text, "\n"),
+            ("\n" + block_text, "\n"),
+            (block_text, ""),
+        ]
+        for target, replacement in variants:
+            while target in content:
+                content = content.replace(target, replacement, 1)
+                removed_entries += len(normalized_ips)
 
     content, legacy_removed = _remove_legacy_hosts_entries(content, domain)
     removed_entries += legacy_removed
@@ -283,12 +297,16 @@ def add_hosts_entry(domain, ip=DEFAULT_HOSTS_IPS, log_func=print):
             log_func("未能构造 hosts 写入数据，取消操作")
             return False
 
-        if hosts_block.strip() in content:
+        if (
+            hosts_block in content
+            or f"\n{hosts_block}" in content
+            or f"\n\n{hosts_block}" in content
+        ):
             log_func("hosts 文件已包含目标记录，无需修改")
             return True
 
-        # 添加统一的文本块
-        content = content.rstrip("\n") + hosts_block
+        # 添加统一的文本块并保留一个空行
+        content = _append_hosts_block(content, hosts_block)
 
         # 使用权限写入
         write_success = write_hosts_file_with_permission(hosts_file, content, encoding, log_func)
