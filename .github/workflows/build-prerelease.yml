@@ -406,11 +406,10 @@ jobs:
 
           if [ "$RELEASE_TYPE" = "release" ]; then
             RELEASE_LABEL="正式发布版"
-            RELEASE_NAME="v${VERSION}"
           else
             RELEASE_LABEL="预发布版"
-            RELEASE_NAME="v${VERSIOv${VERSION}"
           fi
+          RELEASE_NAME="v${VERSION}"
 
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_OUTPUT
