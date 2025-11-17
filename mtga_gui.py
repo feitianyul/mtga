@@ -561,9 +561,9 @@ def create_main_window():  # noqa: PLR0915
         return False
 
     def stop_proxy_and_restore(show_idle_message=False):
-        """停止代理并恢复 hosts 记录"""
+        """停止代理并移除模块写入的 hosts 记录"""
         stopped = stop_proxy_instance(show_idle_message=show_idle_message)
-        modify_hosts_task("restore")
+        modify_hosts_task("remove")
         return stopped
 
     # 显示环境检查结果
@@ -1144,7 +1144,7 @@ def create_main_window():  # noqa: PLR0915
 
         def task():
             # 使用字典获取动作名称
-            action_names = {"add": "修改", "backup": "备份", "restore": "还原"}
+            action_names = {"add": "修改", "remove": "移除", "backup": "备份", "restore": "还原"}
             action_name = action_names.get(action, action)
             log(f"开始{action_name} hosts文件...")
             ip_tuple = ("127.0.0.1", "::1")

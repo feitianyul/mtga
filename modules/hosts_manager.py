@@ -12,6 +12,89 @@ from contextlib import suppress
 
 from .resource_manager import ResourceManager
 
+HOSTS_ENTRY_MARKER = "# Added by MTGA GUI"
+DEFAULT_HOSTS_IPS = ("127.0.0.1", "::1")
+
+
+def _normalize_ip_list(ip):
+    """将 IP 参数转换为去重后的字符串列表。"""
+    if ip is None:
+        iterable = DEFAULT_HOSTS_IPS
+    elif isinstance(ip, str):
+        iterable = [ip]
+    elif isinstance(ip, (list, tuple, set)):
+        iterable = list(ip)
+    else:
+        iterable = [ip]
+
+    normalized = []
+    for addr in iterable:
+        if not addr:
+            continue
+        addr_str = str(addr).strip()
+        if addr_str and addr_str not in normalized:
+            normalized.append(addr_str)
+    return normalized
+
+
+def _build_hosts_block(domain, ip_list):
+    """根据域名与 IP 列表构建统一的 hosts 文本块。"""
+    domain = str(domain).strip()
+    valid_ips = [ip for ip in ip_list if ip]
+    if not domain or not valid_ips:
+        return ""
+    entries = "\n".join(f"{ip} {domain}" for ip in valid_ips)
+    return f"\n{HOSTS_ENTRY_MARKER}\n{entries}\n"
+
+
+def _remove_legacy_hosts_entries(content, domain):
+    """
+    移除旧版本逐条写入的 hosts 记录，返回新内容与删除数量。
+    旧格式为一条注释配合单个域名记录。
+    """
+    lines = content.splitlines()
+    new_lines = []
+    skip_block = False
+    removed_entries = 0
+
+    for line in lines:
+        if skip_block:
+            if domain in line:
+                removed_entries += 1
+                continue
+            if not line.strip():
+                skip_block = False
+                continue
+            skip_block = False
+        if HOSTS_ENTRY_MARKER in line:
+            if new_lines and not new_lines[-1].strip():
+                new_lines.pop()
+            skip_block = True
+            continue
+        new_lines.append(line)
+
+    trailing_newline = content.endswith("\n")
+    new_content = "\n".join(new_lines)
+    if trailing_newline:
+        new_content += "\n"
+    return new_content, removed_entries
+
+
+def _remove_hosts_block_from_content(content, domain, ip_list):
+    """移除当前版本写入的文本块，并返回新内容和删除的条目数量。"""
+    normalized_ips = _normalize_ip_list(ip_list)
+    removed_entries = 0
+    block_text = _build_hosts_block(domain, normalized_ips)
+
+    if block_text:
+        while block_text in content:
+            content = content.replace(block_text, "\n", 1)
+            removed_entries += len(normalized_ips)
+
+    content, legacy_removed = _remove_legacy_hosts_entries(content, domain)
+    removed_entries += legacy_removed
+    return content, removed_entries
+
 
 def get_hosts_file_path():
     """获取 hosts 文件路径"""
@@ -149,22 +232,28 @@ def write_hosts_file_with_permission(hosts_file, content, encoding, log_func=pri
             return False
 
 
-def add_hosts_entry(domain, ip="127.0.0.1", log_func=print):
+def add_hosts_entry(domain, ip=DEFAULT_HOSTS_IPS, log_func=print):
     """
     添加 hosts 条目
 
     参数:
         domain: 域名
-        ip: IP 地址
+        ip: 单个 IP 字符串或可迭代的多个 IP
         log_func: 日志输出函数
 
     返回:
         成功返回 True，失败返回 False
     """
+    ip_list = _normalize_ip_list(ip)
+    if not ip_list:
+        log_func("未提供有效 IP，取消 hosts 修改")
+        return False
+
     hosts_file = get_hosts_file_path()
     backup_file = get_backup_file_path()
 
-    log_func(f"开始添加 hosts 条目: {ip} {domain}")
+    ip_text = ", ".join(f"{addr} {domain}" for addr in ip_list)
+    log_func(f"开始添加 hosts 条目: {ip_text}")
 
     if not os.path.exists(hosts_file):
         log_func(f"错误: hosts 文件不存在: {hosts_file}")
@@ -184,40 +273,48 @@ def add_hosts_entry(domain, ip="127.0.0.1", log_func=print):
         with open(hosts_file, encoding=encoding, errors="replace") as f:
             content = f.read()
 
-        # 构造要添加的内容
-        hosts_entry = f"{ip} {domain}"
+        # 移除旧记录，保证写入是原子块
+        content, removed_entries = _remove_hosts_block_from_content(content, domain, ip_list)
+        if removed_entries:
+            log_func(f"检测到重复记录，已移除 {removed_entries} 个 {domain} 条目")
 
-        # 检查是否已经包含该条目
-        if hosts_entry in content:
-            log_func("hosts 文件已包含该条目，无需修改")
+        hosts_block = _build_hosts_block(domain, ip_list)
+        if not hosts_block:
+            log_func("未能构造 hosts 写入数据，取消操作")
+            return False
+
+        if hosts_block.strip() in content:
+            log_func("hosts 文件已包含目标记录，无需修改")
             return True
 
-        # 添加条目到内容
-        content += f"\n# Added by MTGA GUI\n{hosts_entry}\n"
+        # 添加统一的文本块
+        content = content.rstrip("\n") + hosts_block
 
         # 使用权限写入
-        if write_hosts_file_with_permission(hosts_file, content, encoding, log_func):
+        write_success = write_hosts_file_with_permission(hosts_file, content, encoding, log_func)
+        if write_success:
             log_func("hosts 文件修改成功！")
-            return True
-        else:
-            return False
+        return write_success
 
     except Exception as e:
         log_func(f"修改 hosts 文件失败: {e}")
         return False
 
 
-def remove_hosts_entry(domain, log_func=print):
+def remove_hosts_entry(domain, log_func=print, *, ip=None):
     """
     删除 hosts 条目
 
     参数:
         domain: 要删除的域名
+        ip: 需要删除的 IP 列表（默认删除模块写入的两个地址）
         log_func: 日志输出函数
 
     返回:
         成功返回 True，失败返回 False
     """
+    ip_list = _normalize_ip_list(ip)
+
     hosts_file = get_hosts_file_path()
 
     log_func(f"开始删除 hosts 条目: {domain}")
@@ -234,25 +331,9 @@ def remove_hosts_entry(domain, log_func=print):
         with open(hosts_file, encoding=encoding, errors="replace") as f:
             content = f.read()
 
-        # 查找并删除包含域名的行
-        lines = content.splitlines()
-        new_lines = []
-        skip_next = False
-        removed_count = 0
-
-        for line in lines:
-            if "Added by MTGA GUI" in line:
-                skip_next = True
-                continue
-            if skip_next and domain in line:
-                skip_next = False
-                removed_count += 1
-                continue
-            new_lines.append(line)
+        new_content, removed_count = _remove_hosts_block_from_content(content, domain, ip_list)
 
         if removed_count > 0:
-            # 写回文件（使用权限）
-            new_content = "\n".join(new_lines)
             if write_hosts_file_with_permission(hosts_file, new_content, encoding, log_func):
                 log_func(f"hosts 文件已重置，删除了 {removed_count} 个 {domain} 条目")
             else:
@@ -308,9 +389,7 @@ def open_hosts_file(log_func=print):
         return False
 
 
-def modify_hosts_file(
-    domain="api.openai.com", action="add", ip=("127.0.0.1", "::1"), log_func=print
-):
+def modify_hosts_file(domain="api.openai.com", action="add", ip=DEFAULT_HOSTS_IPS, log_func=print):
     """
     修改 hosts 文件的主函数
 
@@ -337,22 +416,9 @@ def modify_hosts_file(
     elif action == "restore":
         return restore_hosts_file(log_func)
     elif action == "add":
-        if isinstance(ip, (list, tuple, set)):
-            ips = list(ip)
-        elif ip is None:
-            ips = []
-        else:
-            ips = [ip]
-
-        results = []
-        for ip_addr in ips:
-            if not ip_addr:
-                continue
-            results.append(add_hosts_entry(domain, ip_addr, log_func))
-
-        return all(results) if results else True
+        return add_hosts_entry(domain, ip=ip, log_func=log_func)
     elif action == "remove":
-        return remove_hosts_entry(domain, log_func)
+        return remove_hosts_entry(domain, log_func=log_func, ip=ip)
     else:
         log_func(f"错误: 不支持的操作类型: {action}")
         return False
