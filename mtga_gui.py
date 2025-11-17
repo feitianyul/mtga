@@ -8,6 +8,7 @@ import io
 import locale
 import os
 import shutil
+import subprocess
 import sys
 import tkinter as tk
 import traceback
@@ -458,20 +459,47 @@ def create_main_window():  # noqa: PLR0915
             fallback = formatted_message.encode("unicode_escape").decode("ascii", errors="replace")
             print(fallback)
 
+    def detect_macos_dark_mode():
+        """检测 macOS 是否处于深色模式"""
+        if sys.platform != "darwin":
+            return False
+
+        apple_script = (
+            'tell application "System Events" to tell appearance preferences to get dark mode'
+        )
+        commands = [
+            (["osascript", "-e", apple_script], {"true"}),
+            (["defaults", "read", "-g", "AppleInterfaceStyle"], {"dark"}),
+        ]
+        for cmd, expected in commands:
+            try:
+                result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            except (FileNotFoundError, OSError):
+                continue
+            output = (result.stdout or "").strip().lower()
+            if result.returncode == 0 and output in expected:
+                return True
+        return False
+
+    macos_dark_mode = detect_macos_dark_mode()
+
     def create_tooltip(widget, text, wraplength=300):
         """为控件创建可复用悬浮提示"""
         tooltip_window = None
+        bg_color = "#2C2C2E" if macos_dark_mode else "lightyellow"
+        fg_color = "#F5F5F7" if macos_dark_mode else "black"
 
         def on_enter(event):
             nonlocal tooltip_window
             tooltip_window = tk.Toplevel()
             tooltip_window.wm_overrideredirect(True)
             tooltip_window.wm_geometry(f"+{event.x_root + 10}+{event.y_root + 10}")
-            tooltip_window.configure(bg="lightyellow", relief="solid", bd=1)
+            tooltip_window.configure(bg=bg_color, relief="solid", bd=1, highlightthickness=0)
             label = tk.Label(
                 tooltip_window,
                 text=text,
-                bg="lightyellow",
+                bg=bg_color,
+                fg=fg_color,
                 font=("Arial", 9),
                 wraplength=wraplength,
             )
