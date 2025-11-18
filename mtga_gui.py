@@ -516,6 +516,7 @@ def create_main_window():  # noqa: PLR0915
 
     proxy_start_task_id = None
     proxy_stop_task_id = None
+    hosts_task_id = None
 
     def build_proxy_config():
         """根据当前 UI 状态生成代理配置"""
@@ -560,10 +561,13 @@ def create_main_window():  # noqa: PLR0915
         set_proxy_instance(None)
         return False
 
-    def stop_proxy_and_restore(show_idle_message=False):
-        """停止代理并移除模块写入的 hosts 记录"""
+    def stop_proxy_and_restore(show_idle_message=False, *, block_hosts_cleanup=False):
+        """停止代理并移除模块写入的 hosts 记录。
+
+        block_hosts_cleanup=True 时会同步等待 hosts 操作完成，避免程序退出前记录未清理。
+        """
         stopped = stop_proxy_instance(show_idle_message=show_idle_message)
-        modify_hosts_task("remove")
+        modify_hosts_task("remove", block=block_hosts_cleanup)
         return stopped
 
     # 显示环境检查结果
@@ -1139,8 +1143,9 @@ def create_main_window():  # noqa: PLR0915
     hosts_tab = ttk.Frame(notebook)
     notebook.add(hosts_tab, text="hosts文件管理")
 
-    def modify_hosts_task(action="add"):
+    def modify_hosts_task(action="add", *, block=False):
         """修改hosts文件任务"""
+        nonlocal hosts_task_id
 
         def task():
             # 使用字典获取动作名称
@@ -1153,7 +1158,19 @@ def create_main_window():  # noqa: PLR0915
             else:
                 log(f"❌ hosts文件{action_name}失败")
 
-        thread_manager.run("hosts_manage", task)
+        if block:
+            thread_manager.wait(hosts_task_id)
+            hosts_task_id = None
+            task()
+            return None
+
+        wait_targets = [hosts_task_id] if hosts_task_id else None
+        hosts_task_id = thread_manager.run(
+            "hosts_manage",
+            task,
+            wait_for=wait_targets,
+        )
+        return hosts_task_id
 
     def open_hosts_task():
         """打开hosts文件任务"""
@@ -1544,7 +1561,7 @@ def create_main_window():  # noqa: PLR0915
         nonlocal proxy_start_task_id, proxy_stop_task_id
         thread_manager.wait(proxy_start_task_id, timeout=5)
         thread_manager.wait(proxy_stop_task_id, timeout=5)
-        stopped = stop_proxy_and_restore()
+        stopped = stop_proxy_and_restore(block_hosts_cleanup=True)
         if stopped:
             log("代理服务器已停止，程序即将退出")
         window.destroy()
