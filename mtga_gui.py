@@ -20,6 +20,8 @@ from tkinter import messagebox, scrolledtext, ttk
 import requests
 import yaml
 
+from modules import macos_privileged_helper
+
 os.environ.setdefault("LANG", "zh_CN.UTF-8")
 os.environ.setdefault("LC_ALL", "zh_CN.UTF-8")
 os.environ.setdefault("PYTHONIOENCODING", "utf-8")
@@ -76,6 +78,12 @@ def setup_environment():
 
     if os.path.exists(tk_library):
         os.environ["TK_LIBRARY"] = tk_library
+
+
+# 处理 macOS 持久化 helper CLI 调用
+if macos_privileged_helper.HELPER_FLAG in sys.argv:
+    macos_privileged_helper.main()
+    sys.exit(0)
 
 
 # Call setup_environment before importing other modules

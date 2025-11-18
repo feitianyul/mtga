@@ -7,9 +7,8 @@ import os
 import shutil
 import subprocess
 import sys
-import tempfile
-from contextlib import suppress
 
+from .macos_privileged_helper import get_mac_privileged_session
 from .resource_manager import ResourceManager
 
 HOSTS_ENTRY_MARKER = "# Added by MTGA GUI"
@@ -185,6 +184,15 @@ def restore_hosts_file(log_func=print):
         return False
 
     try:
+        if sys.platform == "darwin":
+            session = get_mac_privileged_session(log_func=log_func)
+            if not session:
+                return False
+            if session.copy_file(backup_file, hosts_file, log_func=log_func):
+                log_func("hosts 文件已还原")
+                return True
+            return False
+
         shutil.copy2(backup_file, hosts_file)
         log_func("hosts 文件已还原")
         return True
@@ -207,34 +215,13 @@ def write_hosts_file_with_permission(hosts_file, content, encoding, log_func=pri
         成功返回 True，失败返回 False
     """
     if sys.platform == "darwin":
-        # macOS: 使用 osascript 请求管理员权限
-        # 创建临时文件
-        with tempfile.NamedTemporaryFile(mode="w", encoding=encoding, delete=False) as temp_file:
-            temp_file.write(content)
-            temp_path = temp_file.name
-
-        try:
-            # 使用 osascript 复制文件（需要管理员权限）
-            script = (
-                f'do shell script "cp \\"{temp_path}\\" \\"{hosts_file}\\"" '
-                "with administrator privileges"
-            )
-            cmd = ["osascript", "-e", script]
-            result = subprocess.run(cmd, check=False, capture_output=True, text=True)
-
-            if result.returncode == 0:
-                log_func("✅ hosts 文件写入成功")
-                return True
-            else:
-                if "User canceled" in result.stderr:
-                    log_func("用户取消了操作")
-                else:
-                    log_func(f"写入失败: {result.stderr}")
-                return False
-        finally:
-            # 清理临时文件
-            with suppress(OSError):
-                os.remove(temp_path)
+        session = get_mac_privileged_session(log_func=log_func)
+        if not session:
+            return False
+        if session.write_file(hosts_file, content, encoding, log_func=log_func):
+            log_func("✅ hosts 文件写入成功")
+            return True
+        return False
     else:
         # Windows 和其他系统：直接写入
         try:
@@ -377,30 +364,39 @@ def open_hosts_file(log_func=print):
         成功返回 True，失败返回 False
     """
     hosts_file = get_hosts_file_path()
+    result = False
 
     try:
         if os.name == "nt":  # Windows
-            # Windows 使用记事本打开
             subprocess.run(["notepad", hosts_file], check=True)
             log_func("已使用记事本打开 hosts 文件")
+            result = True
         elif sys.platform == "darwin":  # macOS
-            # macOS 使用默认文本编辑器打开
-            subprocess.run(["open", "-t", hosts_file], check=True)
-            log_func("已使用默认文本编辑器打开 hosts 文件")
+            session = get_mac_privileged_session(log_func=log_func)
+            if session:
+                success, data = session.run_command(["open", "-t", hosts_file], log_func=log_func)
+                if success:
+                    log_func("已使用默认文本编辑器打开 hosts 文件")
+                    result = True
+                else:
+                    error_msg = data.get("stderr") or data.get("error") or data.get("stdout") or ""
+                    log_func(f"打开 hosts 文件失败: {error_msg or '未知错误'}")
+            else:
+                log_func("⚠️ 打开 hosts 文件需要管理员权限，已取消操作")
         else:  # Linux
-            # Linux 尝试使用常见的文本编辑器
             editors = ["gedit", "nano", "vim"]
             for editor in editors:
                 try:
                     subprocess.run([editor, hosts_file], check=True)
                     log_func(f"已使用 {editor} 打开 hosts 文件")
-                    return True
+                    result = True
+                    break
                 except (subprocess.CalledProcessError, FileNotFoundError):
                     continue
-            log_func("未找到合适的文本编辑器")
-            return False
+            if not result:
+                log_func("未找到合适的文本编辑器")
 
-        return True
+        return result
 
     except Exception as e:
         log_func(f"打开 hosts 文件失败: {e}")
