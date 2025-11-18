@@ -99,7 +99,6 @@ uv run --python .venv/bin/python nuitka \
     --enable-plugin=tk-inter \
     --macos-target-arch=arm64 \
     --remove-output \
-    --disable-console \
     --include-package=modules \
     --macos-app-name="MTGA GUI" \
     --macos-signed-app-name="com.mtga.gui" \
