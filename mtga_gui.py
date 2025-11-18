@@ -517,6 +517,7 @@ def create_main_window():  # noqa: PLR0915
     proxy_start_task_id = None
     proxy_stop_task_id = None
     hosts_task_id = None
+    shutdown_task_id = None
 
     def build_proxy_config():
         """根据当前 UI 状态生成代理配置"""
@@ -552,7 +553,7 @@ def create_main_window():  # noqa: PLR0915
     def start_proxy_instance(config, success_message="✅ 代理服务器启动成功"):
         """启动代理实例并输出统一日志。"""
         log("开始启动代理服务器...")
-        instance = ProxyServer(config, log_func=log)
+        instance = ProxyServer(config, log_func=log, thread_manager=thread_manager)
         set_proxy_instance(instance)
         if instance.start():
             log(success_message)
@@ -1558,13 +1559,30 @@ def create_main_window():  # noqa: PLR0915
 
     # 窗口关闭处理
     def on_closing():
-        nonlocal proxy_start_task_id, proxy_stop_task_id
-        thread_manager.wait(proxy_start_task_id, timeout=5)
-        thread_manager.wait(proxy_stop_task_id, timeout=5)
-        stopped = stop_proxy_and_restore(block_hosts_cleanup=True)
-        if stopped:
-            log("代理服务器已停止，程序即将退出")
-        window.destroy()
+        nonlocal proxy_start_task_id, proxy_stop_task_id, shutdown_task_id
+        if shutdown_task_id:
+            log("⌛ 正在退出程序，请稍候...")
+            return
+
+        log("正在退出程序，请稍候...")
+
+        def cleanup():
+            nonlocal shutdown_task_id
+            try:
+                thread_manager.wait(proxy_start_task_id, timeout=5)
+                thread_manager.wait(proxy_stop_task_id, timeout=5)
+                stopped = stop_proxy_and_restore(block_hosts_cleanup=True)
+                if stopped:
+                    log("代理服务器已停止，程序即将退出")
+            finally:
+                shutdown_task_id = None
+                window.after(0, window.destroy)
+
+        shutdown_task_id = thread_manager.run(
+            "app_shutdown",
+            cleanup,
+            allow_parallel=False,
+        )
 
     window.protocol("WM_DELETE_WINDOW", on_closing)
 

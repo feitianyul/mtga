@@ -16,6 +16,7 @@ from flask import Flask, Response, jsonify, request
 from werkzeug.serving import BaseWSGIServer, WSGIRequestHandler
 
 from .resource_manager import ResourceManager
+from .thread_manager import ThreadManager
 
 
 class StoppableWSGIServer(BaseWSGIServer):
@@ -32,6 +33,7 @@ class StoppableWSGIServer(BaseWSGIServer):
 
     def serve_forever(self, poll_interval=0.5):
         """运行服务器直到停止"""
+        self.timeout = poll_interval
         while not self._stop_event.is_set():
             try:
                 self.handle_request()
@@ -43,13 +45,14 @@ class StoppableWSGIServer(BaseWSGIServer):
 class ProxyServer:
     """代理服务器类，支持在线程中运行并可优雅停止"""
 
-    def __init__(self, config=None, log_func=print):
+    def __init__(self, config=None, log_func=print, *, thread_manager: ThreadManager):
         """
         初始化代理服务器
 
         参数:
             config: 配置字典，包含 api_url、model_id、target_model_id、stream_mode
             log_func: 日志输出函数
+            thread_manager: 外部注入的线程管理器
         """
         self.config = config or {}
         self.log_func = log_func
@@ -58,6 +61,8 @@ class ProxyServer:
         self.server = None
         self.server_thread = None
         self.running = False
+        self.thread_manager = thread_manager
+        self.server_task_id = None
 
         # 从配置中获取参数
         self.target_api_base_url = self.config.get(
@@ -374,7 +379,7 @@ class ProxyServer:
             self.log_func(error_msg)
             return jsonify({"error": "An internal server error occurred"}), 500
 
-    def start(self, host="0.0.0.0", port=443):  # noqa: PLR0911, PLR0915
+    def start(self, host="0.0.0.0", port=443):  # noqa: PLR0911, PLR0912, PLR0915
         """
         启动代理服务器
 
@@ -423,25 +428,38 @@ class ProxyServer:
                 self.log_func(f"创建服务器实例失败: {e}")
                 return False
 
+            server_ready_event = threading.Event()
+
             def run_server():
+                self.server_thread = threading.current_thread()
                 try:
-                    if self.server:
-                        self.server.serve_forever()
-                    else:
+                    if not self.server:
+                        server_ready_event.set()
                         self.log_func("服务器实例为空，无法启动")
+                        return
+                    server_ready_event.set()
+                    self.server.serve_forever()
                 except Exception as e:
                     self.log_func(f"服务器运行出错: {e}")
                 finally:
                     self.running = False
+                    self.server_task_id = None
+                    self.server_thread = None
                     self.log_func("服务器线程已退出")
 
-            # 在线程中启动服务器
-            self.server_thread = threading.Thread(target=run_server, daemon=True)
-            self.server_thread.start()
+            if self.server_task_id:
+                self.thread_manager.wait(self.server_task_id, timeout=5)
+
+            self.server_task_id = self.thread_manager.run(
+                "proxy_server",
+                run_server,
+                allow_parallel=False,
+            )
             self.running = True
 
-            # 等待一小段时间确保服务器启动
-            time.sleep(1)
+            if not server_ready_event.wait(timeout=5):
+                self.log_func("代理服务器启动超时")
+                return False
 
             if self.running:
                 self.log_func("代理服务器已成功启动")
@@ -473,46 +491,59 @@ class ProxyServer:
         self.running = False
 
         # 停止服务器
+        stop_requested = False
         if self.server:
             try:
                 self.server.server_close()
-                self.log_func("服务器已停止")
+                stop_requested = True
+                self.log_func("服务器停止指令已发送")
             except Exception as e:
                 self.log_func(f"停止服务器时出错: {e}")
+        else:
+            self.log_func("未检测到可停止的服务器实例")
 
         # 等待线程结束
-        if self.server_thread and self.server_thread.is_alive():
+        clean_stop = True
+        if self.server_task_id:
             try:
-                self.server_thread.join(timeout=5)  # 最多等待5秒
-                if self.server_thread.is_alive():
-                    self.log_func("服务器线程未能在5秒内停止")
-                else:
+                finished = self.thread_manager.wait(self.server_task_id, timeout=5)
+                if finished:
                     self.log_func("服务器线程已安全停止")
+                else:
+                    clean_stop = False
+                    self.log_func("服务器线程未能在 5 秒内停止")
             except Exception as e:
+                clean_stop = False
                 self.log_func(f"等待线程结束时出错: {e}")
+            finally:
+                self.server_task_id = None
 
         # 清理资源
         self.server = None
         self.server_thread = None
-        self.log_func("代理服务器已完全停止")
+        if clean_stop or not stop_requested:
+            self.log_func("代理服务器已完全停止")
+        else:
+            self.log_func("代理服务器仍在后台清理，请稍后关注日志")
 
     def is_running(self):
         """检查代理服务器是否正在运行"""
-        return self.running and self.server_thread and self.server_thread.is_alive()
+        return self.running
 
 
-def start_proxy_server(config, log_func=print):
+def start_proxy_server(config, log_func=print, *, thread_manager: ThreadManager):
     """
     启动代理服务器的便捷函数
 
     参数:
         config: 配置字典
         log_func: 日志输出函数
+        thread_manager: 线程管理器实例
 
     返回:
         ProxyServer 实例，失败返回 None
     """
-    proxy = ProxyServer(config, log_func)
+    proxy = ProxyServer(config, log_func, thread_manager=thread_manager)
     if proxy.start():
         return proxy
     return None
