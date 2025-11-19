@@ -15,12 +15,18 @@ import traceback
 import webbrowser
 from contextlib import suppress
 from datetime import datetime
+from pathlib import Path
 from tkinter import font as tkfont
 from tkinter import messagebox, scrolledtext, ttk
 
 import requests
 import yaml
 from tkinterweb import HtmlFrame
+
+try:  # Python 3.11+
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover
+    tomllib = None
 
 from modules import macos_privileged_helper, update_checker
 from modules.markdown_renderer import convert_markdown_to_html
@@ -169,8 +175,32 @@ HTTP_OK = 200
 CONTENT_PREVIEW_LEN = 50
 API_KEY_VISIBLE_CHARS = 4
 APP_DISPLAY_NAME = "MTGA GUI"
-APP_VERSION = "v1.2.0"
 GITHUB_REPO = "BiFangKNT/mtga"
+
+
+def resolve_app_version():
+    """从环境变量或 pyproject.toml 解析应用版本。"""
+    env_version = os.getenv("MTGA_VERSION")
+    if env_version:
+        return env_version
+
+    if tomllib is None:
+        return "v0.0.0"
+
+    project_root = Path(__file__).resolve().parent
+    pyproject_path = project_root / "pyproject.toml"
+    try:
+        with pyproject_path.open("rb") as f:
+            data = tomllib.load(f)
+        version = data.get("project", {}).get("version")
+        if not version:
+            return "v0.0.0"
+        return version if version.startswith("v") else f"v{version}"
+    except Exception:
+        return "v0.0.0"
+
+
+APP_VERSION = resolve_app_version()
 
 
 

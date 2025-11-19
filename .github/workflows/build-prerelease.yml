@@ -22,7 +22,8 @@ on:
         description: >-
           起始提交哈希（示例：
           1234567890abcdef1234567890abcdef12345678）
-        required: true
+        required: false
+        default: ''
 
 env:
   PYTHON_VERSION: '3.13'
@@ -474,8 +475,13 @@ jobs:
 
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             if [ -z "$START_COMMIT_INPUT" ]; then
-              echo "❌ 手动触发工作流时必须填写起始提交哈希"
-              exit 1
+              PREV_TAG=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname | head -n 1)
+              if [ -z "$PREV_TAG" ]; then
+                echo "❌ 未找到上一正式版标签可用作起始提交"
+                exit 1
+              fi
+              START_COMMIT_INPUT=$(git rev-parse "$PREV_TAG^{commit}")
+              echo "ℹ️ 未提供起始提交，使用上一正式版标签 $PREV_TAG ($START_COMMIT_INPUT)"
             fi
             if ! git cat-file -e "$START_COMMIT_INPUT^{commit}" 2>/dev/null; then
               echo "❌ 无法在仓库中找到起始提交：$START_COMMIT_INPUT"
