@@ -33,19 +33,7 @@ dependencies = [
     "PyYAML",
     "markdown>=3.10",
     "tkinterweb>=4.9.0",
-]
-
-[project.optional-dependencies]
-dev = [ # 用于打包为可执行文件
-]
-build = []
-win-build = [
-    "nuitka>=2.7.12",
-]
-mac-build = [
-    "nuitka>=2.7.12",
-    "dmgbuild>=1.6.5",
-    "imageio",
+    "pyobjc>=12.1 ; sys_platform == 'darwin'",
 ]
 
 [project.scripts]
@@ -56,8 +44,12 @@ dev = [
     "pyright>=1.1.407",
     "ruff>=0.14.4",
 ]
-mac = [
-    "pyobjc>=12.1",
+mac-build = [
+    "dmgbuild>=1.6.5 ; sys_platform == 'darwin'",
+    "nuitka>=2.7.12 ; sys_platform == 'darwin'",
+]
+win-build = [
+    "nuitka>=2.7.12 ; sys_platform == 'win32'",
 ]
 
 [tool.pyright]
