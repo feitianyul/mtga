@@ -37,7 +37,8 @@ jobs:
         run: |
           Invoke-WebRequest -Uri "https://astral.sh/uv/install.ps1" -OutFile "install.ps1"
           ./install.ps1
-          echo "$env:USERPROFILE\.local\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          echo "$env:USERPROFILE\.local\bin" |
+            Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: 🔧 安装依赖 (win-build)
         run: |
@@ -46,10 +47,19 @@ jobs:
       - name: 🔍 检查 Visual Studio
         run: |
           $vcBuildDir = $null
-          $vswherePath = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+          $vswhereBase = ${env:ProgramFiles(x86)}
+          $vsInstallerPath = "Microsoft Visual Studio\Installer\vswhere.exe"
+          $vswherePath = Join-Path $vswhereBase $vsInstallerPath
           if (Test-Path $vswherePath) {
             try {
-              $installationPath = & $vswherePath -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+              $vswhereArgs = @(
+                '-latest'
+                '-products' '*'
+                '-requires'
+                'Microsoft.VisualStudio.Component.VC.Tools.x86.x64'
+                '-property' 'installationPath'
+              )
+              $installationPath = & $vswherePath @vswhereArgs
               if ($installationPath) {
                 $candidate = Join-Path $installationPath "VC\Auxiliary\Build"
                 if (Test-Path $candidate) {
@@ -126,7 +136,9 @@ jobs:
             Write-Host "文件大小: $([math]::Round($exeItem.Length / 1MB, 2)) MB"
             Write-Host "dist-onefile 顶层内容:"
             Get-ChildItem -Path $distDir | ForEach-Object { Write-Host "  $($_.FullName)" }
-            "PROBE_EXE_PATH=$($exeItem.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            $exeFullPath = $exeItem.FullName
+            $envLine = "PROBE_EXE_PATH=$exeFullPath"
+            $envLine | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           } else {
             Write-Host "❌ 未找到可执行文件: $exePath"
             Write-Host "当前 dist-onefile 内容:"

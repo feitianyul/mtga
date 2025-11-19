@@ -14,4 +14,4 @@ rules:
     level: warning
   indentation:
     spaces: 2
-    indent-sequences: false
+    indent-sequences: true

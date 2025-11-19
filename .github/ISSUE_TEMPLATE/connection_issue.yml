@@ -30,7 +30,7 @@ body:
       description: |
         - macOS / Linux：请粘贴 `uname -mprs` 的完整输出
         - Windows（PowerShell）：请粘贴以下命令的完整输出：
-          `"$([Environment]::OSVersion | ForEach-Object VersionString) $(if ([Environment]::Is64BitOperatingSystem) { "x64" } else { "x86" })"`
+          `Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version, OSArchitecture`
       render: shell
     validations:
       required: true

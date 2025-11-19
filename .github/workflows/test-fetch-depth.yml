@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       commit:
-        description: '要检查的提交哈希（完整或前缀）'
+        description: "要检查的提交哈希（完整或前缀）"
         required: true
 
 jobs:
@@ -37,4 +37,3 @@ jobs:
             echo "提示: 确认该哈希属于当前仓库且拼写正确"
             exit 1
           fi
-

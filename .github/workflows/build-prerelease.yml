@@ -3,18 +3,18 @@ name: 🚀 构建和发布版本
 on:
   push:
     tags:
-      - 'v*.*.*-*'  # 预发布版标签格式：v1.2.0-beta.1, v1.2.0-rc.1
-      - 'v*.*.*'    # 正式版标签：v1.2.0
+      - "v*.*.*-*"  # 预发布版标签格式：v1.2.0-beta.1, v1.2.0-rc.1
+      - "v*.*.*"  # 正式版标签：v1.2.0
   workflow_dispatch:
     inputs:
       version:
-        description: '版本号 (例如: 1.2.0-beta.1)'
+        description: "版本号 (例如: 1.2.0-beta.1)"
         required: false
-        default: '1.2.0-beta.1'
+        default: "1.2.0-beta.1"
       release_type:
-        description: '发布类型'
+        description: "发布类型"
         required: true
-        default: 'prerelease'
+        default: "prerelease"
         type: choice
         options:
           - prerelease
@@ -24,10 +24,10 @@ on:
           起始提交哈希（示例：
           1234567890abcdef1234567890abcdef12345678）
         required: false
-        default: ''
+        default: ""
 
 env:
-  PYTHON_VERSION: '3.13'
+  PYTHON_VERSION: "3.13"
 
 jobs:
   build-macos:
@@ -35,14 +35,14 @@ jobs:
     runs-on: macos-latest
     strategy:
       matrix:
-        arch: 
+        arch:
           # - x64
           - arm64
         include:
           # - arch: x64
           #   runner_arch: x86_64
           #   nuitka_arch: x86_64
-          - arch: arm64  
+          - arch: arm64
             runner_arch: arm64
             nuitka_arch: arm64
 
@@ -126,22 +126,24 @@ jobs:
       - name: 🔨 构建 macOS 应用包
         run: |
           # 修改构建脚本中的版本号
-          sed -i.bak "s/VERSION=\".*\"/VERSION=\"${{ steps.version.outputs.VERSION }}\"/g" build_mac_app.sh
-          
+          sed -i.bak \
+            "s/VERSION=\".*\"/VERSION=\"${{ steps.version.outputs.VERSION }}\"/g" \
+            build_mac_app.sh
+
           # 根据架构设置输出文件名，替换 $(uname -m) 为具体架构
           sed -i.bak "s/\$(uname -m)/${{ matrix.arch }}/g" build_mac_app.sh
-          
+
           # 显示修改后的构建脚本相关行，用于调试
           echo "🔍 检查修改后的构建脚本:"
           echo "VERSION 行:"
           grep "VERSION=" build_mac_app.sh | head -1
           echo "output-filename 行:"
           grep "output-filename" build_mac_app.sh
-          
+
           # 执行构建
           chmod +x build_mac_app.sh
           ./build_mac_app.sh
-          
+
           # Nuitka 在 macOS 应用包模式下忽略 --output-filename，总是使用源文件名
           # 需要手动重命名到期望的文件名
           # if [ -d "dist-onefile/mtga_gui.app" ]; then
@@ -155,7 +157,7 @@ jobs:
         run: |
           echo "🔍 检查 dist-onefile 目录内容:"
           ls -la dist-onefile/ || echo "❌ dist-onefile 目录不存在"
-          
+
           # 查找实际生成的 .app 文件
           APP_FILES=(dist-onefile/*.app)
           if [ ! -e "${APP_FILES[0]}" ]; then
@@ -164,14 +166,14 @@ jobs:
             find dist-onefile/ -type f -name "*.app" 2>/dev/null || echo "没有找到任何 .app 文件"
             exit 1
           fi
-          
+
           # 使用找到的第一个 .app 文件
           ACTUAL_APP_PATH="${APP_FILES[0]}"
           echo "✅ 应用包构建成功: $ACTUAL_APP_PATH"
           echo "📊 应用包大小: $(du -sh "$ACTUAL_APP_PATH" | cut -f1)"
           echo "📁 应用包结构:"
           find "$ACTUAL_APP_PATH" -maxdepth 2 -type d | head -10
-          
+
           # 检查期望的文件名是否匹配
           EXPECTED_PATH="dist-onefile/${{ steps.version.outputs.APP_NAME }}.app"
           if [ "$ACTUAL_APP_PATH" != "$EXPECTED_PATH" ]; then
@@ -187,31 +189,34 @@ jobs:
             echo "❌ DMG 配置文件不存在: mac/dmg_settings.py"
             exit 1
           fi
-          
+
           # 查找实际的 .app 文件
           APP_FILES=(dist-onefile/*.app)
           if [ ! -e "${APP_FILES[0]}" ]; then
             echo "❌ 没有找到 .app 文件用于创建 DMG"
             exit 1
           fi
-          
+
           ACTUAL_APP_PATH="${APP_FILES[0]}"
-          
+
+          DMG_PATH="dist-onefile/${{ steps.version.outputs.DMG_NAME }}.dmg"
+
           echo "📦 使用应用包: $ACTUAL_APP_PATH"
           echo "📦 DMG 文件名: ${{ steps.version.outputs.DMG_NAME }}.dmg"
-          
+
           # 设置环境变量供DMG配置文件使用，包含完整路径
           export MTGA_APP_NAME="$ACTUAL_APP_PATH"
           echo "🔧 设置 DMG 应用路径: $MTGA_APP_NAME"
-          
+
           # 创建 DMG
           uv run dmgbuild \
             -s mac/dmg_settings.py \
             "MTGA GUI v${{ steps.version.outputs.VERSION }} Installer" \
-            "dist-onefile/${{ steps.version.outputs.DMG_NAME }}.dmg"
-          
+            "$DMG_PATH"
+
           echo "✅ DMG 创建成功"
-          echo "📊 DMG 大小: $(du -sh "dist-onefile/${{ steps.version.outputs.DMG_NAME }}.dmg" | cut -f1)"
+          DMG_SIZE=$(du -sh "$DMG_PATH" | cut -f1)
+          echo "📊 DMG 大小: $DMG_SIZE"
 
       - name: 📤 上传构建产物
         uses: actions/upload-artifact@v4
@@ -240,7 +245,8 @@ jobs:
         run: |
           Invoke-WebRequest -Uri "https://astral.sh/uv/install.ps1" -OutFile "install.ps1"
           ./install.ps1
-          echo "$env:USERPROFILE\.local\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          echo "$env:USERPROFILE\.local\bin" |
+            Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - name: 💾 缓存 uv 依赖
         uses: actions/cache@v4
         with:
@@ -267,11 +273,18 @@ jobs:
       - name: 🔍 检查 Visual Studio
         run: |
           $vcBuildDir = $null
-
-          $vswherePath = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+          $vswhereBase = ${env:ProgramFiles(x86)}
+          $vsInstallerPath = "Microsoft Visual Studio\Installer\vswhere.exe"
+          $vswherePath = Join-Path $vswhereBase $vsInstallerPath
           if (Test-Path $vswherePath) {
             try {
-              $installationPath = & $vswherePath -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+              $vswhereArgs = @(
+                '-latest'
+                '-products' '*'
+                '-requires' 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64'
+                '-property' 'installationPath'
+              )
+              $installationPath = & $vswherePath @vswhereArgs
               if ($installationPath) {
                 $candidate = Join-Path $installationPath "VC\Auxiliary\Build"
                 if (Test-Path $candidate) {
@@ -325,7 +338,9 @@ jobs:
         run: |
           # 修改构建脚本中的版本号
           $content = Get-Content "build_onefile.bat"
-          $content = $content -replace 'set "VERSION=.*"', "set `"VERSION=${{ steps.version.outputs.VERSION }}`""
+          $pattern = 'set "VERSION=.*"'
+          $newVersionLine = "set `"VERSION=${{ steps.version.outputs.VERSION }}`""
+          $content = $content -replace $pattern, $newVersionLine
           $content | Set-Content "build_onefile.bat"
 
           # 显示修改后的版本号
@@ -357,7 +372,10 @@ jobs:
           }
 
           if (-not (Test-Path $expectedPath)) {
-            $latestExe = Get-ChildItem -Path "dist-onefile" -Filter *.exe -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+            $latestExe = Get-ChildItem -Path "dist-onefile" -Filter *.exe -File `
+              -ErrorAction SilentlyContinue |
+              Sort-Object LastWriteTime -Descending |
+              Select-Object -First 1
             if ($latestExe) {
               Write-Host "⚠️ 发现未命名为期望格式的可执行文件: $($latestExe.Name)"
               Rename-Item -Path $latestExe.FullName -NewName $expectedName -Force
@@ -374,7 +392,8 @@ jobs:
             Write-Host "  - 创建时间: $($fileInfo.CreationTime)"
             Write-Host "  - 修改时间: $($fileInfo.LastWriteTime)"
             Write-Host "  - 文件属性: $($fileInfo.Attributes)"
-            "WINDOWS_EXE_PATH=$expectedPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            $envLine = "WINDOWS_EXE_PATH=$expectedPath"
+            $envLine | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           } else {
             Write-Host "❌ 未找到预期的可执行文件: $expectedPath"
             Write-Host "📁 dist-onefile 目录内容:"
@@ -400,18 +419,38 @@ jobs:
     name: 🚀 创建 GitHub 发布
     needs: [build-windows, build-macos]
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: 📥 检出代码
         uses: actions/checkout@v4
         with:
-            fetch-depth: 0
+          fetch-depth: 0
 
       - name: ⚙️ 获取版本信息
         id: version
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION="${{ github.event.inputs.version }}"
+            INPUT_VERSION="${{ github.event.inputs.version }}"
+            if [ -n "$INPUT_VERSION" ]; then
+              VERSION="$INPUT_VERSION"
+            elif command -v python3 >/dev/null 2>&1; then
+              VERSION=$(python3 - <<'PY'
+              import tomllib
+              from pathlib import Path
+
+              pyproject = Path('pyproject.toml')
+              data = tomllib.loads(pyproject.read_text(encoding='utf-8'))
+              version = data.get('project', {}).get('version')
+              if not version:
+                  raise SystemExit('Missing project.version')
+              print(version)
+              PY
+              )
+              echo "ℹ️ 未提供版本号，回退到 pyproject.toml 中的 $VERSION"
+            else
+              echo "❌ 无法解析 pyproject.toml，请在 workflow_dispatch 中提供版本号"
+              exit 1
+            fi
             TAG_NAME="v$VERSION"
             RELEASE_TYPE="${{ github.event.inputs.release_type }}"
           else
@@ -459,13 +498,14 @@ jobs:
           else
             EMOJI="🎉"
           fi
-          
+
           # 删除已存在的标签（如果有）
           git tag -d ${{ steps.version.outputs.TAG_NAME }} || true
           git push origin :refs/tags/${{ steps.version.outputs.TAG_NAME }} || true
-          
+
           # 创建新标签
-          git tag -a ${{ steps.version.outputs.TAG_NAME }} -m "$EMOJI $LABEL ${{ steps.version.outputs.VERSION }}"
+          git tag -a ${{ steps.version.outputs.TAG_NAME }} \
+            -m "$EMOJI $LABEL ${{ steps.version.outputs.VERSION }}"
           git push origin ${{ steps.version.outputs.TAG_NAME }}
 
       - name: 📝 生成发布说明
@@ -474,6 +514,7 @@ jobs:
           TAG_NAME="${{ steps.version.outputs.TAG_NAME }}"
           START_COMMIT_INPUT="${{ github.event.inputs.start_commit || '' }}"
           TARGET_COMMIT="${{ github.sha }}"
+          START_COMMIT_SOURCE="user-input"
 
           FEAT_TEMP=$(mktemp)
           FIX_TEMP=$(mktemp)
@@ -492,38 +533,40 @@ jobs:
             fi
           }
 
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            if [ -z "$START_COMMIT_INPUT" ]; then
-              PREV_TAG=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname | head -n 1)
-              if [ -z "$PREV_TAG" ]; then
-                echo "❌ 未找到上一正式版标签可用作起始提交"
-                exit 1
-              fi
-              START_COMMIT_INPUT=$(git rev-parse "$PREV_TAG^{commit}")
-              echo "ℹ️ 未提供起始提交，使用上一正式版标签 $PREV_TAG ($START_COMMIT_INPUT)"
-            fi
-            if ! git cat-file -e "$START_COMMIT_INPUT^{commit}" 2>/dev/null; then
-              echo "❌ 无法在仓库中找到起始提交：$START_COMMIT_INPUT"
+          if [ -z "$START_COMMIT_INPUT" ]; then
+            START_COMMIT_SOURCE="previous-tag"
+            TAG_PATTERN='v[0-9]*.[0-9]*.[0-9]*'
+            PREV_TAG=$(git tag -l "$TAG_PATTERN" --sort=-version:refname \
+              | grep -Fvx "$TAG_NAME" | head -n 1)
+            if [ -z "$PREV_TAG" ]; then
+              echo "❌ 未找到上一正式版标签可用作起始提交"
               exit 1
             fi
-
-            START_COMMIT=$(git rev-parse "$START_COMMIT_INPUT")
-
-            if ! git merge-base --is-ancestor "$START_COMMIT" "$TARGET_COMMIT"; then
-              echo "❌ 起始提交不在当前构建提交的历史中：$START_COMMIT_INPUT"
-              exit 1
-            fi
-
-            START_SUBJECT=$(git show -s --format='%s' "$START_COMMIT")
-            append_release_entry "$START_SUBJECT" "$START_COMMIT"
-
-            git log --format='%H%x09%s' --reverse "$START_COMMIT..$TARGET_COMMIT" | while IFS=$'\t' read -r HASH SUBJECT; do
-              append_release_entry "$SUBJECT" "$HASH"
-            done
+            START_COMMIT_INPUT=$(git rev-parse "$PREV_TAG^{commit}")
+            echo "ℹ️ 未提供起始提交，使用上一正式版标签 $PREV_TAG ($START_COMMIT_INPUT)"
           else
-            SUBJECT=$(git show -s --format='%s' "$TARGET_COMMIT" 2>/dev/null || true)
-            append_release_entry "$SUBJECT" "$TARGET_COMMIT"
+            echo "ℹ️ 使用传入的起始提交：$START_COMMIT_INPUT"
           fi
+          if ! git cat-file -e "$START_COMMIT_INPUT^{commit}" 2>/dev/null; then
+            echo "❌ 无法在仓库中找到起始提交：$START_COMMIT_INPUT"
+            exit 1
+          fi
+
+          START_COMMIT=$(git rev-parse "$START_COMMIT_INPUT")
+
+          if ! git merge-base --is-ancestor "$START_COMMIT" "$TARGET_COMMIT"; then
+            echo "❌ 起始提交不在当前构建提交的历史中：$START_COMMIT_INPUT"
+            exit 1
+          fi
+
+          START_SUBJECT=$(git show -s --format='%s' "$START_COMMIT")
+          append_release_entry "$START_SUBJECT" "$START_COMMIT"
+          echo "ℹ️ 发布说明范围: $START_COMMIT..$TARGET_COMMIT (起始来源: $START_COMMIT_SOURCE)"
+
+          git log --format='%H%x09%s' --reverse "$START_COMMIT..$TARGET_COMMIT" |
+            while IFS=$'\t' read -r HASH SUBJECT; do
+            append_release_entry "$SUBJECT" "$HASH"
+          done
 
           {
             echo "## :sparkles: 新功能"
@@ -560,5 +603,9 @@ jobs:
 
       - name: ✅ 发布完成
         run: |
-          echo "🎉 ${{ steps.version.outputs.RELEASE_LABEL }} v${{ steps.version.outputs.VERSION }} 发布完成!"
-          echo "🔗 发布页面: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.TAG_NAME }}"
+          RELEASE_LABEL="${{ steps.version.outputs.RELEASE_LABEL }}"
+          RELEASE_VERSION="${{ steps.version.outputs.VERSION }}"
+          echo "🎉 $RELEASE_LABEL v$RELEASE_VERSION 发布完成!"
+          TAG_NAME="${{ steps.version.outputs.TAG_NAME }}"
+          RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/$TAG_NAME"
+          echo "🔗 发布页面: $RELEASE_URL"
