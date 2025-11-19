@@ -100,18 +100,15 @@ jobs:
             if [ -n "${{ github.event.inputs.version }}" ]; then
               VERSION="${{ github.event.inputs.version }}"
             elif command -v python3 >/dev/null 2>&1; then
-              VERSION=$(python3 - <<'PY'
-              import tomllib
-              from pathlib import Path
-
-              pyproject = Path('pyproject.toml')
-              data = tomllib.loads(pyproject.read_text(encoding='utf-8'))
-              version = data.get('project', {}).get('version')
-              if not version:
-                  raise SystemExit('Missing project.version')
-              print(version)
-              PY
-              )
+              PY_VERSION_SCRIPT=$'import tomllib\n'\
+                $'from pathlib import Path\n\n'\
+                $'pyproject = Path("pyproject.toml")\n'\
+                $'data = tomllib.loads(pyproject.read_text(encoding="utf-8"))\n'\
+                $'version = data.get("project", {}).get("version")\n'\
+                $'if not version:\n'\
+                $'    raise SystemExit("Missing project.version")\n'\
+                $'print(version)'
+              VERSION=$(python3 -c "$PY_VERSION_SCRIPT")
             else
               echo "❌ 无法解析 pyproject.toml，请在 workflow_dispatch 中提供版本号"
               exit 1
@@ -437,18 +434,15 @@ jobs:
             if [ -n "$INPUT_VERSION" ]; then
               VERSION="$INPUT_VERSION"
             elif command -v python3 >/dev/null 2>&1; then
-              VERSION=$(python3 - <<'PY'
-              import tomllib
-              from pathlib import Path
-
-              pyproject = Path('pyproject.toml')
-              data = tomllib.loads(pyproject.read_text(encoding='utf-8'))
-              version = data.get('project', {}).get('version')
-              if not version:
-                  raise SystemExit('Missing project.version')
-              print(version)
-              PY
-              )
+              PY_VERSION_SCRIPT=$'import tomllib\n'\
+                $'from pathlib import Path\n\n'\
+                $'pyproject = Path("pyproject.toml")\n'\
+                $'data = tomllib.loads(pyproject.read_text(encoding="utf-8"))\n'\
+                $'version = data.get("project", {}).get("version")\n'\
+                $'if not version:\n'\
+                $'    raise SystemExit("Missing project.version")\n'\
+                $'print(version)'
+              VERSION=$(python3 -c "$PY_VERSION_SCRIPT")
               echo "ℹ️ 未提供版本号，回退到 pyproject.toml 中的 $VERSION"
             else
               echo "❌ 无法解析 pyproject.toml，请在 workflow_dispatch 中提供版本号"
