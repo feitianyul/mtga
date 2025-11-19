@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tkinter as tk
 import traceback
+import webbrowser
 from contextlib import suppress
 from datetime import datetime
 from tkinter import font as tkfont
@@ -19,8 +20,30 @@ from tkinter import messagebox, scrolledtext, ttk
 
 import requests
 import yaml
+from tkinterweb import HtmlFrame
 
-from modules import macos_privileged_helper
+from modules import macos_privileged_helper, update_checker
+from modules.markdown_renderer import convert_markdown_to_html
+
+if sys.platform == "darwin":
+    try:
+        import Cocoa  # pyright: ignore[reportMissingImports]
+        import Foundation  # pyright: ignore[reportMissingImports]
+        import objc  # pyright: ignore[reportMissingImports]
+    except ImportError:
+        Cocoa = None
+        Foundation = None
+        objc = None
+    NSDistributedNotificationCenter = (
+        getattr(Cocoa, "NSDistributedNotificationCenter", None) if Cocoa else None
+    )
+    NSObject = getattr(Foundation, "NSObject", None) if Foundation else None
+else:  # 非 macOS 平台仅作占位
+    Cocoa = None
+    Foundation = None
+    objc = None
+    NSDistributedNotificationCenter = None
+    NSObject = None
 
 os.environ.setdefault("LANG", "zh_CN.UTF-8")
 os.environ.setdefault("LC_ALL", "zh_CN.UTF-8")
@@ -145,6 +168,10 @@ thread_manager = ThreadManager()
 HTTP_OK = 200
 CONTENT_PREVIEW_LEN = 50
 API_KEY_VISIBLE_CHARS = 4
+APP_DISPLAY_NAME = "MTGA GUI"
+APP_VERSION = "v1.2.0"
+GITHUB_REPO = "BiFangKNT/mtga"
+
 
 
 def get_proxy_instance():
@@ -490,6 +517,41 @@ def create_main_window():  # noqa: PLR0915
         return False
 
     macos_dark_mode = detect_macos_dark_mode()
+
+    def register_macos_theme_observer(callback):
+        """监听 macOS 主题切换通知并返回 (center, observer)。"""
+        if (
+            sys.platform != "darwin"
+            or NSDistributedNotificationCenter is None
+            or NSObject is None
+            or objc is None
+        ):
+            return None, None
+
+        class ThemeObserver(NSObject):  # type: ignore[misc]
+            """在 macOS 上监听主题切换通知。"""
+
+            def initWithCallback_(self, cb):
+                obj = objc.super(ThemeObserver, self).init()  # type: ignore[attr-defined]
+                if obj is None:
+                    return None
+                obj._callback = cb
+                return obj
+
+            def themeChanged_(self, _notification):
+                if getattr(self, "_callback", None):
+                    self._callback()
+
+        observer = ThemeObserver.alloc().initWithCallback_(callback)  # type: ignore[call-arg]
+        center = NSDistributedNotificationCenter.defaultCenter()
+        selector = objc.selector(ThemeObserver.themeChanged_, signature=b"v@:@")  # type: ignore[attr-defined]
+        center.addObserver_selector_name_object_(
+            observer,
+            selector,
+            "AppleInterfaceThemeChangedNotification",
+            None,
+        )
+        return center, observer
 
     def create_tooltip(widget, text, wraplength=300):
         """为控件创建可复用悬浮提示"""
@@ -1460,52 +1522,173 @@ def create_main_window():  # noqa: PLR0915
             "删除所有用户数据（保留历史备份）\n清除内容：配置文件、SSL证书、hosts备份\n保留内容：backups文件夹及其历史备份",
         )
 
+    check_updates_button = None
+
+    def show_release_notes_dialog(version_label, notes, release_url):
+        """显示包含 Markdown 说明的新版本弹窗。"""
+        current_dark_mode = detect_macos_dark_mode()
+        markdown_text = notes or "该版本暂无更新说明。"
+        dialog = tk.Toplevel(window)
+        dialog.title(f"发现新版本：{version_label}")
+        dialog.geometry("520x420")
+        dialog.minsize(480, 360)
+        dialog.transient(window)
+        dialog.grab_set()
+
+        heading_font = tkfont.nametofont("TkDefaultFont").copy()
+        heading_font.configure(weight="bold", size=heading_font.cget("size") + 1)
+
+        ttk.Label(
+            dialog,
+            text=f"发现新版本：{version_label}",
+            anchor="w",
+            font=heading_font,
+        ).pack(fill=tk.X, padx=12, pady=(12, 6))
+
+        notes_widget = HtmlFrame(
+            dialog,
+            horizontal_scrollbar="auto",
+            vertical_scrollbar="auto",
+            relief="solid",
+            borderwidth=1,
+            messages_enabled=False,
+        )
+        notes_widget.pack(fill=tk.BOTH, expand=True, padx=12, pady=(0, 10))
+
+        def render_markdown(dark_mode):
+            notes_html = convert_markdown_to_html(markdown_text, dark_mode=dark_mode)
+            notes_widget.load_html(notes_html)
+
+        render_markdown(current_dark_mode)
+
+        default_link_handler = notes_widget.html.on_link_click
+
+        def handle_link_click(url, decode=None, force=False):
+            if url.startswith(("http://", "https://")):
+                webbrowser.open(url)
+            else:
+                default_link_handler(url, decode=decode, force=force)
+
+        notes_widget.html.on_link_click = handle_link_click
+
+        theme_center = None
+        theme_observer = None
+
+        def handle_theme_change():
+            nonlocal current_dark_mode
+            new_mode = detect_macos_dark_mode()
+            if new_mode != current_dark_mode:
+                current_dark_mode = new_mode
+                render_markdown(current_dark_mode)
+
+        if sys.platform == "darwin":
+            theme_center, theme_observer = register_macos_theme_observer(
+                lambda: window.after(0, handle_theme_change)
+            )
+
+        def on_close():
+            if theme_center and theme_observer:
+                with suppress(Exception):
+                    theme_center.removeObserver_(theme_observer)
+            dialog.destroy()
+
+        dialog.protocol("WM_DELETE_WINDOW", on_close)
+
+        button_frame = ttk.Frame(dialog)
+        button_frame.pack(fill=tk.X, padx=12, pady=(0, 12))
+
+        if release_url:
+            ttk.Button(
+                button_frame,
+                text="打开发布页",
+                command=lambda: webbrowser.open(release_url),
+            ).pack(side=tk.LEFT)
+
+        ttk.Button(button_frame, text="关闭", command=on_close).pack(side=tk.RIGHT)
+
+    update_check_task_id = None
+
+    def check_for_updates():
+        """后台检查 GitHub 最新发行版，并在主线程更新 UI。"""
+        nonlocal check_updates_button, update_check_task_id
+        if check_updates_button:
+            check_updates_button.state(["disabled"])
+
+        def finalize(callback):
+            def _finish():
+                if check_updates_button:
+                    check_updates_button.state(["!disabled"])
+                callback()
+
+            window.after(0, _finish)
+
+        def worker():
+            try:
+                release_info = update_checker.fetch_latest_release(
+                    GITHUB_REPO,
+                    timeout=10,
+                    user_agent=f"{APP_DISPLAY_NAME}/{APP_VERSION}",
+                )
+            except requests.RequestException as exc:
+                error_msg = f"检查更新失败：网络异常 {exc}"
+                finalize(lambda: (messagebox.showerror("检查更新失败", error_msg), log(error_msg)))
+                return
+            except (ValueError, RuntimeError) as exc:
+                error_msg = f"检查更新失败：{exc}"
+                finalize(lambda: (messagebox.showerror("检查更新失败", error_msg), log(error_msg)))
+                return
+
+            latest_version = release_info.version_label
+            if not latest_version:
+                finalize(
+                    lambda: (
+                        messagebox.showwarning("检查更新", "未能解析最新版本号，请稍后再试。"),
+                        log("检查更新失败：未解析到版本号"),
+                    )
+                )
+                return
+
+            if not update_checker.is_remote_version_newer(latest_version, APP_VERSION):
+                finalize(
+                    lambda: (
+                        messagebox.showinfo("检查更新", f"当前版本 {APP_VERSION} 已是最新。"),
+                        log("检查更新：当前已是最新版本"),
+                    )
+                )
+                return
+
+            release_notes = release_info.release_notes or "该版本暂无更新说明。"
+            release_url = release_info.release_url
+
+            def _show_new_version():
+                show_release_notes_dialog(latest_version, release_notes, release_url)
+                log(f"发现新版本：{latest_version}")
+
+            finalize(_show_new_version)
+
+        update_check_task_id = thread_manager.run("check_updates", worker)
+
     # 关于标签页
     style = ttk.Style()
     style.configure("About.TFrame", background="#f0f0f0")
+    style.configure(
+        "AboutTitle.TLabel",
+        background="#f0f0f0",
+        font=("Microsoft YaHei", 11, "bold"),
+    )
     about_tab = ttk.Frame(notebook, style="About.TFrame")
     notebook.add(about_tab, text="关于")
 
-    about_title = "MTGA GUI v1.2.0"
-    about_points = [
-        (
-            "• 重构模型映射架构：使用统一映射模型ID，代理支持模型ID映射与MTGA鉴权，"
-            "全局配置支持映射模型ID和鉴权Key"
-        ),
-        (
-            "• 配置组管理优化：名称改为可选，API URL、实际模型ID、API Key改为必填，"
-            "移除目标模型ID字段并保留旧配置兼容"
-        ),
-        (
-            "• 新增自动化测试：保存配置后自动拉取模型信息，支持聊天补全测活，提供响应内容与"
-            "token消耗日志"
-        ),
-        ("• 增强用户体验：增加测活按钮与提示，异步测试避免UI阻塞，API Key默认掩码显示"),
-    ]
-    about_body = "版本亮点：\n" + "\n".join(about_points) + "\n"
-
-    # 使用带滚动条的文本组件显示关于信息，减少标签页的最小高度
-    about_text_widget = scrolledtext.ScrolledText(
+    version_label = ttk.Label(
         about_tab,
-        height=5,
-        wrap="none",
-        background="#f0f0f0",
-        relief="flat",
-        borderwidth=0,
-        highlightthickness=0,
+        text=f"{APP_DISPLAY_NAME} {APP_VERSION}",
+        style="AboutTitle.TLabel",
+        anchor="w",
     )
-    about_text_widget.pack(fill=tk.BOTH, expand=True, padx=5, pady=(5, 0))
-    # 添加水平滚动条
-    about_x_scroll = ttk.Scrollbar(about_tab, orient=tk.HORIZONTAL, command=about_text_widget.xview)
-    about_text_widget.configure(xscrollcommand=about_x_scroll.set)
-    about_x_scroll.pack(fill=tk.X, padx=5, pady=(0, 5))
-    default_font = tkfont.nametofont(about_text_widget.cget("font"))
-    bold_font = default_font.copy()
-    bold_font.configure(weight="bold")
-    about_text_widget.tag_config("h2", font=("Microsoft YaHei", 10, "bold"), background="#f0f0f0")
-    about_text_widget.insert(tk.END, about_title + "\n\n", "h2")
-    about_text_widget.insert(tk.END, about_body)
-    about_text_widget.config(state="disabled")
+    version_label.pack(anchor="w", fill=tk.X, padx=8, pady=(8, 4))
+
+    check_updates_button = ttk.Button(about_tab, text="检查更新", command=check_for_updates)
+    check_updates_button.pack(anchor="w", padx=8, pady=(0, 8))
 
     # 一键启动按钮
     def start_all_task():

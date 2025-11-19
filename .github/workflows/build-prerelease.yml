@@ -71,7 +71,7 @@ jobs:
 
       - name: 🔧 安装依赖
         run: |
-          uv sync --extra mac-build
+          uv sync --extra mac-build --group mac
 
       - name: 💾 缓存 Nuitka 工具
         uses: actions/cache@v4

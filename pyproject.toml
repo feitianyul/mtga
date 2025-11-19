@@ -31,6 +31,8 @@ dependencies = [
     "idna",
     "certifi",
     "PyYAML",
+    "markdown>=3.10",
+    "tkinterweb>=4.9.0",
 ]
 
 [project.optional-dependencies]
@@ -53,6 +55,9 @@ mtga-gui = "mtga_gui:gui"
 dev = [
     "pyright>=1.1.407",
     "ruff>=0.14.4",
+]
+mac = [
+    "pyobjc>=12.1",
 ]
 
 [tool.pyright]
