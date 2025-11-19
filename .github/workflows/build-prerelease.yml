@@ -8,7 +8,7 @@ on:
     inputs:
       version:
         description: '版本号 (例如: 1.2.0-beta.1)'
-        required: true
+        required: false
         default: '1.2.0-beta.1'
       release_type:
         description: '发布类型'
@@ -72,7 +72,7 @@ jobs:
 
       - name: 🔧 安装依赖
         run: |
-          uv sync --extra mac-build --group mac
+          uv sync --group mac-build
 
       - name: 💾 缓存 Nuitka 工具
         uses: actions/cache@v4
@@ -234,7 +234,7 @@ jobs:
 
       - name: 🔧 安装依赖
         run: |
-          uv sync --extra win-build
+          uv sync --group win-build
 
       - name: 💾 缓存 Nuitka 工具
         uses: actions/cache@v4
