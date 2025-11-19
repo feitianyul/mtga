@@ -54,10 +54,12 @@ jobs:
             try {
               $vswhereArgs = @(
                 '-latest'
-                '-products' '*'
+                '-products'
+                '*'
                 '-requires'
                 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64'
-                '-property' 'installationPath'
+                '-property'
+                'installationPath'
               )
               $installationPath = & $vswherePath @vswhereArgs
               if ($installationPath) {
