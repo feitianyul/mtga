@@ -18,6 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from tkinter import font as tkfont
 from tkinter import messagebox, scrolledtext, ttk
+from typing import Literal
 
 import requests
 import yaml
@@ -474,6 +475,43 @@ def create_main_window():  # noqa: PLR0915
     window.geometry("1250x750")
     window.resizable(True, True)
 
+    font_cache = {}
+
+    def get_preferred_font(
+        size: int = 10,
+        weight: Literal["normal", "bold"] = "normal",
+    ) -> tkfont.Font:
+        """返回跨平台首选字体对象，缺失时回退到默认字体。"""
+        key = (size, weight)
+        if key in font_cache:
+            return font_cache[key]
+
+        available = {name.lower(): name for name in tkfont.families()}
+        candidates = [
+            "Microsoft YaHei UI",
+            "Microsoft YaHei",
+            "PingFang SC",
+            "Hiragino Sans GB",
+            "Segoe UI",
+            "Arial",
+        ]
+
+        chosen = None
+        for name in candidates:
+            matched = available.get(name.lower())
+            if matched:
+                chosen = matched
+                break
+
+        if chosen is None:
+            font_obj = tkfont.nametofont("TkDefaultFont").copy()
+            font_obj.configure(size=size, weight=weight)
+        else:
+            font_obj = tkfont.Font(family=chosen, size=size, weight=weight)
+
+        font_cache[key] = font_obj
+        return font_obj
+
     # 设置窗口图标
     try:
         if os.name == "nt":
@@ -489,7 +527,9 @@ def create_main_window():  # noqa: PLR0915
 
     # 添加标题
     title_label = ttk.Label(
-        main_frame, text="MTGA - 代理服务器管理工具", font=("Arial", 16, "bold")
+        main_frame,
+        text="MTGA - 代理服务器管理工具",
+        font=get_preferred_font(size=16, weight="bold"),
     )
     title_label.pack(pady=10)
 
@@ -600,7 +640,7 @@ def create_main_window():  # noqa: PLR0915
                 text=text,
                 bg=bg_color,
                 fg=fg_color,
-                font=("Arial", 9),
+                font=get_preferred_font(size=9),
                 wraplength=wraplength,
             )
             label.pack()
@@ -903,7 +943,12 @@ def create_main_window():  # noqa: PLR0915
         api_key_entry.grid(row=3, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
 
         # 添加说明标签
-        info_label = ttk.Label(main_frame, text="* 为必填项", font=("Arial", 8), foreground="gray")
+        info_label = ttk.Label(
+            main_frame,
+            text="* 为必填项",
+            font=get_preferred_font(size=8),
+            foreground="gray",
+        )
         info_label.grid(row=4, column=0, columnspan=2, sticky=tk.W, pady=5)
 
         button_frame = ttk.Frame(main_frame)
@@ -1001,7 +1046,12 @@ def create_main_window():  # noqa: PLR0915
         api_key_entry.grid(row=3, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
 
         # 添加说明标签
-        info_label = ttk.Label(main_frame, text="* 为必填项", font=("Arial", 8), foreground="gray")
+        info_label = ttk.Label(
+            main_frame,
+            text="* 为必填项",
+            font=get_preferred_font(size=8),
+            foreground="gray",
+        )
         info_label.grid(row=4, column=0, columnspan=2, sticky=tk.W, pady=5)
 
         button_frame = ttk.Frame(main_frame)
@@ -1704,7 +1754,7 @@ def create_main_window():  # noqa: PLR0915
     style.configure(
         "AboutTitle.TLabel",
         background="#f0f0f0",
-        font=("Microsoft YaHei", 11, "bold"),
+        font=get_preferred_font(size=11, weight="bold"),
     )
     about_tab = ttk.Frame(notebook, style="About.TFrame")
     notebook.add(about_tab, text="关于")
