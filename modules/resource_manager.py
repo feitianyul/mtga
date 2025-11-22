@@ -49,7 +49,7 @@ def _contains_packaged_resources(path):
     """检查路径是否包含打包所需资源"""
     if not path:
         return False
-    resource_markers = ("ca", "openssl")
+    resource_markers = ("ca", "openssl", "tkinterweb_tkhtml")
     return any(os.path.exists(os.path.join(path, marker)) for marker in resource_markers)
 
 
@@ -62,6 +62,7 @@ def get_program_resource_dir():
         if sys.platform == "darwin":
             return exe_dir
 
+        debug_lines = [f"[resdir] packaged=1 exe_dir={exe_dir}"]
         candidates = []
 
         # Nuitka 单文件模式会将资源解压到临时目录（__main__.__file__ 所在路径）
@@ -74,10 +75,15 @@ def get_program_resource_dir():
         candidates.extend([exe_dir, os.getcwd()])
 
         for path in candidates:
-            if _contains_packaged_resources(path):
+            has_resources = _contains_packaged_resources(path)
+            debug_lines.append(f"[resdir] candidate={path} has_resources={has_resources}")
+            if has_resources:
+                safe_print("\n".join(debug_lines))
                 return path
 
         # 若未找到包含资源的目录，仍回退到可执行文件目录
+        debug_lines.append("[resdir] fallback to exe_dir")
+        safe_print("\n".join(debug_lines))
         return exe_dir
     else:
         # 开发环境使用项目根目录

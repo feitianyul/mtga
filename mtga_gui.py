@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# ruff: noqa: E402
+# ruff: noqa: E402,I001
 
 # 在最早阶段设置 UTF-8 编码环境变量 - 必须在任何导入之前
 import ctypes
@@ -18,18 +18,17 @@ from datetime import datetime
 from pathlib import Path
 from tkinter import font as tkfont
 from tkinter import messagebox, scrolledtext, ttk
-from typing import Any, Literal
-
+from typing import Any, Literal, cast
+from types import ModuleType
 import requests
 import yaml
-from tkinterweb import HtmlFrame
+
 
 try:  # Python 3.11+
     import tomllib
 except ModuleNotFoundError:  # pragma: no cover
     tomllib = None
 
-from modules import macos_privileged_helper, update_checker
 from modules.markdown_renderer import convert_markdown_to_html
 
 if sys.platform == "darwin":
@@ -110,11 +109,6 @@ def setup_environment():
         os.environ["TK_LIBRARY"] = tk_library
 
 
-# 处理 macOS 持久化 helper CLI 调用
-if macos_privileged_helper.HELPER_FLAG in sys.argv:
-    macos_privileged_helper.main()
-    sys.exit(0)
-
 
 # Call setup_environment before importing other modules
 setup_environment()
@@ -161,11 +155,17 @@ try:
         is_packaged,
     )
     from modules.thread_manager import ThreadManager
+    from modules import macos_privileged_helper, update_checker
+    from modules import resource_manager as resource_manager_module
 except ImportError as e:
     print(f"导入模块失败: {e}")
     print("请确保 modules 目录及其模块文件存在")
     sys.exit(1)
 
+# 处理 macOS 持久化 helper CLI 调用
+if macos_privileged_helper.HELPER_FLAG in sys.argv:
+    macos_privileged_helper.main()
+    sys.exit(0)
 
 # 全局变量
 proxy_server_instance = None
@@ -1690,7 +1690,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
 
     check_updates_button = None
 
-    def show_release_notes_dialog(version_label, notes, release_url):
+    def show_release_notes_dialog(version_label, notes, release_url):  # noqa: PLR0915
         """显示包含 Markdown 说明的新版本弹窗。"""
         current_dark_mode = detect_macos_dark_mode()
         markdown_text = notes or "该版本暂无更新说明。"
@@ -1711,36 +1711,115 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
             font=heading_font,
         ).pack(fill=tk.X, padx=12, pady=(12, 6))
 
-        notes_widget = HtmlFrame(
-            dialog,
-            horizontal_scrollbar="auto",
-            vertical_scrollbar="auto",
-            relief="solid",
-            borderwidth=1,
-            messages_enabled=False,
-        )
+        def _init_tkhtml_dir():
+            base_dir = Path(resource_manager_module.get_program_resource_dir())
+            pkg_dir = base_dir / "tkinterweb_tkhtml"
+            candidate = pkg_dir / "tkhtml"
+
+            if not candidate.exists():
+                return None
+
+            # DLL 搜索路径
+            os.environ["PATH"] = f"{candidate}{os.pathsep}{os.environ.get('PATH', '')}"
+
+            # 伪造 tkinterweb_tkhtml 模块，强制指向解压目录
+            sys.modules.pop("tkinterweb_tkhtml", None)
+            binaries = sorted([f for f in os.listdir(candidate) if "libTkhtml" in f])
+
+            fake_mod = ModuleType("tkinterweb_tkhtml")
+            fake_mod.__file__ = str(pkg_dir / "__init__.py")
+            fake_mod.__path__ = [str(pkg_dir)]
+            cast(Any, fake_mod).TKHTML_ROOT_DIR = str(candidate)
+            cast(Any, fake_mod).ALL_TKHTML_BINARIES = binaries
+
+            def _get_tkhtml_file(version=None, index=-1, experimental=False):
+                files = sorted(cast(Any, fake_mod).ALL_TKHTML_BINARIES)
+                if not files:
+                    raise OSError("No Tkhtml binaries found in packaged root")
+                chosen = files[index]
+                exp = experimental or ("exp" in chosen)
+                ver = chosen.replace("libTkhtml", "").replace("exp", "").replace(".dll", "")
+                return os.path.join(cast(Any, fake_mod).TKHTML_ROOT_DIR, chosen), ver, exp
+
+            def _load_tkhtml_file(master, file):
+                master.tk.call("load", file)
+
+            def _load_tkhtml(master):
+                path, ver, exp = _get_tkhtml_file()
+                _load_tkhtml_file(master, path)
+                with suppress(Exception):
+                    master.tk.call("package", "provide", "Tkhtml", ver or "0")
+
+            def _get_loaded_tkhtml_version(master):
+                try:
+                    return master.tk.call("package", "present", "Tkhtml")
+                except Exception:
+                    return ""
+
+            cast(Any, fake_mod).get_tkhtml_file = _get_tkhtml_file
+            cast(Any, fake_mod).load_tkhtml_file = _load_tkhtml_file
+            cast(Any, fake_mod).load_tkhtml = _load_tkhtml
+            cast(Any, fake_mod).get_loaded_tkhtml_version = _get_loaded_tkhtml_version
+
+            sys.modules["tkinterweb_tkhtml"] = fake_mod
+
+            return candidate
+
+
+        _TKHTML_DIR = _init_tkhtml_dir()
+        if _TKHTML_DIR:
+            with suppress(Exception):
+                import tkinterweb_tkhtml as tkhtml_mod  # type: ignore  # noqa: PLC0415
+
+                load_fn = getattr(tkhtml_mod, "load_tkhtml", None)
+                if callable(load_fn):
+                    load_fn(dialog)
+
+        try:
+            from tkinterweb import HtmlFrame  # noqa: PLC0415
+            html_frame_cls: Any | None = HtmlFrame
+            notes_widget = HtmlFrame(
+                dialog,
+                horizontal_scrollbar="auto",
+                vertical_scrollbar="auto",
+                relief="solid",
+                borderwidth=1,
+                messages_enabled=False,
+            )
+        except Exception:
+            html_frame_cls = None
+            notes_widget = ttk.Label(
+                dialog,
+                text="该版本暂无更新说明。",
+                anchor="w",
+                font=tkfont.nametofont("TkDefaultFont"),
+            )
         notes_widget.pack(fill=tk.BOTH, expand=True, padx=12, pady=(0, 10))
 
-        def render_markdown(dark_mode):
-            notes_html = convert_markdown_to_html(markdown_text, dark_mode=dark_mode)
-            notes_widget.load_html(notes_html)
+        if html_frame_cls and isinstance(notes_widget, html_frame_cls):
+            frame_widget = cast(Any, notes_widget)
+            def render_markdown(dark_mode):
+                notes_html = convert_markdown_to_html(markdown_text, dark_mode=dark_mode)
+                frame_widget.load_html(notes_html)
 
-        render_markdown(current_dark_mode)
+            render_markdown(current_dark_mode)
 
-        default_link_handler = notes_widget.html.on_link_click
+            default_link_handler = frame_widget.html.on_link_click
 
-        def handle_link_click(url, decode=None, force=False):
-            if url.startswith(("http://", "https://")):
-                webbrowser.open(url)
-            else:
-                default_link_handler(url, decode=decode, force=force)
+            def handle_link_click(url, decode=None, force=False):
+                if url.startswith(("http://", "https://")):
+                    webbrowser.open(url)
+                else:
+                    default_link_handler(url, decode=decode, force=force)
 
-        notes_widget.html.on_link_click = handle_link_click
+            frame_widget.html.on_link_click = handle_link_click
 
         theme_center = None
         theme_observer = None
 
         def handle_theme_change():
+            if not (html_frame_cls and isinstance(notes_widget, html_frame_cls)):
+                return
             nonlocal current_dark_mode
             new_mode = detect_macos_dark_mode()
             if new_mode != current_dark_mode:

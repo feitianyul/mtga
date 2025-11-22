@@ -114,14 +114,14 @@ uv run --python .venv\Scripts\python.exe nuitka ^
     --include-data-files=ca/youtube.cnf=ca/youtube.cnf ^
     --include-data-files=ca/youtube.subj=ca/youtube.subj ^
     --include-data-files=modules/_build_version.py=modules/_build_version.py ^
+    --include-package-data=tkinterweb_tkhtml:* ^
     --include-data-files=openssl/openssl.exe=openssl/openssl.exe ^
     --include-data-files=openssl/libcrypto-3-x64.dll=openssl/libcrypto-3-x64.dll ^
     --include-data-files=openssl/libssl-3-x64.dll=openssl/libssl-3-x64.dll ^
     --include-data-files=icons/f0bb32_bg-black.ico=icons/f0bb32_bg-black.ico ^
     --windows-icon-from-ico=icons/f0bb32_bg-black.ico ^
     --enable-plugin=tk-inter ^
-    --remove-output ^
-    --windows-console-mode=disable ^
+    --windows-console-mode=attach ^
     --include-package=modules ^
     --windows-uac-admin ^
     --output-filename=MTGA_GUI-v%VERSION%-x64.exe ^
