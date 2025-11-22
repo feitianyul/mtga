@@ -571,6 +571,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
 
         available = {name.lower(): name for name in tkfont.families()}
         candidates = [
+            "Maple Mono NF CN",
             "Microsoft YaHei UI",
             "Microsoft YaHei",
             "PingFang SC",
@@ -598,6 +599,11 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
             f"size={font_obj.cget('size')} weight={font_obj.cget('weight')}",
         )
         return font_obj
+
+    # 全局字体覆盖，避免 ttk 控件仍然使用系统默认字体
+    default_font = get_preferred_font()
+    window.option_add("*Font", default_font)
+    ttk.Style().configure(".", font=default_font)
 
     # 设置窗口图标
     try:
@@ -1808,7 +1814,13 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
         if html_frame_cls and isinstance(notes_widget, html_frame_cls):
             frame_widget = cast(Any, notes_widget)
             def render_markdown(dark_mode):
-                notes_html = convert_markdown_to_html(markdown_text, dark_mode=dark_mode)
+                notes_html = convert_markdown_to_html(
+                    markdown_text,
+                    dark_mode=dark_mode,
+                    font_family=default_font.cget("family"),
+                    font_size=int(default_font.cget("size")),
+                    font_weight=default_font.cget("weight"),
+                )
                 frame_widget.load_html(notes_html)
 
             render_markdown(current_dark_mode)
