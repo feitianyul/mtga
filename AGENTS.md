@@ -6,6 +6,7 @@
 - 文档位于 `docs/`；打包资源在 `mac/`、`helper-tool/`、`icons/`，诊断脚本（`test_*.py`、`debug_test.py`）放在仓库根目录。
 
 ## 构建、测试与开发命令
+- Windows pwsh 中运行python命令时，不要使用 here-string，而是使用 python -c。
 - 在任何 `uv` 命令前先设置 `UV_CACHE_DIR="$PWD/.uv_cache"`，然后执行原命令，确保缓存路径可控。
 - 在交付任何代码修改前必须运行 `uv run pyright/ruff check .`，并确认无报错后才能交付；macOS 中改为使用 `./.venv/bin/python -m pyright/ruff check .`；Windows 改为 `.\.venv\Scripts\python -m pyright/ruff check .`。
 - 交付 yaml 文件前必须运行 `uv run yamllint <filename>`，并确认无报错后才能交付；macOS/Windows 同上。
