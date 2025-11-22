@@ -562,7 +562,12 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
         """返回跨平台首选字体对象，缺失时回退到默认字体。"""
         key = (size, weight)
         if key in font_cache:
-            return font_cache[key]
+            font_obj = font_cache[key]
+            print(
+                f"[字体] 使用缓存字体: {font_obj.cget('family')} "
+                f"size={font_obj.cget('size')} weight={font_obj.cget('weight')}",
+            )
+            return font_obj
 
         available = {name.lower(): name for name in tkfont.families()}
         candidates = [
@@ -588,6 +593,10 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
             font_obj = tkfont.Font(family=chosen, size=size, weight=weight)
 
         font_cache[key] = font_obj
+        print(
+            f"[字体] 选用字体: {font_obj.cget('family')} "
+            f"size={font_obj.cget('size')} weight={font_obj.cget('weight')}",
+        )
         return font_obj
 
     # 设置窗口图标
