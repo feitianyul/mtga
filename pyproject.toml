@@ -27,13 +27,13 @@ dependencies = [
     "itsdangerous",
     "click",
     "urllib3",
-    "charset_normalizer",
     "idna",
     "certifi",
     "PyYAML",
     "markdown>=3.10",
     "tkinterweb>=4.9.0",
     "pyobjc>=12.1 ; sys_platform == 'darwin'",
+    "charset-normalizer>=3.4.4",
 ]
 
 [project.scripts]
