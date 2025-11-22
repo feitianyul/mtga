@@ -18,7 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from tkinter import font as tkfont
 from tkinter import messagebox, scrolledtext, ttk
-from typing import Literal
+from typing import Any, Literal
 
 import requests
 import yaml
@@ -178,6 +178,7 @@ API_KEY_VISIBLE_CHARS = 4
 APP_DISPLAY_NAME = "MTGA GUI"
 GITHUB_REPO = "BiFangKNT/mtga"
 ERROR_LOG_FILENAME = "mtga_gui_error.log"
+THEME_OBSERVER_CLASS = None
 
 
 def setup_logging():
@@ -535,7 +536,7 @@ def test_chat_completion(config_group, log_func=print):
     thread_manager.run("test_chat_completion", run_test)
 
 
-def create_main_window():  # noqa: PLR0915
+def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
     """创建主窗口"""
     # 在 macOS 上，确保工作目录不是根目录
     if sys.platform == "darwin" and os.getcwd() == "/":
@@ -675,23 +676,31 @@ def create_main_window():  # noqa: PLR0915
         ):
             return None, None
 
-        class ThemeObserver(NSObject):  # type: ignore[misc]
-            """在 macOS 上监听主题切换通知。"""
+        global THEME_OBSERVER_CLASS  # noqa: PLW0603
+        if THEME_OBSERVER_CLASS is None:
 
-            def initWithCallback_(self, cb):
-                obj = objc.super(ThemeObserver, self).init()  # type: ignore[attr-defined]
-                if obj is None:
-                    return None
-                obj._callback = cb
-                return obj
+            class ThemeObserver(NSObject):  # type: ignore[misc]
+                """在 macOS 上监听主题切换通知。"""
 
-            def themeChanged_(self, _notification):
-                if getattr(self, "_callback", None):
-                    self._callback()
+                def initWithCallback_(self, cb):
+                    obj = objc.super(ThemeObserver, self).init()  # type: ignore[attr-defined]
+                    if obj is None:
+                        return None
+                    obj._callback = cb
+                    return obj
 
-        observer = ThemeObserver.alloc().initWithCallback_(callback)  # type: ignore[call-arg]
+                def themeChanged_(self, _notification):
+                    if getattr(self, "_callback", None):
+                        self._callback()
+
+            THEME_OBSERVER_CLASS = ThemeObserver
+
+        observer = THEME_OBSERVER_CLASS.alloc().initWithCallback_(callback)  # type: ignore[call-arg]
         center = NSDistributedNotificationCenter.defaultCenter()
-        selector = objc.selector(ThemeObserver.themeChanged_, signature=b"v@:@")  # type: ignore[attr-defined]
+        selector_factory: Any = objc.selector  # type: ignore[attr-defined]
+        selector = selector_factory(  # type: ignore[call-arg]
+            THEME_OBSERVER_CLASS.themeChanged_, signature=b"v@:@"
+        )
         center.addObserver_selector_name_object_(
             observer,
             selector,
@@ -1948,6 +1957,9 @@ def main():
     try:
         # 创建并运行GUI
         root = create_main_window()
+        if root is None:
+            log_error("GUI initialization returned None; aborting.")
+            sys.exit(1)
         root.mainloop()
     except Exception as e:
         # 如果 GUI 创建失败，至少尝试记录错误
