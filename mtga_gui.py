@@ -648,6 +648,11 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
     left_frame = ttk.Frame(main_paned, width=1)
     main_paned.add(left_frame, weight=1)
 
+    left_frame.grid_rowconfigure(0, weight=1)
+    left_frame.grid_columnconfigure(0, weight=1)
+    left_content = ttk.Frame(left_frame)
+    left_content.grid(row=0, column=0, sticky="nsew")
+
     # 右侧日志区域
     right_frame = ttk.Frame(main_paned, width=1)
     main_paned.add(right_frame, weight=1)
@@ -840,7 +845,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
     # 配置组管理界面
     config_groups = []
     current_config_index = 0
-    config_frame = ttk.LabelFrame(left_frame, text="代理服务器配置组")
+    config_frame = ttk.LabelFrame(left_content, text="代理服务器配置组")
     config_frame.pack(fill=tk.BOTH, expand=True, pady=5)
 
     config_paned = ttk.PanedWindow(config_frame, orient=tk.HORIZONTAL)
@@ -1285,7 +1290,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
     refresh_config_list()
 
     # 全局配置框架
-    global_config_frame = ttk.LabelFrame(left_frame, text="全局配置")
+    global_config_frame = ttk.LabelFrame(left_content, text="全局配置")
     global_config_frame.pack(fill=tk.X, padx=5, pady=5)
 
     # 映射模型ID配置
@@ -1343,11 +1348,11 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
 
     # 调试模式复选框
     debug_mode_var = tk.BooleanVar(value=False)
-    debug_mode_check = ttk.Checkbutton(left_frame, text="开启调试模式", variable=debug_mode_var)
+    debug_mode_check = ttk.Checkbutton(left_content, text="开启调试模式", variable=debug_mode_var)
     debug_mode_check.pack(fill=tk.X, padx=5, pady=2)
 
     # 强制流模式选项
-    stream_mode_frame = ttk.Frame(left_frame)
+    stream_mode_frame = ttk.Frame(left_content)
     stream_mode_frame.pack(fill=tk.X, padx=5, pady=2)
     stream_mode_var = tk.BooleanVar(value=False)
     stream_mode_check = ttk.Checkbutton(
@@ -1366,8 +1371,8 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
     stream_mode_combo.set("true")  # 默认值
 
     # 功能标签页
-    notebook = ttk.Notebook(left_frame)
-    notebook.pack(fill=tk.BOTH, expand=True, pady=5)
+    notebook = ttk.Notebook(left_content)
+    notebook.pack(fill=tk.BOTH, expand=True, pady=0)
 
     # 证书管理标签页
     cert_tab = ttk.Frame(notebook)
@@ -2041,7 +2046,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
         thread_manager.run("start_all", task)
 
     start_button = ttk.Button(left_frame, text="一键启动全部服务", command=start_all_task)
-    start_button.pack(fill=tk.X, pady=10)
+    start_button.grid(row=1, column=0, sticky="ew", padx=5, pady=0)
 
     first_layout_done = False
 
