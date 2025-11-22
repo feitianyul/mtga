@@ -631,17 +631,17 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
     main_paned.pack(fill=tk.BOTH, expand=True, pady=5)
 
     # 左侧功能区域
-    left_frame = ttk.Frame(main_paned)
-    main_paned.add(left_frame, weight=1000)
+    left_frame = ttk.Frame(main_paned, width=1)
+    main_paned.add(left_frame, weight=1)
 
     # 右侧日志区域
-    right_frame = ttk.Frame(main_paned)
+    right_frame = ttk.Frame(main_paned, width=1)
     main_paned.add(right_frame, weight=1)
 
     # 创建日志文本框
     log_frame = ttk.LabelFrame(right_frame, text="日志")
     log_frame.pack(fill=tk.BOTH, expand=True)
-    log_text = scrolledtext.ScrolledText(log_frame, height=10)
+    log_text = scrolledtext.ScrolledText(log_frame, height=10, width=1)
     log_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
     def log(message):
@@ -1942,6 +1942,12 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
         background="#f0f0f0",
         font=get_preferred_font(size=11, weight="bold"),
     )
+    style.configure(
+        "AboutFooter.TLabel",
+        background="#f0f0f0",
+        foreground="#666666",
+        font=get_preferred_font(size=9),
+    )
     about_tab = ttk.Frame(notebook, style="About.TFrame")
     notebook.add(about_tab, text="关于")
 
@@ -1955,6 +1961,15 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
 
     check_updates_button = ttk.Button(about_tab, text="检查更新", command=check_for_updates)
     check_updates_button.pack(anchor="w", padx=8, pady=(0, 8))
+
+    about_footer = ttk.Label(
+        about_tab,
+        text="powered by BiFangKNT",
+        style="AboutFooter.TLabel",
+        anchor="center",
+        justify="center",
+    )
+    about_footer.pack(side=tk.BOTTOM, fill=tk.X, padx=8, pady=(0, 8))
 
     # 一键启动按钮
     def start_all_task():
@@ -2013,6 +2028,21 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
 
     start_button = ttk.Button(left_frame, text="一键启动全部服务", command=start_all_task)
     start_button.pack(fill=tk.X, pady=10)
+
+    first_layout_done = False
+
+    def on_main_paned_configure(_event):
+        nonlocal first_layout_done
+        if first_layout_done:
+            return
+        window.update_idletasks()
+        total_width = main_paned.winfo_width() or main_frame.winfo_width() or window.winfo_width()
+        if total_width > 0:
+            main_paned.sashpos(0, total_width // 2)
+            first_layout_done = True
+            main_paned.unbind("<Configure>")
+
+    main_paned.bind("<Configure>", on_main_paned_configure)
 
     # 窗口关闭处理
     def on_closing():
