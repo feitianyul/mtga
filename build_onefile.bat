@@ -72,6 +72,20 @@ if defined VC_BUILD_DIR (
     )
 )
 
+REM 写入内嵌版本号供打包读取
+if defined MTGA_VERSION (
+    set "APP_VERSION=%MTGA_VERSION%"
+) else (
+    set "APP_VERSION=%VERSION%"
+)
+if not "%APP_VERSION:~0,1%"=="v" (
+    set "APP_VERSION=v%APP_VERSION%"
+)
+> "modules\_build_version.py" (
+    echo BUILT_APP_VERSION = "%APP_VERSION%"
+)
+echo 已写入版本号到 modules\_build_version.py: %APP_VERSION%
+
 REM 创建输出目录
 if not exist "dist-onefile" mkdir dist-onefile
 
@@ -99,6 +113,7 @@ uv run --python .venv\Scripts\python.exe nuitka ^
     --include-data-files=ca/v3_req.cnf=ca/v3_req.cnf ^
     --include-data-files=ca/youtube.cnf=ca/youtube.cnf ^
     --include-data-files=ca/youtube.subj=ca/youtube.subj ^
+    --include-data-files=modules/_build_version.py=modules/_build_version.py ^
     --include-data-files=openssl/openssl.exe=openssl/openssl.exe ^
     --include-data-files=openssl/libcrypto-3-x64.dll=openssl/libcrypto-3-x64.dll ^
     --include-data-files=openssl/libssl-3-x64.dll=openssl/libssl-3-x64.dll ^

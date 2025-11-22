@@ -30,8 +30,76 @@ env:
   PYTHON_VERSION: "3.13"
 
 jobs:
+  prepare-version:
+    name: 🧮 计算版本信息
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag_name: ${{ steps.version.outputs.tag_name }}
+      release_type: ${{ steps.version.outputs.release_type }}
+      release_label: ${{ steps.version.outputs.release_label }}
+      release_name: ${{ steps.version.outputs.release_name }}
+
+    steps:
+      - name: 📥 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🐍 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: ⚙️ 获取版本信息
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ -n "${{ github.event.inputs.version }}" ]; then
+              VERSION="${{ github.event.inputs.version }}"
+            elif command -v python3 >/dev/null 2>&1; then
+              PY_VERSION_SCRIPT=$'import tomllib\n'\
+                $'from pathlib import Path\n\n'\
+                $'pyproject = Path("pyproject.toml")\n'\
+                $'data = tomllib.loads(pyproject.read_text(encoding="utf-8"))\n'\
+                $'version = data.get("project", {}).get("version")\n'\
+                $'if not version:\n'\
+                $'    raise SystemExit("Missing project.version")\n'\
+                $'print(version)'
+              VERSION=$(python3 -c "$PY_VERSION_SCRIPT")
+              echo "ℹ️ 未提供版本号，回退到 pyproject.toml 中的 $VERSION"
+            else
+              echo "❌ 无法解析 pyproject.toml，请在 workflow_dispatch 中提供版本号"
+              exit 1
+            fi
+            TAG_NAME="v$VERSION"
+            RELEASE_TYPE="${{ github.event.inputs.release_type }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/v}
+            TAG_NAME=${GITHUB_REF#refs/tags/}
+            if [[ "${TAG_NAME}" == *"-"* ]]; then
+              RELEASE_TYPE="prerelease"
+            else
+              RELEASE_TYPE="release"
+            fi
+          fi
+
+          if [ "$RELEASE_TYPE" = "release" ]; then
+            RELEASE_LABEL="正式发布版"
+          else
+            RELEASE_LABEL="预发布版"
+          fi
+          RELEASE_NAME="v${VERSION}"
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "release_type=$RELEASE_TYPE" >> $GITHUB_OUTPUT
+          echo "release_label=$RELEASE_LABEL" >> $GITHUB_OUTPUT
+          echo "release_name=$RELEASE_NAME" >> $GITHUB_OUTPUT
+
   build-macos:
     name: 🍎 构建 macOS
+    needs: prepare-version
     runs-on: macos-latest
     strategy:
       matrix:
@@ -93,38 +161,19 @@ jobs:
             sleep 10
           done
 
-      - name: ⚙️ 获取版本信息
-        id: version
+      - name: 🧭 设置版本环境变量
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            if [ -n "${{ github.event.inputs.version }}" ]; then
-              VERSION="${{ github.event.inputs.version }}"
-            elif command -v python3 >/dev/null 2>&1; then
-              PY_VERSION_SCRIPT=$'import tomllib\n'\
-                $'from pathlib import Path\n\n'\
-                $'pyproject = Path("pyproject.toml")\n'\
-                $'data = tomllib.loads(pyproject.read_text(encoding="utf-8"))\n'\
-                $'version = data.get("project", {}).get("version")\n'\
-                $'if not version:\n'\
-                $'    raise SystemExit("Missing project.version")\n'\
-                $'print(version)'
-              VERSION=$(python3 -c "$PY_VERSION_SCRIPT")
-            else
-              echo "❌ 无法解析 pyproject.toml，请在 workflow_dispatch 中提供版本号"
-              exit 1
-            fi
-          else
-            VERSION=${GITHUB_REF#refs/tags/v}
-          fi
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-          echo "APP_NAME=mtga_gui" >> $GITHUB_OUTPUT
-          echo "DMG_NAME=MTGA_GUI-v$VERSION-${{ matrix.arch }}" >> $GITHUB_OUTPUT
+          VERSION="${{ needs.prepare-version.outputs.version }}"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "MTGA_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "APP_NAME=mtga_gui" >> $GITHUB_ENV
+          echo "DMG_NAME=MTGA_GUI-v${VERSION}-${{ matrix.arch }}" >> $GITHUB_ENV
 
       - name: 🔨 构建 macOS 应用包
         run: |
           # 修改构建脚本中的版本号
           sed -i.bak \
-            "s/VERSION=\".*\"/VERSION=\"${{ steps.version.outputs.VERSION }}\"/g" \
+            "s/VERSION=\".*\"/VERSION=\"${VERSION}\"/g" \
             build_mac_app.sh
 
           # 根据架构设置输出文件名，替换 $(uname -m) 为具体架构
@@ -144,7 +193,7 @@ jobs:
           # Nuitka 在 macOS 应用包模式下忽略 --output-filename，总是使用源文件名
           # 需要手动重命名到期望的文件名
           # if [ -d "dist-onefile/mtga_gui.app" ]; then
-          #   EXPECTED_NAME="${{ steps.version.outputs.APP_NAME }}.app"
+          #   EXPECTED_NAME="${APP_NAME}.app"
           #   echo "🔄 重命名应用包: mtga_gui.app → $EXPECTED_NAME"
           #   mv "dist-onefile/mtga_gui.app" "dist-onefile/$EXPECTED_NAME"
           #   echo "✅ 重命名完成"
@@ -172,7 +221,7 @@ jobs:
           find "$ACTUAL_APP_PATH" -maxdepth 2 -type d | head -10
 
           # 检查期望的文件名是否匹配
-          EXPECTED_PATH="dist-onefile/${{ steps.version.outputs.APP_NAME }}.app"
+          EXPECTED_PATH="dist-onefile/${APP_NAME}.app"
           if [ "$ACTUAL_APP_PATH" != "$EXPECTED_PATH" ]; then
             echo "⚠️ 警告: 实际文件名与期望不符"
             echo "期望: $EXPECTED_PATH"
@@ -196,10 +245,10 @@ jobs:
 
           ACTUAL_APP_PATH="${APP_FILES[0]}"
 
-          DMG_PATH="dist-onefile/${{ steps.version.outputs.DMG_NAME }}.dmg"
+          DMG_PATH="dist-onefile/${DMG_NAME}.dmg"
 
           echo "📦 使用应用包: $ACTUAL_APP_PATH"
-          echo "📦 DMG 文件名: ${{ steps.version.outputs.DMG_NAME }}.dmg"
+          echo "📦 DMG 文件名: ${DMG_NAME}.dmg"
 
           # 设置环境变量供DMG配置文件使用，包含完整路径
           export MTGA_APP_NAME="$ACTUAL_APP_PATH"
@@ -208,7 +257,7 @@ jobs:
           # 创建 DMG
           uv run dmgbuild \
             -s mac/dmg_settings.py \
-            "MTGA GUI v${{ steps.version.outputs.VERSION }} Installer" \
+            "MTGA GUI v${VERSION} Installer" \
             "$DMG_PATH"
 
           echo "✅ DMG 创建成功"
@@ -227,6 +276,7 @@ jobs:
   # Windows 构建任务（预留框架）
   build-windows:
     name: 🪟 构建 Windows
+    needs: prepare-version
     runs-on: windows-latest
 
     steps:
@@ -323,23 +373,20 @@ jobs:
             Write-Host "❌ 未找到任何已安装的 Visual Studio MSVC 环境，后续构建可能失败"
           }
 
-      - name: ⚙️ 获取版本信息
-        id: version
+      - name: 🧭 设置版本环境变量
         run: |
-          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
-            $VERSION = "${{ github.event.inputs.version }}"
-          } else {
-            $VERSION = "${{ github.ref }}" -replace "refs/tags/v", ""
-          }
-          echo "VERSION=$VERSION" >> $env:GITHUB_OUTPUT
-          echo "EXE_NAME=MTGA_GUI-v$VERSION-x64.exe" >> $env:GITHUB_OUTPUT
+          $version = "${{ needs.prepare-version.outputs.version }}"
+          "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "MTGA_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $exeName = "MTGA_GUI-v$version-x64.exe"
+          "EXE_NAME=$exeName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: 🔨 构建 Windows 单文件版本
         run: |
           # 修改构建脚本中的版本号
           $content = Get-Content "build_onefile.bat"
           $pattern = 'set "VERSION=.*"'
-          $newVersionLine = "set `"VERSION=${{ steps.version.outputs.VERSION }}`""
+          $newVersionLine = "set `"VERSION=$env:VERSION`""
           $content = $content -replace $pattern, $newVersionLine
           $content | Set-Content "build_onefile.bat"
 
@@ -363,7 +410,7 @@ jobs:
 
       - name: 📱 验证可执行文件
         run: |
-          $expectedName = "${{ steps.version.outputs.EXE_NAME }}"
+          $expectedName = "$env:EXE_NAME"
           $expectedPath = Join-Path "dist-onefile" $expectedName
 
           if (-not (Test-Path "dist-onefile")) {
@@ -417,7 +464,7 @@ jobs:
 
   create-release:
     name: 🚀 创建 GitHub 发布
-    needs: [build-windows, build-macos]
+    needs: [prepare-version, build-windows, build-macos]
     runs-on: ubuntu-latest
 
     steps:
@@ -425,53 +472,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: ⚙️ 获取版本信息
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            INPUT_VERSION="${{ github.event.inputs.version }}"
-            if [ -n "$INPUT_VERSION" ]; then
-              VERSION="$INPUT_VERSION"
-            elif command -v python3 >/dev/null 2>&1; then
-              PY_VERSION_SCRIPT=$'import tomllib\n'\
-                $'from pathlib import Path\n\n'\
-                $'pyproject = Path("pyproject.toml")\n'\
-                $'data = tomllib.loads(pyproject.read_text(encoding="utf-8"))\n'\
-                $'version = data.get("project", {}).get("version")\n'\
-                $'if not version:\n'\
-                $'    raise SystemExit("Missing project.version")\n'\
-                $'print(version)'
-              VERSION=$(python3 -c "$PY_VERSION_SCRIPT")
-              echo "ℹ️ 未提供版本号，回退到 pyproject.toml 中的 $VERSION"
-            else
-              echo "❌ 无法解析 pyproject.toml，请在 workflow_dispatch 中提供版本号"
-              exit 1
-            fi
-            TAG_NAME="v$VERSION"
-            RELEASE_TYPE="${{ github.event.inputs.release_type }}"
-          else
-            VERSION=${GITHUB_REF#refs/tags/v}
-            TAG_NAME=${GITHUB_REF#refs/tags/}
-            if [[ "${TAG_NAME}" == *"-"* ]]; then
-              RELEASE_TYPE="prerelease"
-            else
-              RELEASE_TYPE="release"
-            fi
-          fi
-
-          if [ "$RELEASE_TYPE" = "release" ]; then
-            RELEASE_LABEL="正式发布版"
-          else
-            RELEASE_LABEL="预发布版"
-          fi
-          RELEASE_NAME="v${VERSION}"
-
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_OUTPUT
-          echo "RELEASE_TYPE=$RELEASE_TYPE" >> $GITHUB_OUTPUT
-          echo "RELEASE_LABEL=$RELEASE_LABEL" >> $GITHUB_OUTPUT
-          echo "RELEASE_NAME=$RELEASE_NAME" >> $GITHUB_OUTPUT
 
       - name: 📥 下载所有构建产物
         uses: actions/download-artifact@v4
@@ -483,13 +483,21 @@ jobs:
           echo "🗂️ 构建产物列表:"
           find artifacts -type f -name "*.app" -o -name "*.dmg" -o -name "*.exe" | sort
 
+      - name: 🧭 设置发布环境变量
+        run: |
+          echo "VERSION=${{ needs.prepare-version.outputs.version }}" >> $GITHUB_ENV
+          echo "TAG_NAME=${{ needs.prepare-version.outputs.tag_name }}" >> $GITHUB_ENV
+          echo "RELEASE_TYPE=${{ needs.prepare-version.outputs.release_type }}" >> $GITHUB_ENV
+          echo "RELEASE_LABEL=${{ needs.prepare-version.outputs.release_label }}" >> $GITHUB_ENV
+          echo "RELEASE_NAME=${{ needs.prepare-version.outputs.release_name }}" >> $GITHUB_ENV
+
       - name: 🏷️ 创建或更新标签
         if: github.event_name == 'workflow_dispatch'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          LABEL="${{ steps.version.outputs.RELEASE_LABEL }}"
+          LABEL="$RELEASE_LABEL"
           if [ "$LABEL" = "预发布版" ]; then
             EMOJI="🚀"
           else
@@ -497,18 +505,18 @@ jobs:
           fi
 
           # 删除已存在的标签（如果有）
-          git tag -d ${{ steps.version.outputs.TAG_NAME }} || true
-          git push origin :refs/tags/${{ steps.version.outputs.TAG_NAME }} || true
+          git tag -d "$TAG_NAME" || true
+          git push origin :refs/tags/"$TAG_NAME" || true
 
           # 创建新标签
-          git tag -a ${{ steps.version.outputs.TAG_NAME }} \
-            -m "$EMOJI $LABEL ${{ steps.version.outputs.VERSION }}"
-          git push origin ${{ steps.version.outputs.TAG_NAME }}
+          git tag -a "$TAG_NAME" \
+            -m "$EMOJI $LABEL $VERSION"
+          git push origin "$TAG_NAME"
 
       - name: 📝 生成发布说明
         id: release_notes
         run: |
-          TAG_NAME="${{ steps.version.outputs.TAG_NAME }}"
+          TAG_NAME="$TAG_NAME"
           START_COMMIT_INPUT="${{ github.event.inputs.start_commit || '' }}"
           TARGET_COMMIT="${{ github.sha }}"
           START_COMMIT_SOURCE="user-input"
@@ -589,10 +597,10 @@ jobs:
       - name: 🚀 创建 GitHub 发布
         uses: ncipollo/release-action@v1
         with:
-          tag: ${{ steps.version.outputs.TAG_NAME }}
-          name: ${{ steps.version.outputs.RELEASE_NAME }}
+          tag: ${{ needs.prepare-version.outputs.tag_name }}
+          name: ${{ needs.prepare-version.outputs.release_name }}
           body: ${{ steps.release_notes.outputs.RELEASE_NOTES }}
-          prerelease: ${{ steps.version.outputs.RELEASE_TYPE != 'release' }}
+          prerelease: ${{ needs.prepare-version.outputs.release_type != 'release' }}
           draft: false
           artifacts: |
             artifacts/windows-artifacts/*.exe
@@ -601,9 +609,8 @@ jobs:
 
       - name: ✅ 发布完成
         run: |
-          RELEASE_LABEL="${{ steps.version.outputs.RELEASE_LABEL }}"
-          RELEASE_VERSION="${{ steps.version.outputs.VERSION }}"
+          RELEASE_LABEL="$RELEASE_LABEL"
+          RELEASE_VERSION="$VERSION"
           echo "🎉 $RELEASE_LABEL v$RELEASE_VERSION 发布完成!"
-          TAG_NAME="${{ steps.version.outputs.TAG_NAME }}"
           RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/$TAG_NAME"
           echo "🔗 发布页面: $RELEASE_URL"

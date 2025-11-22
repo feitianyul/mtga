@@ -6,12 +6,12 @@ import ctypes
 import glob
 import io
 import locale
+import logging
 import os
 import shutil
 import subprocess
 import sys
 import tkinter as tk
-import traceback
 import webbrowser
 from contextlib import suppress
 from datetime import datetime
@@ -177,13 +177,85 @@ CONTENT_PREVIEW_LEN = 50
 API_KEY_VISIBLE_CHARS = 4
 APP_DISPLAY_NAME = "MTGA GUI"
 GITHUB_REPO = "BiFangKNT/mtga"
+ERROR_LOG_FILENAME = "mtga_gui_error.log"
+
+
+def setup_logging():
+    """配置全局日志，将 ERROR 级别写入用户数据目录并带时间戳。"""
+    user_dir = get_user_data_dir()
+    log_path = os.path.join(user_dir, ERROR_LOG_FILENAME)
+    os.makedirs(user_dir, exist_ok=True)
+
+    formatter = logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    file_handler = logging.FileHandler(log_path, encoding="utf-8")
+    file_handler.setLevel(logging.ERROR)
+    file_handler.setFormatter(formatter)
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+    if not any(
+        isinstance(handler, logging.FileHandler)
+        and getattr(handler, "baseFilename", None) == os.path.abspath(log_path)
+        for handler in root_logger.handlers
+    ):
+        root_logger.addHandler(file_handler)
+
+    return log_path
+
+
+ERROR_LOG_PATH = setup_logging()
+
+
+def log_error(message: str, exc_info=None):
+    """统一的错误日志入口，写入文件并附带时间戳。"""
+    logging.getLogger("mtga_gui").error(message, exc_info=exc_info)
+
+
+def install_global_exception_hook():
+    """将未捕获异常写入错误日志。"""
+
+    def handle_exception(exc_type, exc_value, exc_traceback):
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc_value, exc_traceback)
+            return
+        log_error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
+
+    sys.excepthook = handle_exception
+
+
+install_global_exception_hook()
 
 
 def resolve_app_version():
-    """从环境变量或 pyproject.toml 解析应用版本。"""
-    env_version = os.getenv("MTGA_VERSION")
+    """从构建期注入的版本信息或 pyproject.toml 解析应用版本。"""
+
+    def normalize_version(raw_value: str | None) -> str | None:
+        if not raw_value:
+            return None
+        raw_value = raw_value.strip()
+        if not raw_value:
+            return None
+        return raw_value if raw_value.startswith("v") else f"v{raw_value}"
+
+    env_version = normalize_version(os.getenv("MTGA_VERSION"))
     if env_version:
         return env_version
+
+    baked_version: str | None = None
+    try:
+        from modules import _build_version as build_version_module  # type: ignore  # noqa: PLC0415
+
+        baked_version = normalize_version(
+            getattr(build_version_module, "BUILT_APP_VERSION", None)
+        )
+    except Exception:
+        baked_version = None
+
+    if baked_version:
+        return baked_version
 
     if tomllib is None:
         return "v0.0.0"
@@ -193,10 +265,10 @@ def resolve_app_version():
     try:
         with pyproject_path.open("rb") as f:
             data = tomllib.load(f)
-        version = data.get("project", {}).get("version")
+        version = normalize_version(data.get("project", {}).get("version"))
         if not version:
             return "v0.0.0"
-        return version if version.startswith("v") else f"v{version}"
+        return version
     except Exception:
         return "v0.0.0"
 
@@ -474,6 +546,11 @@ def create_main_window():  # noqa: PLR0915
     window.title("MTGA GUI")
     window.geometry("1250x750")
     window.resizable(True, True)
+
+    def tk_error_handler(exc, val, tb):
+        log_error("Tkinter 回调异常", exc_info=(exc, val, tb))
+
+    window.report_callback_exception = tk_error_handler
 
     font_cache = {}
 
@@ -1435,7 +1512,7 @@ def create_main_window():  # noqa: PLR0915
                 items_to_backup = []
                 for item in os.listdir(user_data_dir):
                     item_path = os.path.join(user_data_dir, item)
-                    if item != "backups":  # 排除备份文件夹本身
+                    if item not in {"backups", ERROR_LOG_FILENAME}:  # 排除备份文件夹和日志
                         items_to_backup.append((item, item_path))
 
                 if items_to_backup:
@@ -1475,7 +1552,7 @@ def create_main_window():  # noqa: PLR0915
                 # 删除除备份文件夹外的所有文件和文件夹
                 items_to_remove = []
                 for item in os.listdir(user_data_dir):
-                    if item != "backups":  # 保留备份文件夹
+                    if item not in {"backups", ERROR_LOG_FILENAME}:  # 保留备份文件夹与日志
                         item_path = os.path.join(user_data_dir, item)
                         items_to_remove.append((item, item_path))
 
@@ -1874,18 +1951,16 @@ def main():
         root.mainloop()
     except Exception as e:
         # 如果 GUI 创建失败，至少尝试记录错误
-        error_msg = f"GUI initialization failed: {e}\n"
-        with suppress(Exception):
-            error_file = os.path.join(os.path.expanduser("~"), "mtga_gui_error.log")
-            with open(error_file, "w") as f:
-                f.write(error_msg)
-                f.write(f"Working directory: {os.getcwd()}\n")
-                f.write(f"Traceback:\n{traceback.format_exc()}\n")
+        error_msg = f"GUI initialization failed: {e}"
+        log_error(error_msg, exc_info=True)
 
-        # 在 macOS 上，如果是从 Finder 启动，显示错误对话框
+        # 在 macOS 上，如果是从 Finder 启动，显示错误对话框并指明日志路径
         if sys.platform == "darwin":
             with suppress(Exception):
-                messagebox.showerror("MTGA GUI Error", error_msg)
+                messagebox.showerror(
+                    "MTGA GUI Error",
+                    f"{error_msg}\n\n详细日志: {ERROR_LOG_PATH}",
+                )
 
         # 退出程序
         sys.exit(1)
