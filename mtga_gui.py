@@ -548,6 +548,15 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
     window.geometry("1250x750")
     window.resizable(True, True)
 
+    if sys.platform == "darwin":
+        try:
+            # Retina 屏幕上 Tk 默认按 72 DPI 渲染，字号偏小，这里按实际 DPI 调整缩放
+            scaling = window.winfo_fpixels("1i") / 72.0
+            if scaling > 0:
+                window.tk.call("tk", "scaling", scaling)
+        except tk.TclError:
+            pass
+
     def tk_error_handler(exc, val, tb):
         log_error("Tkinter 回调异常", exc_info=(exc, val, tb))
 
@@ -560,7 +569,12 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
         weight: Literal["normal", "bold"] = "normal",
     ) -> tkfont.Font:
         """返回跨平台首选字体对象，缺失时回退到默认字体。"""
-        key = (size, weight)
+        effective_size = size
+        if sys.platform == "darwin":
+            # macOS 上字号普遍偏小，整体放大约 15%
+            effective_size = max(size + 1, round(size * 1.15))
+
+        key = (effective_size, weight)
         if key in font_cache:
             font_obj = font_cache[key]
             print(
@@ -589,9 +603,9 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
 
         if chosen is None:
             font_obj = tkfont.nametofont("TkDefaultFont").copy()
-            font_obj.configure(size=size, weight=weight)
+            font_obj.configure(size=effective_size, weight=weight)
         else:
-            font_obj = tkfont.Font(family=chosen, size=size, weight=weight)
+            font_obj = tkfont.Font(family=chosen, size=effective_size, weight=weight)
 
         font_cache[key] = font_obj
         print(
