@@ -33,6 +33,7 @@ REQUEST_TERMINATOR = b"\n"
 CONNECT_TIMEOUT = 12.0
 RETRY_DELAY = 0.15
 HELPER_FLAG = "--run-macos-helper"
+_SOCKET_FAMILY_UNIX = getattr(socket, "AF_UNIX", None)
 
 
 class MacPrivilegeSessionError(RuntimeError):
@@ -43,8 +44,8 @@ class MacPrivilegeSession:
     """与 root helper 通信的客户端，实现写文件/复制/运行命令等能力。"""
 
     def __init__(self) -> None:
-        self.owner_uid = os.getuid()
-        self.owner_gid = os.getgid()
+        self.owner_uid = getattr(os, "getuid", lambda: 0)()
+        self.owner_gid = getattr(os, "getgid", lambda: 0)()
         base_dir = Path("/tmp/mtga_gui_privileged") / str(self.owner_uid)
         base_dir.mkdir(parents=True, exist_ok=True)
         base_dir.chmod(0o700)
@@ -214,7 +215,10 @@ class MacPrivilegeSession:
         deadline = time.time() + CONNECT_TIMEOUT
         while time.time() < deadline:
             try:
-                conn = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                if _SOCKET_FAMILY_UNIX is None:
+                    log_func("当前系统不支持 Unix Socket，无法建立连接")
+                    break
+                conn = socket.socket(_SOCKET_FAMILY_UNIX, socket.SOCK_STREAM)
                 conn.connect(self.socket_path)
                 self._connection = conn
                 self._recv_buffer = b""
@@ -320,9 +324,14 @@ class _PrivilegeHelperServer:
         with suppress(FileNotFoundError):
             os.remove(self.socket_path)
 
-        server_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        if _SOCKET_FAMILY_UNIX is None:
+            return
+
+        server_socket = socket.socket(_SOCKET_FAMILY_UNIX, socket.SOCK_STREAM)
         server_socket.bind(self.socket_path)
-        os.chown(self.socket_path, self.owner_uid, self.owner_gid)
+        chown_fn = getattr(os, "chown", None)
+        if callable(chown_fn):
+            chown_fn(self.socket_path, self.owner_uid, self.owner_gid)
         os.chmod(self.socket_path, 0o600)
         server_socket.listen(1)
 
