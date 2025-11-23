@@ -125,6 +125,22 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
+      - name: 🔍 调试 uv.lock
+        run: |
+          pwd
+          ls -l uv.lock || echo "uv.lock 不存在"
+          head -5 uv.lock || true
+
+      - name: 🧮 计算 uv.lock 哈希
+        id: uv-lock-hash
+        run: |
+          if [ -f uv.lock ]; then
+            echo "hash=$(shasum -a 256 uv.lock | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
+          else
+            echo "hash=missing" >> "$GITHUB_OUTPUT"
+            echo "⚠️ uv.lock 不存在，缓存 key 使用 missing"
+          fi
+
       - name: 📦 安装 uv
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -135,7 +151,7 @@ jobs:
           path: |
             .venv
             ~/.cache/uv
-          key: ${{ runner.os }}-uv-${{ matrix.arch }}-${{ hashFiles('uv.lock') }}
+          key: ${{ runner.os }}-uv-${{ matrix.arch }}-${{ steps.uv-lock-hash.outputs.hash }}
           restore-keys: |
             ${{ runner.os }}-uv-${{ matrix.arch }}-
 
@@ -149,7 +165,7 @@ jobs:
           path: |
             ~/.local/share/Nuitka
             ~/.cache/nuitka
-          key: ${{ runner.os }}-nuitka-${{ matrix.arch }}-${{ hashFiles('uv.lock') }}
+          key: ${{ runner.os }}-nuitka-${{ matrix.arch }}-${{ steps.uv-lock-hash.outputs.hash }}
           restore-keys: |
             ${{ runner.os }}-nuitka-${{ matrix.arch }}-
       - name: 🛠️ 安装 Xcode Command Line Tools
@@ -288,6 +304,27 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
+      - name: 🔍 调试 uv.lock
+        run: |
+          Get-Location
+          if (Test-Path uv.lock) {
+            Get-Item uv.lock | Format-List FullName,Length
+            Get-Content uv.lock -TotalCount 5
+          } else {
+            Write-Host "uv.lock 不存在"
+          }
+
+      - name: 🧮 计算 uv.lock 哈希
+        id: uv-lock-hash
+        run: |
+          if (Test-Path uv.lock) {
+            $hash = (Get-FileHash uv.lock -Algorithm SHA256).Hash
+          } else {
+            $hash = "missing"
+            Write-Host "⚠️ uv.lock 不存在，缓存 key 使用 missing"
+          }
+          "hash=$hash" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
       - name: 📦 安装 uv
         run: |
           Invoke-WebRequest -Uri "https://astral.sh/uv/install.ps1" -OutFile "install.ps1"
@@ -300,7 +337,7 @@ jobs:
           path: |
             .venv
             ${{ env.USERPROFILE }}\.cache\uv
-          key: ${{ runner.os }}-uv-win-${{ hashFiles('uv.lock') }}
+          key: ${{ runner.os }}-uv-win-${{ steps.uv-lock-hash.outputs.hash }}
           restore-keys: |
             ${{ runner.os }}-uv-win-
 
@@ -313,7 +350,7 @@ jobs:
         with:
           path: |
             ${{ env.USERPROFILE }}\AppData\Local\Nuitka
-          key: ${{ runner.os }}-nuitka-win-${{ hashFiles('uv.lock') }}
+          key: ${{ runner.os }}-nuitka-win-${{ steps.uv-lock-hash.outputs.hash }}
           restore-keys: |
             ${{ runner.os }}-nuitka-win-
 
