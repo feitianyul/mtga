@@ -7,10 +7,17 @@
 - feat(hosts管理): 修复程序退出时hosts记录未清理的问题 (7249afb730b3b3aa7a634db0577a0b63d283b16a)
 - feat(macos): 添加持久化提权模块用于 macOS 管理员权限操作 (d935b8b757abc2751684d1eedc4dc896f2c2a5af)
 - feat(gui): 添加版本更新检查功能和Markdown渲染器 (15aec5a8fb5e9c16fdd0f62827129a6e17081f61)
+- feat(version): 添加构建时版本注入和错误日志记录 (0c0c4fb44b46a84e19853f0353ca9f5e91fc6015)
+- feat(字体): 统一应用字体设置并支持自定义渲染字体 (2546b8e2abd87951ddec81fd68d3feab712a293c)
+- feat(界面): 调整主窗口布局并添加关于页脚 (c55c30376084052b9e3e1a2c3d73beaa783300db)
 ### :bug: 修复
 - fix(界面): 调整窗口高度并优化关于标签页样式 (99ae59c1530fdcc52c6522c1bb8578c42e120e28)
 - fix(resources): 恢复 Windows 打包后的资源路径回退逻辑 (b087d5c50834fe3e633bb83e838b15ac596d069e)
 - fix(proxy): 改进代理服务器的启动和关闭逻辑 (5fc9f935e8a346d508babd2721a41bc4a1235051)
+- fix(gui): 增强字体选择避免打包后崩溃 (8f3cdb0b8d38d53564a4c8451388c005c64a7c27)
+- fix(tkhtml): 修复tkinterweb资源打包和运行时加载问题 (c071f3bc753bb1598a87ccbc79ef0b9062b6efc8)
+- fix(ui): 修复macOS上字体显示过小和DPI缩放问题 (9bac52baec9aa597d7aab99e5d880f02bb5b538d)
+- fix(mtga_gui): 重构左侧面板布局以使用网格管理 (0e16c93f756dea8a1069bb817a152751a2af2e1b)
 
 ## v1.2.1
 此版本主要是合并双端，并跑通自动化发版流程
