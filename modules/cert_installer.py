@@ -7,21 +7,10 @@ import os
 import subprocess
 import sys
 
+from .process_utils import run_command
 from .resource_manager import ResourceManager
 
 PROCESS_PARTS_MIN = 3
-
-
-def run_command(cmd, shell=False):
-    """运行命令并返回结果"""
-    try:
-        process = subprocess.Popen(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=shell
-        )
-        stdout, stderr = process.communicate()
-        return process.returncode, stdout, stderr
-    except Exception as e:
-        return -1, "", str(e)
 
 
 def install_ca_cert_windows(ca_cert_file, log_func=print):

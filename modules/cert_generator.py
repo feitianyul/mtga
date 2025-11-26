@@ -5,9 +5,9 @@
 
 import atexit
 import os
-import subprocess
 import tempfile
 
+from .process_utils import run_subprocess
 from .resource_manager import ResourceManager
 
 
@@ -24,7 +24,7 @@ def create_temp_file(content, suffix=".cnf"):
 def run_openssl_command(command, error_message, log_func=print):
     """运行 OpenSSL 命令并检查结果"""
     log_func(f"执行命令: {' '.join(command)}")
-    result = subprocess.run(command, check=False, capture_output=True, text=True)
+    result = run_subprocess(command, check=False, capture_output=True, text=True)
 
     # 特殊处理证书签署的情况 - 如果stderr包含"Signature ok"，则认为成功
     if result.returncode != 0:
@@ -403,7 +403,7 @@ def generate_certificates(domain="api.openai.com", log_func=print):
 
     # 检查 OpenSSL 是否可用
     try:
-        result = subprocess.run(
+        result = run_subprocess(
             [resource_manager.openssl_path, "version"], check=False, capture_output=True, text=True
         )
         if result.returncode == 0:
