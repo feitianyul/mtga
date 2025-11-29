@@ -178,6 +178,7 @@ API_KEY_VISIBLE_CHARS = 4
 APP_DISPLAY_NAME = "MTGA GUI"
 GITHUB_REPO = "BiFangKNT/mtga"
 ERROR_LOG_FILENAME = "mtga_gui_error.log"
+CA_COMMON_NAME = "MTGA_CA"
 THEME_OBSERVER_CLASS = None
 
 
@@ -1393,7 +1394,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
 
         def task():
             log("开始生成证书...")
-            if generate_certificates(log_func=log):
+            if generate_certificates(log_func=log, ca_common_name=CA_COMMON_NAME):
                 log("✅ 证书生成完成")
             else:
                 log("❌ 证书生成失败")
@@ -2018,7 +2019,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
 
             # 1. 生成证书
             log("步骤 1/4: 生成证书")
-            if not generate_certificates(log_func=log):
+            if not generate_certificates(log_func=log, ca_common_name=CA_COMMON_NAME):
                 log("❌ 生成证书失败，无法继续")
                 return
 

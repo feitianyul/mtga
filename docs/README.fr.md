@@ -141,7 +141,7 @@ MTGA est une solution basée sur un proxy local pour fournisseurs de modèles fi
 4. Le programme effectuera automatiquement :
    - La génération et l'installation du certificat SSL dans le trousseau système
    - La modification du fichier `/etc/hosts` (nécessite les privilèges administrateur)
-5. Vous devez manuellement approuver le certificat généré dans la fenêtre du trousseau qui s'ouvre, nommé par défaut `MyLocalCA`
+5. Vous devez manuellement approuver le certificat généré dans la fenêtre du trousseau qui s'ouvre, nommé par défaut `MTGA_CA`
 6. Démarrez le serveur proxy local
 7. Suivez la configuration [Trae IDE ci-dessous](#第-5-步配置-trae-ide) pour finaliser la configuration
 
@@ -206,7 +206,7 @@ cd "mtga/ca"
 Lors de l'exécution de `./genca.sh`, il vous demandera "Do you want to generate ca cert and key? [yes/no]", saisissez `y` et appuyez sur Entrée. Ensuite, il vous sera demandé de renseigner quelques informations :
 
 *   `Country Name (2 letter code) []` : Saisissez `CN` (ou un autre code pays)
-*   Les autres champs (comme State, Locality, Organization, Common Name for CA) peuvent être remplis au besoin ou laissés vides, il est recommandé de mettre `X`. Le Common Name peut être `MyLocalCA` ou similaire. L'e-mail peut être laissé vide.
+*   Les autres champs (comme State, Locality, Organization, Common Name for CA) peuvent être remplis au besoin ou laissés vides, il est recommandé de mettre `X`. Le Common Name peut être `MTGA_CA` ou similaire. L'e-mail peut être laissé vide.
 
 ```bash
 # 2. Générer le certificat SSL pour api.openai.com (api.openai.com.crt et api.openai.com.key)

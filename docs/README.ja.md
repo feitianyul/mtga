@@ -141,7 +141,7 @@ MTGA は、Windows と macOS 向けのローカルプロキシベースの IDE �
 4. プログラムが自動的に完了します：
    - SSL証明書を生成し、システムキーチェーンにインストール
    - `/etc/hosts`ファイルを修正（管理者権限が必要）
-5. 開かれたキーチェーンウィンドウで生成された証明書を手動で信頼設定、デフォルト名は`MyLocalCA`
+5. 開かれたキーチェーンウィンドウで生成された証明書を手動で信頼設定、デフォルト名は`MTGA_CA`
 6. ローカルプロキシサーバーを起動
 7. 下記の[Trae IDE 設定](#第-5-步配置-trae-ide)に従って設定を完了
 
@@ -206,7 +206,7 @@ cd "mtga/ca"
 `./genca.sh`を実行すると、"Do you want to generate ca cert and key? [yes/no]"と聞かれるので、`y`を入力してEnter。その後、いくつかの情報入力が要求されます：
 
 *   `Country Name (2 letter code) []`: `CN`と入力（または他の国コード）
-*   他のフィールド（State, Locality, Organization, Common Name for CAなど）は必要に応じて入力または空欄、`X`と入力することを推奨。Common Nameは`MyLocalCA`などと入力可能。メールは空欄可。
+*   他のフィールド（State, Locality, Organization, Common Name for CAなど）は必要に応じて入力または空欄、`X`と入力することを推奨。Common Nameは`MTGA_CA`などと入力可能。メールは空欄可。
 
 ```bash
 # 2. api.openai.com のサーバー証明書の生成 (api.openai.com.crt と api.openai.com.key)

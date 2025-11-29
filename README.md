@@ -101,7 +101,7 @@
 4. 程序会自动完成：
    - 生成并安装 SSL 证书到系统钥匙串
    - 修改 `/etc/hosts` 文件（需要管理员权限）
-5. 需要手动在打开的钥匙串窗口中信任生成的证书，默认名称为 `MyLocalCA`
+5. 需要手动在打开的钥匙串窗口中信任生成的证书，默认名称为 `MTGA_CA`
 6. 启动本地代理服务器
 7. 按照下方的 [Trae IDE 配置](#第-5-步配置-trae-ide) 完成设置
 
@@ -181,7 +181,7 @@ cd "mtga/ca"
 
 执行 `./genca.sh` 时，它会问你 "Do you want to generate ca cert and key? [yes/no]"，输入 `y` 并按回车。之后会要求填写一些信息：
 *   `Country Name (2 letter code) []`: 填 `CN` (或其他国家代码)
-*   其他字段（如 State, Locality, Organization, Common Name for CA）可以按需填写或留空，建议填`X`。Common Name 可以填 `MyLocalCA` 之类的。邮箱可以留空。
+*   其他字段（如 State, Locality, Organization, Common Name for CA）可以按需填写或留空，建议填`X`。Common Name 可以填 `MTGA_CA` 之类的。邮箱可以留空。
 
 ```bash
 # 2. 生成 api.openai.com 的服务器证书 (api.openai.com.crt 和 api.openai.com.key)

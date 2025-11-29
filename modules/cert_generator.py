@@ -122,7 +122,7 @@ DNS.1 = api.openai.com
     return True
 
 
-def generate_ca_cert(resource_manager, log_func=print):
+def generate_ca_cert(resource_manager, log_func=print, *, ca_common_name="MTGA_CA"):
     """生成 CA 证书和私钥"""
     log_func("开始生成CA证书和私钥...")
 
@@ -171,7 +171,7 @@ def generate_ca_cert(resource_manager, log_func=print):
     log_func("正在生成CA证书 (ca.crt)...")
 
     # 使用默认值构建主题字符串
-    subject = "/C=CN/ST=X/L=X/O=X/OU=X/CN=MyLocalCA"
+    subject = f"/C=CN/ST=X/L=X/O=X/OU=X/CN={ca_common_name}"
     log_func(f"使用默认证书信息: {subject}")
 
     success, _ = run_openssl_command(
@@ -383,7 +383,7 @@ def generate_server_cert(resource_manager, domain="api.openai.com", log_func=pri
     return True
 
 
-def generate_certificates(domain="api.openai.com", log_func=print):
+def generate_certificates(domain="api.openai.com", *, ca_common_name="MTGA_CA", log_func=print):
     """
     一键生成 CA 证书和服务器证书
 
@@ -420,7 +420,7 @@ def generate_certificates(domain="api.openai.com", log_func=print):
         return False
 
     # 生成 CA 证书
-    if not generate_ca_cert(resource_manager, log_func):
+    if not generate_ca_cert(resource_manager, log_func, ca_common_name=ca_common_name):
         return False
 
     # 生成服务器证书

@@ -141,7 +141,7 @@ MTGA는 Windows와 macOS용 로컬 프록시 기반 IDE 고정 모델 서비스 
 4. 프로그램이 자동으로 완료합니다:
    - SSL 인증서 생성 및 시스템 키체인에 설치
    - `/etc/hosts` 파일 수정 (관리자 권한 필요)
-5. 열린 키체인 창에서 생성된 인증서를 신뢰하도록 수동 설정 필요, 기본 이름은 `MyLocalCA`
+5. 열린 키체인 창에서 생성된 인증서를 신뢰하도록 수동 설정 필요, 기본 이름은 `MTGA_CA`
 6. 로컬 프록시 서버 시작
 7. 아래의 [Trae IDE 설정](#5-단계-trae-ide-설정)에 따라 설정 완료
 
@@ -208,7 +208,7 @@ cd "mtga/ca"
 `./genca.sh` 실행 시 "Do you want to generate ca cert and key? [yes/no]" 질문에 `y` 입력 후 엔터. 이후 일부 정보 입력 요청:
 
 *   `Country Name (2 letter code) []`: `CN` 입력 (또는 다른 국가 코드)
-*   기타 필드(State, Locality, Organization, Common Name for CA)는 필요에 따라 입력 또는 공백, `X` 입력 권장. Common Name은 `MyLocalCA` 등 입력 가능. 이메일은 공백 가능.
+*   기타 필드(State, Locality, Organization, Common Name for CA)는 필요에 따라 입력 또는 공백, `X` 입력 권장. Common Name은 `MTGA_CA` 등 입력 가능. 이메일은 공백 가능.
 
 ```bash
 # 2. api.openai.com 서버 인증서 생성 (api.openai.com.crt 및 api.openai.com.key)

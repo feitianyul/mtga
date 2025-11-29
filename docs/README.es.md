@@ -141,7 +141,7 @@ MTGA es una solución de proveedor de servicios de modelos fijos para IDE basada
 4. El programa completará automáticamente:
    - Generar e instalar el certificado SSL en el llavero del sistema
    - Modificar el archivo `/etc/hosts` (se requieren permisos de administrador)
-5. Es necesario confiar manualmente en el certificado generado en la ventana del llavero que se abre, el nombre predeterminado es `MyLocalCA`
+5. Es necesario confiar manualmente en el certificado generado en la ventana del llavero que se abre, el nombre predeterminado es `MTGA_CA`
 6. Inicia el servidor proxy local
 7. Completa la configuración según la [Configuración del IDE Trae](#第-5-步配置-trae-ide) a continuación
 
@@ -206,7 +206,7 @@ cd "mtga/ca"
 Al ejecutar `./genca.sh`, te preguntará "Do you want to generate ca cert and key? [yes/no]". Ingresa `y` y presiona Enter. Luego, te pedirá que completes cierta información:
 
 *   `Country Name (2 letter code) []`: Ingresa `CN` (u otro código de país)
-*   Otros campos (como State, Locality, Organization, Common Name for CA) pueden completarse según sea necesario o dejarse en blanco; se sugiere ingresar `X`. Common Name puede ser algo como `MyLocalCA`. El correo electrónico puede dejarse en blanco.
+*   Otros campos (como State, Locality, Organization, Common Name for CA) pueden completarse según sea necesario o dejarse en blanco; se sugiere ingresar `X`. Common Name puede ser algo como `MTGA_CA`. El correo electrónico puede dejarse en blanco.
 
 ```bash
 # 2. Generar el certificado SSL para api.openai.com (api.openai.com.crt y api.openai.com.key)

@@ -141,7 +141,7 @@ MTGA ist eine auf einem lokalen Proxy basierende IDE-Lösung für feste Modellan
 4. Das Programm führt automatisch durch:
    - Generierung und Installation des SSL-Zertifikats in den System-Schlüsselbund
    - Änderung der `/etc/hosts`-Datei (Administratorrechte erforderlich)
-5. Manuell im geöffneten Schlüsselbund-Fenster das generierte Zertifikat vertrauen, Standardname ist `MyLocalCA`
+5. Manuell im geöffneten Schlüsselbund-Fenster das generierte Zertifikat vertrauen, Standardname ist `MTGA_CA`
 6. Lokalen Proxy-Server starten
 7. Führen Sie die Einrichtung gemäß der untenstehenden [Trae IDE Konfiguration](#第-5-步配置-trae-ide) ab
 
@@ -206,7 +206,7 @@ cd "mtga/ca"
 Bei Ausführung von `./genca.sh` wird gefragt: "Do you want to generate ca cert and key? [yes/no]". Eingabe `y` und Enter drücken. Anschließend werden einige Informationen abgefragt:
 
 *   `Country Name (2 letter code) []`: `CN` eingeben (oder anderer Ländercode)
-*   Andere Felder (wie State, Locality, Organization, Common Name for CA) können nach Bedarf ausgefüllt oder leer gelassen werden, `X` wird empfohlen. Common Name kann z.B. `MyLocalCA` sein. E-Mail kann leer bleiben.
+*   Andere Felder (wie State, Locality, Organization, Common Name for CA) können nach Bedarf ausgefüllt oder leer gelassen werden, `X` wird empfohlen. Common Name kann z.B. `MTGA_CA` sein. E-Mail kann leer bleiben.
 
 ```bash
 # 2. SSL-Zertifikat für api.openai.com generieren (api.openai.com.crt und api.openai.com.key)
