@@ -59,7 +59,7 @@ mac/create_mac_app.sh
 
 ```bash
 # 安装构建依赖
-uv sync --extra build
+uv sync --group mac-build
 
 # 构建 DMG
 uv run dmgbuild -s mac/dmg_settings.py "MTGA GUI Installer" MTGA_GUI-v1.x.x-aarch64.dmg
@@ -119,7 +119,7 @@ uv run dmgbuild -s mac/dmg_settings.py "MTGA GUI Installer" MTGA_GUI-v1.x.x-aarc
 ## 故障排除
 
 ### 依赖安装问题
-如果 `uv sync --extra build` 失败：
+如果 `uv sync --group mac-build` 失败：
 - 确保已安装 `uv` 包管理器
 - 检查网络连接，dmgbuild 需要从 PyPI 下载
 - 如遇权限问题，可能需要重新创建虚拟环境

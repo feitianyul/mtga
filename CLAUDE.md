@@ -46,10 +46,10 @@ MTGA 是一个基于本地代理的 IDE 固定模型服务商解决方案，支�
 uv sync
 
 # 安装构建依赖 (Windows)
-uv sync --extra win-build
+uv sync --group win-build
 
 # 安装构建依赖 (macOS)  
-uv sync --extra mac-build
+uv sync --group mac-build
 ```
 
 ### 核心依赖
@@ -88,10 +88,10 @@ sudo uv run python mtga_gui.py
 uv sync
 
 # 安装构建依赖 (Windows)
-uv sync --extra win-build
+uv sync --group win-build
 
 # 安装构建依赖 (macOS)  
-uv sync --extra mac-build
+uv sync --group mac-build
 ```
 
 #### 测试和验证

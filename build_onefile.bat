@@ -11,7 +11,7 @@ echo.
 
 REM 检查虚拟环境是否存在
 if not exist ".venv\Scripts\python.exe" (
-    echo 错误：虚拟环境不存在，请先运行 uv sync --extra win-build 安装依赖
+    echo 错误：虚拟环境不存在，请先运行 uv sync --group win-build 安装依赖
     if defined GITHUB_ACTIONS (
         exit /b 1
     ) else (

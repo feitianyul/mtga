@@ -37,7 +37,7 @@ echo
 
 # 检查虚拟环境是否存在
 if [[ ! -f ".venv/bin/python" ]]; then
-    print_error "虚拟环境不存在，请先运行 uv sync --extra mac-build 安装依赖"
+    print_error "虚拟环境不存在，请先运行 uv sync --group mac-build 安装依赖"
     exit 1
 fi
 
@@ -54,7 +54,7 @@ print_success "找到 clang 编译器"
 
 # 检查是否安装了 Nuitka
 if ! .venv/bin/python -c "import nuitka" &> /dev/null; then
-    print_error "Nuitka 未安装，请先运行 uv sync --extra mac-build 安装依赖"
+    print_error "Nuitka 未安装，请先运行 uv sync --group mac-build 安装依赖"
     print_warning "如果仍然出现问题，请手动安装: uv add nuitka"
     exit 1
 fi

@@ -31,7 +31,7 @@
 
 ```bash
 # 安装依赖
-uv sync --extra win-build
+uv sync --group win-build
 ```
 
 ### 2. 执行构建
@@ -123,7 +123,7 @@ REM ================================
    ```
    错误：虚拟环境不存在
    ```
-   **解决方案**：运行 `uv sync --extra win-build` 安装依赖
+   **解决方案**：运行 `uv sync --group win-build` 安装依赖
 
 3. **构建时间过长**
    - 单文件构建通常需要 30-40 分钟

@@ -42,7 +42,7 @@ jobs:
 
       - name: 🔧 安装依赖 (win-build)
         run: |
-          uv sync --extra win-build
+          uv sync --group win-build
 
       - name: 🔍 检查 Visual Studio
         run: |

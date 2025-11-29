@@ -24,7 +24,7 @@ set "PROBE_EXE_NAME=MTGA_GUI-v%PROBE_VERSION%-x64.exe"
 
 REM 检查虚拟环境
 if not exist ".venv\Scripts\python.exe" (
-    echo [probe] 错误：虚拟环境不存在，请先运行 uv sync --extra win-build
+    echo [probe] 错误：虚拟环境不存在，请先运行 uv sync --group win-build
     if defined GITHUB_ACTIONS (
         exit /b 1
     ) else (
