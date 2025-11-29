@@ -810,8 +810,18 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
             log("代理服务器未运行")
         return False
 
-    def start_proxy_instance(config, success_message="✅ 代理服务器启动成功"):
-        """启动代理实例并输出统一日志。"""
+    def start_proxy_instance(
+        config, success_message="✅ 代理服务器启动成功", *, hosts_modified=False
+    ):
+        """启动代理实例并输出统一日志。
+
+        hosts_modified=True 表示已在外部完成 hosts 更新，可跳过内置步骤。
+        """
+        if not hosts_modified:
+            log("正在修改hosts文件...")
+            if not modify_hosts_file(log_func=log):
+                log("❌ 修改hosts文件失败，代理服务器未启动")
+                return False
         log("开始启动代理服务器...")
         instance = ProxyServer(config, log_func=log, thread_manager=thread_manager)
         set_proxy_instance(instance)
@@ -2020,7 +2030,8 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
 
             # 3. 修改hosts文件
             log("步骤 3/4: 修改hosts文件")
-            if not modify_hosts_file(log_func=log):
+            hosts_modified = modify_hosts_file(log_func=log)
+            if not hosts_modified:
                 log("❌ 修改hosts文件失败，无法继续")
                 return
 
@@ -2039,7 +2050,11 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
                 if stream_mode_value is not None:
                     log(f"启用强制流模式: {stream_mode_value}")
                 stop_proxy_instance(reason="restart")
-                if start_proxy_instance(config, success_message="✅ 全部服务启动成功"):
+                if start_proxy_instance(
+                    config,
+                    success_message="✅ 全部服务启动成功",
+                    hosts_modified=hosts_modified,
+                ):
                     return
                 log("❌ 全部服务启动失败：代理服务器未能启动")
 
