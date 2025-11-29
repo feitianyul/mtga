@@ -2035,28 +2035,22 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
                 log("❌ 修改hosts文件失败，无法继续")
                 return
 
-            # 4. 启动代理服务器（macOS需要手动）
-            if sys.platform == "darwin":
-                log("步骤 4/4: macOS平台需要手动启动代理服务器")
-                log("⚠️  证书安装后需要用户手动确认信任设置")
-                log("📋  证书信任设置完成后，点击 '启动代理服务器' 按钮")
-                log("✅ 准备工作已完成")
-            else:
-                log("步骤 4/4: 启动代理服务器")
-                config = build_proxy_config()
-                if not config:
-                    return
-                stream_mode_value = config.get("stream_mode")
-                if stream_mode_value is not None:
-                    log(f"启用强制流模式: {stream_mode_value}")
-                stop_proxy_instance(reason="restart")
-                if start_proxy_instance(
-                    config,
-                    success_message="✅ 全部服务启动成功",
-                    hosts_modified=hosts_modified,
-                ):
-                    return
-                log("❌ 全部服务启动失败：代理服务器未能启动")
+            # 4. 启动代理服务器
+            log("步骤 4/4: 启动代理服务器")
+            config = build_proxy_config()
+            if not config:
+                return
+            stream_mode_value = config.get("stream_mode")
+            if stream_mode_value is not None:
+                log(f"启用强制流模式: {stream_mode_value}")
+            stop_proxy_instance(reason="restart")
+            if start_proxy_instance(
+                config,
+                success_message="✅ 全部服务启动成功",
+                hosts_modified=hosts_modified,
+            ):
+                return
+            log("❌ 全部服务启动失败：代理服务器未能启动")
 
         thread_manager.run("start_all", task)
 

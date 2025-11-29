@@ -24,7 +24,14 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
-from .resource_manager import is_packaged
+try:
+    from .resource_manager import is_packaged
+except ImportError:
+    # 作为脚本运行时，没有包上下文，补充模块搜索路径
+    import sys
+
+    sys.path.append(str(Path(__file__).resolve().parent.parent))
+    from modules.resource_manager import is_packaged
 
 JsonDict = dict[str, Any]
 JsonMapping = Mapping[str, Any]
@@ -59,6 +66,7 @@ class MacPrivilegeSession:
         self._lock = threading.Lock()
         self._atexit_registered = False
         self._connect_logged_wait = False
+        self._security_session = os.environ.get("SECURITYSESSIONID")
 
     def ensure_ready(self, log_func=print) -> bool:
         """确保 helper 已经启动并建立 socket 连接。"""
@@ -120,6 +128,40 @@ class MacPrivilegeSession:
         data.setdefault("error", response.get("error", "未知错误"))
         return False, data
 
+    def install_trusted_cert(
+        self,
+        cert_path: str,
+        *,
+        keychain: str = "/Library/Keychains/System.keychain",
+        log_func=print,
+    ) -> tuple[bool, JsonDict]:
+        """使用管理员权限安装并信任 CA 证书，返回 (success, data)。"""
+        if not cert_path:
+            return False, {"error": "证书路径为空"}
+
+        base_cmd: list[str] = [
+            "security",
+            "add-trusted-cert",
+            "-d",
+            "-r",
+            "trustRoot",
+            "-k",
+            keychain,
+            cert_path,
+        ]
+        cmd = base_cmd
+        if sys.platform == "darwin" and self.owner_uid:
+            cmd = ["launchctl", "asuser", str(self.owner_uid)]
+            if self._security_session:
+                cmd.extend(["env", f"SECURITYSESSIONID={self._security_session}"])
+            cmd.extend(base_cmd)
+        success, data = self.run_command(cmd, log_func=log_func)
+        if success or cmd == base_cmd:
+            return success, data
+
+        # 回退使用直接 security 命令，避免 launchctl 不可用时失败
+        return self.run_command(base_cmd, log_func=log_func)
+
     def shutdown(self) -> None:
         """GUI 退出时关闭 helper。"""
         if not self._helper_started:
@@ -169,6 +211,8 @@ class MacPrivilegeSession:
 
         log_func("🔐 正在请求管理员权限，请在弹窗中输入密码...")
         helper_cmd = " ".join(cmd_parts)
+        if self._security_session:
+            helper_cmd = f"SECURITYSESSIONID={shlex.quote(self._security_session)} " + helper_cmd
         helper_cmd += f" >> {shlex.quote(self.helper_log_path)} 2>&1 &"
         script = f'do shell script "{helper_cmd}" with administrator privileges'
         result = subprocess.run(
