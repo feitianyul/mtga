@@ -145,6 +145,7 @@ ensure_utf8_stdio()
 # 导入自定义模块
 try:
     from modules.cert_generator import generate_certificates
+    from modules.cert_cleaner import clear_ca_cert
     from modules.cert_installer import install_ca_cert
     from modules.hosts_manager import modify_hosts_file, open_hosts_file
     from modules.proxy_server import ProxyServer
@@ -1392,7 +1393,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
     def generate_certs_task():
         """生成证书任务"""
 
-        def task():
+        def task():  # noqa: PLR0912
             log("开始生成证书...")
             if generate_certificates(log_func=log, ca_common_name=CA_COMMON_NAME):
                 log("✅ 证书生成完成")
@@ -1404,7 +1405,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
     def install_certs_task():
         """安装证书任务"""
 
-        def task():
+        def task():  # noqa: PLR0912
             log("开始安装CA证书...")
             # install_ca_cert 内部会处理权限请求
             if install_ca_cert(log_func=log):
@@ -1414,11 +1415,29 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
 
         thread_manager.run("cert_install", task)
 
+    def clear_ca_cert_task():
+        """清除系统钥匙串中的 CA 证书"""
+
+        def task():
+            clear_ca_cert(ca_common_name=CA_COMMON_NAME, log_func=log)
+
+        thread_manager.run("cert_clear", task)
+
     ttk.Button(cert_tab, text="生成CA和服务器证书", command=generate_certs_task).pack(
         fill=tk.X, padx=5, pady=5
     )
     ttk.Button(cert_tab, text="安装CA证书", command=install_certs_task).pack(
         fill=tk.X, padx=5, pady=5
+    )
+    clear_ca_btn = ttk.Button(cert_tab, text="清除系统CA证书", command=clear_ca_cert_task)
+    clear_ca_btn.pack(fill=tk.X, padx=5, pady=5)
+    create_tooltip(
+        clear_ca_btn,
+        "macOS: 删除系统钥匙串中匹配的CA证书；"
+        "Windows: 删除本地计算机/Root 中匹配的CA证书\n"
+        f"Common Name: {CA_COMMON_NAME}\n"
+        "需要管理员权限，建议仅在需要重置证书时使用",
+        wraplength=280,
     )
 
     # hosts文件管理标签页
