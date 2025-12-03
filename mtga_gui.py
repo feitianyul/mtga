@@ -146,6 +146,7 @@ ensure_utf8_stdio()
 try:
     from modules.cert_generator import generate_certificates
     from modules.cert_cleaner import clear_ca_cert
+    from modules.cert_checker import has_existing_ca_cert
     from modules.cert_installer import install_ca_cert
     from modules.hosts_manager import modify_hosts_file, open_hosts_file
     from modules.proxy_server import ProxyServer
@@ -2038,15 +2039,21 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
 
             # 1. 生成证书
             log("步骤 1/4: 生成证书")
-            if not generate_certificates(log_func=log, ca_common_name=CA_COMMON_NAME):
-                log("❌ 生成证书失败，无法继续")
-                return
+            has_existing_ca = has_existing_ca_cert(CA_COMMON_NAME, log_func=log)
+            if has_existing_ca:
+                log(f"检测到系统已存在 CA 证书 ({CA_COMMON_NAME})，跳过证书生成和安装")
+                log("ℹ️ 如有需要，请手动执行生成和安装")
+                log("步骤 2/4: 安装CA证书（已跳过）")
+            else:
+                if not generate_certificates(log_func=log, ca_common_name=CA_COMMON_NAME):
+                    log("❌ 生成证书失败，无法继续")
+                    return
 
-            # 2. 安装CA证书
-            log("步骤 2/4: 安装CA证书")
-            if not install_ca_cert(log_func=log):
-                log("❌ 安装CA证书失败，无法继续")
-                return
+                # 2. 安装CA证书
+                log("步骤 2/4: 安装CA证书")
+                if not install_ca_cert(log_func=log):
+                    log("❌ 安装CA证书失败，无法继续")
+                    return
 
             # 3. 修改hosts文件
             log("步骤 3/4: 修改hosts文件")
