@@ -1416,13 +1416,49 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
 
         thread_manager.run("cert_install", task)
 
-    def clear_ca_cert_task():
+    def clear_ca_cert_task(ca_common_name: str):
         """清除系统钥匙串中的 CA 证书"""
 
         def task():
-            clear_ca_cert(ca_common_name=CA_COMMON_NAME, log_func=log)
+            clear_ca_cert(ca_common_name=ca_common_name, log_func=log)
 
         thread_manager.run("cert_clear", task)
+
+    def confirm_clear_ca_cert():
+        """确认后清除 CA 证书，可临时修改 Common Name。"""
+
+        dialog = tk.Toplevel(window)
+        dialog.title("确认清除 CA 证书")
+        dialog.transient(window)
+        dialog.grab_set()
+
+        ttk.Label(
+            dialog,
+            text="将从系统信任存储中删除匹配的 CA 证书，是否继续？",
+            anchor="w",
+            justify="left",
+        ).pack(fill=tk.X, padx=12, pady=(12, 6))
+
+        ttk.Label(dialog, text="Common Name:", anchor="w").pack(
+            fill=tk.X, padx=12, pady=(0, 4)
+        )
+        cn_var = tk.StringVar(value=CA_COMMON_NAME)
+        ttk.Entry(dialog, textvariable=cn_var).pack(fill=tk.X, padx=12, pady=(0, 12))
+
+        button_frame = ttk.Frame(dialog)
+        button_frame.pack(fill=tk.X, padx=12, pady=(0, 12))
+
+        def on_cancel():
+            dialog.destroy()
+
+        def on_confirm():
+            cn_value = cn_var.get().strip() or CA_COMMON_NAME
+            dialog.destroy()
+            log(f"准备清除 CA 证书，Common Name: {cn_value}")
+            clear_ca_cert_task(cn_value)
+
+        ttk.Button(button_frame, text="取消", command=on_cancel).pack(side=tk.RIGHT, padx=(8, 0))
+        ttk.Button(button_frame, text="确定", command=on_confirm).pack(side=tk.RIGHT)
 
     ttk.Button(cert_tab, text="生成CA和服务器证书", command=generate_certs_task).pack(
         fill=tk.X, padx=5, pady=5
@@ -1430,7 +1466,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
     ttk.Button(cert_tab, text="安装CA证书", command=install_certs_task).pack(
         fill=tk.X, padx=5, pady=5
     )
-    clear_ca_btn = ttk.Button(cert_tab, text="清除系统CA证书", command=clear_ca_cert_task)
+    clear_ca_btn = ttk.Button(cert_tab, text="清除系统CA证书", command=confirm_clear_ca_cert)
     clear_ca_btn.pack(fill=tk.X, padx=5, pady=5)
     create_tooltip(
         clear_ca_btn,
