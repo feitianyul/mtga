@@ -793,6 +793,27 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
     hosts_task_id = None
     shutdown_task_id = None
 
+    def ensure_global_config_ready():
+        """检查全局配置文件中的必填项。"""
+        mapped_model_id, mtga_auth_key = load_global_config()
+        mapped_model_id = (mapped_model_id or "").strip()
+        mtga_auth_key = (mtga_auth_key or "").strip()
+
+        missing_fields = []
+        if not mapped_model_id:
+            missing_fields.append("映射模型ID")
+        if not mtga_auth_key:
+            missing_fields.append("MTGA鉴权Key")
+
+        if missing_fields:
+            missing_display = "、".join(missing_fields)
+            log(
+                f"⚠️ 全局配置缺失: {missing_display} 不能为空，请在左侧“全局配置”中填写后再试。"
+            )
+            return False
+
+        return True
+
     def build_proxy_config():
         """根据当前 UI 状态生成代理配置"""
         current_config = get_current_config()
@@ -1310,7 +1331,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
     # 映射模型ID配置
     mapped_model_frame = ttk.Frame(global_config_frame)
     mapped_model_frame.pack(fill=tk.X, padx=5, pady=2)
-    ttk.Label(mapped_model_frame, text="映射模型ID:", width=12).pack(side=tk.LEFT)
+    ttk.Label(mapped_model_frame, text="映射模型ID", width=12).pack(side=tk.LEFT)
     mapped_model_var = tk.StringVar()
     mapped_model_entry = ttk.Entry(mapped_model_frame, textvariable=mapped_model_var, width=25)
     mapped_model_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 0))
@@ -1318,7 +1339,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
     # MTGA鉴权key配置
     mtga_auth_frame = ttk.Frame(global_config_frame)
     mtga_auth_frame.pack(fill=tk.X, padx=5, pady=2)
-    ttk.Label(mtga_auth_frame, text="MTGA鉴权Key:", width=12).pack(side=tk.LEFT)
+    ttk.Label(mtga_auth_frame, text="MTGA鉴权Key", width=12).pack(side=tk.LEFT)
     mtga_auth_var = tk.StringVar()
     mtga_auth_entry = ttk.Entry(mtga_auth_frame, textvariable=mtga_auth_var, width=25, show="*")
     mtga_auth_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 0))
@@ -1549,6 +1570,9 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
     def start_proxy_task():
         """启动代理服务器任务"""
         nonlocal proxy_start_task_id, proxy_stop_task_id
+
+        if not ensure_global_config_ready():
+            return
 
         def task():
             config = build_proxy_config()
@@ -2062,6 +2086,9 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
     def start_all_task():
         """一键启动全部服务"""
         nonlocal proxy_start_task_id, proxy_stop_task_id
+
+        if not ensure_global_config_ready():
+            return
 
         def task():
             thread_manager.wait(proxy_start_task_id)
