@@ -1760,7 +1760,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
         current_dark_mode = detect_macos_dark_mode()
         markdown_text = notes or "该版本暂无更新说明。"
         dialog = tk.Toplevel(window)
-        dialog.title(f"发现新版本：{version_label}")
+        dialog.title("更新检查")
         dialog.geometry("520x420")
         dialog.minsize(480, 360)
         dialog.transient(window)
@@ -1769,12 +1769,20 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
         heading_font = tkfont.nametofont("TkDefaultFont").copy()
         heading_font.configure(weight="bold", size=heading_font.cget("size") + 1)
 
+        header_frame = ttk.Frame(dialog)
+        header_frame.pack(fill=tk.X, padx=12, pady=(12, 6))
         ttk.Label(
-            dialog,
+            header_frame,
             text=f"发现新版本：{version_label}",
             anchor="w",
             font=heading_font,
-        ).pack(fill=tk.X, padx=12, pady=(12, 6))
+        ).pack(side=tk.LEFT, fill=tk.X, expand=True)
+        if release_url:
+            ttk.Button(
+                header_frame,
+                text="前往发布页",
+                command=lambda: webbrowser.open(release_url),
+            ).pack(side=tk.RIGHT, padx=(8, 0))
 
         def _init_tkhtml_dir():
             base_dir = Path(resource_manager_module.get_program_resource_dir())
@@ -1910,17 +1918,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
 
         dialog.protocol("WM_DELETE_WINDOW", on_close)
 
-        button_frame = ttk.Frame(dialog)
-        button_frame.pack(fill=tk.X, padx=12, pady=(0, 12))
-
-        if release_url:
-            ttk.Button(
-                button_frame,
-                text="打开发布页",
-                command=lambda: webbrowser.open(release_url),
-            ).pack(side=tk.LEFT)
-
-        ttk.Button(button_frame, text="关闭", command=on_close).pack(side=tk.RIGHT)
+        # 保留对窗口关闭的清理逻辑，关闭按钮改用系统自带按钮
 
     update_check_task_id = None
 
