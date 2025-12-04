@@ -777,6 +777,17 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
         widget.bind("<Enter>", on_enter)
         widget.bind("<Leave>", on_leave)
 
+    def center_window(toplevel: tk.Toplevel | tk.Tk):
+        """隐藏后再居中显示，避免 macOS 上先闪到左上角。"""
+        toplevel.withdraw()
+        toplevel.update_idletasks()
+        width = max(toplevel.winfo_width(), toplevel.winfo_reqwidth())
+        height = max(toplevel.winfo_height(), toplevel.winfo_reqheight())
+        x = (toplevel.winfo_screenwidth() // 2) - (width // 2)
+        y = (toplevel.winfo_screenheight() // 2) - (height // 2)
+        toplevel.geometry(f"+{x}+{y}")
+        toplevel.deiconify()
+
     proxy_start_task_id = None
     proxy_stop_task_id = None
     hosts_task_id = None
@@ -1040,13 +1051,6 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
         add_window.geometry("450x300")  # 调整窗口大小以容纳新字段
         add_window.resizable(False, False)
         add_window.transient(window)
-        add_window.grab_set()
-
-        # 居中显示
-        add_window.update_idletasks()
-        x = (add_window.winfo_screenwidth() // 2) - (add_window.winfo_width() // 2)
-        y = (add_window.winfo_screenheight() // 2) - (add_window.winfo_height() // 2)
-        add_window.geometry(f"+{x}+{y}")
 
         main_frame = ttk.Frame(add_window, padding=10)
         main_frame.pack(fill=tk.BOTH, expand=True)
@@ -1091,6 +1095,8 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
         ttk.Button(button_frame, text="取消", command=add_window.destroy).pack(side=tk.LEFT, padx=5)
 
         main_frame.columnconfigure(1, weight=1)
+        center_window(add_window)
+        add_window.grab_set()
         name_entry.focus()
 
     # 配置组操作按钮
@@ -1143,13 +1149,6 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
         edit_window.geometry("450x300")  # 调整窗口大小
         edit_window.resizable(False, False)
         edit_window.transient(window)
-        edit_window.grab_set()
-
-        # 居中显示
-        edit_window.update_idletasks()
-        x = (edit_window.winfo_screenwidth() // 2) - (edit_window.winfo_width() // 2)
-        y = (edit_window.winfo_screenheight() // 2) - (edit_window.winfo_height() // 2)
-        edit_window.geometry(f"+{x}+{y}")
 
         main_frame = ttk.Frame(edit_window, padding=10)
         main_frame.pack(fill=tk.BOTH, expand=True)
@@ -1196,6 +1195,8 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
         )
 
         main_frame.columnconfigure(1, weight=1)
+        center_window(edit_window)
+        edit_window.grab_set()
         name_entry.focus()
 
     def delete_config_group():
@@ -1430,12 +1431,6 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
         dialog = tk.Toplevel(window)
         dialog.title("确认清除 CA 证书")
         dialog.transient(window)
-        dialog.grab_set()
-
-        dialog.update_idletasks()
-        x = (dialog.winfo_screenwidth() // 2) - (dialog.winfo_width() // 2)
-        y = (dialog.winfo_screenheight() // 2) - (dialog.winfo_height() // 2)
-        dialog.geometry(f"+{x}+{y}")
 
         ttk.Label(
             dialog,
@@ -1464,6 +1459,8 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
 
         ttk.Button(button_frame, text="取消", command=on_cancel).pack(side=tk.RIGHT, padx=(8, 0))
         ttk.Button(button_frame, text="确定", command=on_confirm).pack(side=tk.RIGHT)
+        center_window(dialog)
+        dialog.grab_set()
 
     ttk.Button(cert_tab, text="生成CA和服务器证书", command=generate_certs_task).pack(
         fill=tk.X, padx=5, pady=5
@@ -1805,11 +1802,6 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
         dialog.geometry("520x420")
         dialog.minsize(480, 360)
         dialog.transient(window)
-        dialog.grab_set()
-        dialog.update_idletasks()
-        x = (dialog.winfo_screenwidth() // 2) - (dialog.winfo_width() // 2)
-        y = (dialog.winfo_screenheight() // 2) - (dialog.winfo_height() // 2)
-        dialog.geometry(f"+{x}+{y}")
 
         heading_font = tkfont.nametofont("TkDefaultFont").copy()
         heading_font.configure(weight="bold", size=heading_font.cget("size") + 1)
@@ -1962,6 +1954,8 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
             dialog.destroy()
 
         dialog.protocol("WM_DELETE_WINDOW", on_close)
+        center_window(dialog)
+        dialog.grab_set()
 
         # 保留对窗口关闭的清理逻辑，关闭按钮改用系统自带按钮
 
