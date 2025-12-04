@@ -1432,6 +1432,11 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
         dialog.transient(window)
         dialog.grab_set()
 
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (dialog.winfo_width() // 2)
+        y = (dialog.winfo_screenheight() // 2) - (dialog.winfo_height() // 2)
+        dialog.geometry(f"+{x}+{y}")
+
         ttk.Label(
             dialog,
             text="将从系统信任存储中删除匹配的 CA 证书，是否继续？",
@@ -1801,6 +1806,10 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
         dialog.minsize(480, 360)
         dialog.transient(window)
         dialog.grab_set()
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (dialog.winfo_width() // 2)
+        y = (dialog.winfo_screenheight() // 2) - (dialog.winfo_height() // 2)
+        dialog.geometry(f"+{x}+{y}")
 
         heading_font = tkfont.nametofont("TkDefaultFont").copy()
         heading_font.configure(weight="bold", size=heading_font.cget("size") + 1)
