@@ -1904,14 +1904,14 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
                 borderwidth=1,
                 messages_enabled=False,
             )
-        except Exception:
+        except Exception as e:
             html_frame_cls = None
             notes_widget = ttk.Label(
                 dialog,
-                text="该版本暂无更新说明。",
                 anchor="w",
                 font=tkfont.nametofont("TkDefaultFont"),
             )
+            log(f"tkhtml导入失败，捕获到异常:\n{e}")
         notes_widget.pack(fill=tk.BOTH, expand=True, padx=12, pady=(0, 10))
 
         if html_frame_cls and isinstance(notes_widget, html_frame_cls):

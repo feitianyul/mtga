@@ -105,6 +105,7 @@ uv run --python .venv/bin/python nuitka \
     --include-data-files=ca/youtube.cnf=ca/youtube.cnf \
     --include-data-files=ca/youtube.subj=ca/youtube.subj \
     --include-data-files=modules/_build_version.py=modules/_build_version.py \
+    --include-data-files=.venv/lib/python3.13/site-packages/tkinterweb_tkhtml/tkhtml/libTkhtml3.0.dylib=tkinterweb_tkhtml/tkhtml/libTkhtml3.0.dylib \
     --macos-app-icon=mac/icon.icns \
     --enable-plugin=tk-inter \
     --macos-target-arch=arm64 \
