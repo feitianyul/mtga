@@ -1,4 +1,25 @@
-## v1.3.0 (Latest)
+## v1.4.0 (Latest)
+### :sparkles: 新功能
+- feat(proxy): 启动代理时自动修改hosts (187ddfc513f9666a646620dde666203b833314f7)
+- feat(macos): 简化macOS证书安装流程并自动设置信任 (b5cf97e0e81685dfbfbcdfc222f9cf5920660c4e)
+- feat(证书管理): 添加清除系统CA证书功能 (05994def0e0daa8b7a7c57f78e690b3d82dd1385)
+- feat(cert): 添加证书存在性检查功能避免重复生成 (ccbfbee547629a1636b56db7adb249910fe16896)
+- feat(更新检查): 优化更新对话框布局并添加前往发布页按钮 (11c812337bdd44cfdcd1a945b0b9fc5cf5abda33)
+- feat(gui): 清除CA证书添加确认对话框以可修改变量及避免误操作风险 (3b98f1ecb4527067b70119e2155fdd7bed8fbed8)
+- feat(gui): 居中显示对话框以提升用户体验 (170f73c0b30f99116566a54a5033ed971fd88f50)
+- feat(gui): 添加全局配置必填项检查功能 (0e35fd3732f1c7e0eb213db9c4b32735646e2a06)
+### :bug: 修复
+- fix(process): 创建子进程工具模块以避免win端继承无效的stdin句柄 (4fcc18507f90e647fc39f08c8a379f6f656c31d2)
+- fix(build): macOS端修复tkhtml库导入失败问题并添加动态库到构建脚本 (6e5fbc5b48ae83a2ee1eef32b35019b651e7a616)
+- fix(gui): 提取窗口居中逻辑到独立函数避免macOS闪屏问题 (16d15a2e1ab98353f8dbe43fe0f103959e973704)
+
+## v1.3.1
+### :sparkles: 新功能
+- 暂无新功能
+### :bug: 修复
+- fix(process): 创建子进程工具模块以避免win端继承无效的stdin句柄 (4fcc18507f90e647fc39f08c8a379f6f656c31d2)
+
+## v1.3.0
 ### :sparkles: 新功能
 - feat(hosts): hosts 文件支持同时写入 IPv4 与 IPv6 映射 (c62d87cfd1c1057266e688c572c443a4d6f89aa2)
 - feat(gui): 引入统一线程管理并强化代码规范 (37cec8d1c38d5daf93fb341ba222e4263c59ad98)
