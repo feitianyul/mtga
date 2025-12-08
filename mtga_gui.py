@@ -9,6 +9,7 @@ import locale
 import logging
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import tkinter as tk
@@ -845,6 +846,22 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
             log("代理服务器未运行")
         return False
 
+    def is_port_in_use(port: int) -> bool:
+        """检查本地端口是否已被占用。"""
+        checks = [("127.0.0.1", socket.AF_INET)]
+        if socket.has_ipv6:
+            checks.append(("::1", socket.AF_INET6))
+
+        for host, family in checks:
+            with socket.socket(family, socket.SOCK_STREAM) as sock:
+                sock.settimeout(0.2)
+                try:
+                    if sock.connect_ex((host, port)) == 0:
+                        return True
+                except OSError:
+                    continue
+        return False
+
     def start_proxy_instance(
         config, success_message="✅ 代理服务器启动成功", *, hosts_modified=False
     ):
@@ -852,6 +869,10 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
 
         hosts_modified=True 表示已在外部完成 hosts 更新，可跳过内置步骤。
         """
+        if is_port_in_use(443):
+            log("⚠️ 端口 443 已被其他进程占用，代理服务器未启动。请释放该端口后重试。")
+            return False
+
         if not hosts_modified:
             log("正在修改hosts文件...")
             if not modify_hosts_file(log_func=log):

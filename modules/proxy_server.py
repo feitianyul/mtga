@@ -23,12 +23,14 @@ class StoppableWSGIServer(BaseWSGIServer):
     """可停止的 WSGI 服务器"""
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
         self._stop_event = threading.Event()
+        super().__init__(*args, **kwargs)
 
     def server_close(self):
         """关闭服务器"""
-        self._stop_event.set()
+        stop_event = getattr(self, "_stop_event", None)
+        if stop_event:
+            stop_event.set()
         super().server_close()
 
     def serve_forever(self, poll_interval=0.5):
