@@ -3,6 +3,7 @@
 将 trae_proxy.py 的功能模块化，支持在线程中运行并可优雅停止
 """
 
+import contextlib
 import json
 import logging
 import os
@@ -13,6 +14,7 @@ import time
 import requests
 import yaml
 from flask import Flask, Response, jsonify, request
+from requests.adapters import HTTPAdapter
 from werkzeug.serving import BaseWSGIServer, WSGIRequestHandler
 
 from .resource_manager import ResourceManager
@@ -42,6 +44,22 @@ class StoppableWSGIServer(BaseWSGIServer):
             except OSError:
                 # 服务器已关闭
                 break
+
+
+class SSLContextAdapter(HTTPAdapter):
+    """支持自定义 SSLContext 的适配器，用于调整验证策略。"""
+
+    def __init__(self, ssl_context: ssl.SSLContext, *args, **kwargs):
+        self.ssl_context = ssl_context
+        super().__init__(*args, **kwargs)
+
+    def init_poolmanager(self, connections, maxsize, block=False, **pool_kwargs):
+        pool_kwargs.setdefault("ssl_context", self.ssl_context)
+        return super().init_poolmanager(connections, maxsize, block=block, **pool_kwargs)
+
+    def proxy_manager_for(self, proxy, **proxy_kwargs):
+        proxy_kwargs.setdefault("ssl_context", self.ssl_context)
+        return super().proxy_manager_for(proxy, **proxy_kwargs)
 
 
 class ProxyServer:
@@ -76,6 +94,8 @@ class ProxyServer:
         self.target_model_id = target_model_id if target_model_id else self.custom_model_id
         self.stream_mode = self.config.get("stream_mode")  # None, 'true', 'false'
         self.debug_mode = self.config.get("debug_mode", False)
+        self.disable_ssl_strict_mode = self.config.get("disable_ssl_strict_mode", False)
+        self.http_client = self._create_http_client()
 
         # 加载全局配置（用于模型映射和鉴权）
         self.global_config = self._load_global_config()
@@ -98,6 +118,20 @@ class ProxyServer:
         except Exception as e:
             self.log_func(f"加载全局配置失败: {e}")
         return {}
+
+    def _create_http_client(self):
+        """创建 HTTP 会话，可按需关闭 SSL 严格模式。"""
+        session = requests.Session()
+        if self.disable_ssl_strict_mode:
+            try:
+                ctx = ssl.create_default_context()
+                ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT
+                adapter = SSLContextAdapter(ctx)
+                session.mount("https://", adapter)
+                self.log_func("关闭 SSL 严格模式: 使用自定义 HTTPS 上下文")
+            except Exception as exc:  # noqa: BLE001
+                self.log_func(f"配置非严格 SSL 上下文失败，继续使用默认设置: {exc}")
+        return session
 
     def _get_mapped_model_id(self):
         """获取映射的模型ID，用于 /v1/models 接口返回"""
@@ -272,7 +306,7 @@ class ProxyServer:
             is_stream = request_data.get("stream", False)
             self.log_func(f"流模式: {is_stream}")
 
-            response_from_target = requests.post(
+            response_from_target = self.http_client.post(
                 target_url,
                 json=request_data,
                 headers=forward_headers,
@@ -483,7 +517,7 @@ class ProxyServer:
             self.log_func(f"启动代理服务器时发生意外错误: {e}")
             return False
 
-    def stop(self):
+    def stop(self):  # noqa: PLR0912
         """停止代理服务器"""
         if not self.running:
             self.log_func("代理服务器未运行")
@@ -523,6 +557,9 @@ class ProxyServer:
         # 清理资源
         self.server = None
         self.server_thread = None
+        if self.http_client:
+            with contextlib.suppress(Exception):
+                self.http_client.close()
         if clean_stop or not stop_requested:
             self.log_func("代理服务器已完全停止")
         else:

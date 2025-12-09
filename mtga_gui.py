@@ -823,6 +823,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
             return None
         config = current_config.copy()
         config["debug_mode"] = debug_mode_var.get()
+        config["disable_ssl_strict_mode"] = disable_ssl_strict_var.get()
         config["stream_mode"] = stream_mode_combo.get() if stream_mode_var.get() else None
         return config
 
@@ -1402,10 +1403,21 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
     )
     global_save_btn.pack(pady=5)
 
-    # 调试模式复选框
+    # 调试与 SSL 模式选项
+    debug_ssl_frame = ttk.Frame(left_content)
+    debug_ssl_frame.pack(fill=tk.X, padx=5, pady=2)
     debug_mode_var = tk.BooleanVar(value=False)
-    debug_mode_check = ttk.Checkbutton(left_content, text="开启调试模式", variable=debug_mode_var)
-    debug_mode_check.pack(fill=tk.X, padx=5, pady=2)
+    debug_mode_check = ttk.Checkbutton(
+        debug_ssl_frame, text="开启调试模式", variable=debug_mode_var
+    )
+    debug_mode_check.pack(side=tk.LEFT)
+    disable_ssl_strict_var = tk.BooleanVar(value=False)
+    disable_ssl_strict_check = ttk.Checkbutton(
+        debug_ssl_frame,
+        text="关闭SSL严格模式",
+        variable=disable_ssl_strict_var,
+    )
+    disable_ssl_strict_check.pack(side=tk.LEFT, padx=(20, 0))
 
     # 强制流模式选项
     stream_mode_frame = ttk.Frame(left_content)
