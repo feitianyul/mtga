@@ -17,7 +17,7 @@ from flask import Flask, Response, jsonify, request
 from requests.adapters import HTTPAdapter
 from werkzeug.serving import BaseWSGIServer, WSGIRequestHandler
 
-from .resource_manager import ResourceManager
+from .resource_manager import ResourceManager, is_packaged
 from .thread_manager import ThreadManager
 
 
@@ -132,6 +132,19 @@ class ProxyServer:
             except Exception as exc:  # noqa: BLE001
                 self.log_func(f"配置非严格 SSL 上下文失败，继续使用默认设置: {exc}")
         return session
+
+    def _prepare_sse_log_path(self) -> str:
+        """为 SSE 原始数据生成日志文件路径。"""
+        base_dir = (
+            self.resource_manager.user_data_dir
+            if is_packaged()
+            else self.resource_manager.program_resource_dir
+        )
+        log_dir = os.path.join(base_dir, "logs")
+        os.makedirs(log_dir, exist_ok=True)
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        filename = f"sse_{timestamp}_{int(time.time() * 1000)}.log"
+        return os.path.join(log_dir, filename)
 
     def _get_mapped_model_id(self):
         """获取映射的模型ID，用于 /v1/models 接口返回"""
@@ -318,8 +331,38 @@ class ProxyServer:
             if is_stream:
                 self.log_func("返回流式响应")
 
+                log_file = None
+                log_file_stack = None
+                log_path = None
+                if self.debug_mode:
+                    try:
+                        log_path = self._prepare_sse_log_path()
+                        log_file_stack = contextlib.ExitStack()
+                        log_file = log_file_stack.enter_context(open(log_path, "wb"))  # noqa: SIM115
+                        self.log_func(f"SSE 原始数据将记录到: {log_path}")
+                    except Exception as log_exc:  # noqa: BLE001
+                        self.log_func(f"SSE 日志文件创建失败: {log_exc}")
+
                 def generate_stream():
-                    yield from response_from_target.iter_content(chunk_size=None)
+                    nonlocal log_file, log_file_stack
+                    try:
+                        for chunk in response_from_target.iter_content(chunk_size=None):
+                            if log_file:
+                                try:
+                                    log_file.write(chunk)
+                                    log_file.flush()
+                                except Exception as write_exc:  # noqa: BLE001
+                                    self.log_func(f"SSE 日志写入失败，停止记录: {write_exc}")
+                                    with contextlib.suppress(Exception):
+                                        log_file.close()
+                                    log_file = None
+                            yield chunk
+                    finally:
+                        if log_file_stack:
+                            with contextlib.suppress(Exception):
+                                log_file_stack.close()
+                        if log_path:
+                            self.log_func(f"SSE 记录完成: {log_path}")
 
                 return Response(
                     generate_stream(),
