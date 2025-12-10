@@ -11,6 +11,7 @@ import ssl
 import threading
 import time
 import uuid
+from collections.abc import Generator
 
 import requests
 import yaml
@@ -163,6 +164,84 @@ class ProxyServer:
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         filename = f"sse_{timestamp}_{int(time.time() * 1000)}.log"
         return os.path.join(log_dir, filename)
+
+    def _extract_sse_events(
+        self, response, *, log_file=None, log
+    ) -> Generator[tuple[int, bytes]]:
+        """从上游响应按 SSE 事件边界提取原始 data 段（含 data: 前缀，去掉结尾空行）。"""
+        buffer = b""
+        chunk_index = 0
+        for chunk in response.iter_content(chunk_size=None):
+            chunk_index += 1
+            if log_file:
+                try:
+                    log_file.write(chunk)
+                    log_file.flush()
+                except Exception as write_exc:  # noqa: BLE001
+                    log(f"SSE 日志写入失败，停止记录: {write_exc}")
+                    with contextlib.suppress(Exception):
+                        log_file.close()
+                    log_file = None
+            buffer += chunk
+            while True:
+                sep = buffer.find(b"\n\n")
+                if sep == -1:
+                    break
+                event = buffer[:sep]
+                buffer = buffer[sep + 2 :]
+                yield chunk_index, event
+        if buffer.strip():
+            log("警告: 上游 SSE 结束时存在未完整分隔的残留数据")
+            yield chunk_index, buffer
+
+    def _normalize_openai_event(
+        self, data_str: str, event_index: int, *, model_name: str, log
+    ) -> tuple[bytes, str | None]:
+        """将上游 data 字符串规范化为 OpenAI SSE chunk。"""
+        try:
+            payload = json.loads(data_str)
+        except Exception as exc:  # noqa: BLE001
+            log(f"chunk#{event_index} JSON 解析失败，原样透传: {exc}")
+            return f"data: {data_str}\n\n".encode(), None
+
+        choices = payload.get("choices") or []
+        choice0 = choices[0] if choices else {}
+        raw_delta = choice0.get("delta") or {}
+        message = choice0.get("message") or {}
+
+        delta: dict[str, object] = {}
+        role = raw_delta.get("role") or message.get("role")
+        if role or event_index == 1:
+            delta["role"] = role or "assistant"
+
+        content = raw_delta.get("content") or message.get("content")
+        if content:
+            delta["content"] = content
+
+        for key in ("tool_calls", "function_calls", "reasoning_content"):
+            value = raw_delta.get(key)
+            if value not in (None, []):
+                delta[key] = value
+
+        finish_reason = choice0.get("finish_reason")
+        normalized_finish = finish_reason if finish_reason not in (None, "") else None
+
+        chunk_obj = {
+            "id": payload.get("id") or self._new_request_id(),
+            "object": "chat.completion.chunk",
+            "created": int(payload.get("created") or time.time()),
+            "model": payload.get("model") or model_name,
+            "choices": [
+                {
+                    "index": choice0.get("index", 0),
+                    "delta": delta,
+                    "logprobs": None,
+                    "finish_reason": normalized_finish,
+                }
+            ],
+        }
+        chunk_json = json.dumps(chunk_obj, ensure_ascii=False)
+        return f"data: {chunk_json}\n\n".encode(), normalized_finish
 
     def _get_mapped_model_id(self):
         """获取映射的模型ID，用于 /v1/models 接口返回"""
@@ -352,6 +431,7 @@ class ProxyServer:
             response_from_target.raise_for_status()
             if self.debug_mode:
                 log(f"上游响应状态码: {response_from_target.status_code}")
+                log(f"上游 Content-Type: {response_from_target.headers.get('content-type')}")
 
             if is_stream:
                 log("返回流式响应")
@@ -368,34 +448,79 @@ class ProxyServer:
                     except Exception as log_exc:  # noqa: BLE001
                         log(f"SSE 日志文件创建失败: {log_exc}")
 
-                def generate_stream():
+                def generate_stream():  # noqa: PLR0915, PLR0912
                     nonlocal log_file, log_file_stack
-                    chunk_index = 0
+                    event_index = 0
+                    done_sent = False
+                    finish_reason_seen = None
                     try:
-                        for chunk in response_from_target.iter_content(chunk_size=None):
-                            chunk_index += 1
-                            if log_file:
-                                try:
-                                    log_file.write(chunk)
-                                    log_file.flush()
-                                except Exception as write_exc:  # noqa: BLE001
-                                    log(f"SSE 日志写入失败，停止记录: {write_exc}")
-                                    if log_file_stack:
-                                        with contextlib.suppress(Exception):
-                                            log_file_stack.close()
-                                    log_file = None
-                                    log_file_stack = None
+                        for upstream_chunk_index, raw_event in self._extract_sse_events(
+                            response_from_target, log_file=log_file, log=log
+                        ):
+                            event_index += 1
+                            event_text = raw_event.decode("utf-8", errors="replace")
+                            data_lines = [
+                                line[len("data:") :].lstrip()
+                                for line in event_text.splitlines()
+                                if line.startswith("data:")
+                            ]
+                            if not data_lines:
+                                log(f"evt#{event_index} 跳过无 data 行的事件: {event_text!r}")
+                                continue
+                            data_str = "\n".join(data_lines)
+
                             if self.debug_mode:
-                                display_chunk = chunk.decode("utf-8", errors="replace")
-                                log(f"UP<< chunk#{chunk_index}: {display_chunk.strip()}")
+                                log(
+                                    f"UP<< evt#{event_index} src_chunk#{upstream_chunk_index} "
+                                    f"bytes={len(raw_event)} | {data_str.strip()}"
+                                )
+
+                            if data_str.strip() == "[DONE]":
+                                done_sent = True
+                                done_bytes = b"data: [DONE]\n\n"
+                                try:
+                                    yield done_bytes
+                                except GeneratorExit:
+                                    log(
+                                        f"DOWN 连接提前中断，已读取上游 evt#{event_index} (DONE)"
+                                    )
+                                    raise
+                                except Exception as downstream_exc:  # noqa: BLE001
+                                    log(f"DOWN 写入异常 (DONE)，停止向下游发送: {downstream_exc}")
+                                    break
+                                log("已转发 [DONE]")
+                                break
+
+                            normalized_bytes, finish_reason = self._normalize_openai_event(
+                                data_str,
+                                event_index,
+                                model_name=self.target_model_id,
+                                log=log,
+                            )
+                            if finish_reason:
+                                finish_reason_seen = finish_reason
                             try:
-                                yield chunk
+                                yield normalized_bytes
                             except GeneratorExit:
-                                log(f"DOWN 连接提前中断，已读取上游 chunk#{chunk_index}")
+                                log(
+                                    f"DOWN 连接提前中断，已读取上游 evt#{event_index} "
+                                    f"finish={finish_reason_seen}"
+                                )
                                 raise
                             except Exception as downstream_exc:  # noqa: BLE001
                                 log(f"DOWN 写入异常，停止向下游发送: {downstream_exc}")
                                 break
+                        if not done_sent:
+                            tail_bytes = b"data: [DONE]\n\n"
+                            with contextlib.suppress(Exception):
+                                yield tail_bytes
+                            if self.debug_mode:
+                                extra = (
+                                    f"，finish_reason={finish_reason_seen}"
+                                    if finish_reason_seen
+                                    else ""
+                                )
+                                log(f"未收到上游 [DONE]，已补发终止事件{extra}")
                     finally:
                         if log_file_stack:
                             with contextlib.suppress(Exception):
@@ -405,13 +530,17 @@ class ProxyServer:
                         with contextlib.suppress(Exception):
                             response_from_target.close()
                         if self.debug_mode:
-                            log(f"UP 流结束，累计 {chunk_index} 个 chunk")
+                            log(f"UP 流结束，累计 {event_index} 个事件")
+
+                downstream_content_type = response_from_target.headers.get(
+                    "content-type", "text/event-stream"
+                )
+                if self.debug_mode:
+                    log(f"下游响应 Content-Type: {downstream_content_type}")
 
                 return Response(
                     generate_stream(),
-                    content_type=response_from_target.headers.get(
-                        "content-type", "text/event-stream"
-                    ),
+                    content_type=downstream_content_type,
                 )
             else:
                 # 获取完整的非流式响应
