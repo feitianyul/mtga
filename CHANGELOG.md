@@ -1,4 +1,13 @@
-## v1.4.0 (Latest)
+## v1.5.0 (Latest)
+## :sparkles: 新功能
+- feat(proxy): 添加关闭SSL严格模式的选项 (8bf706b75f2b3909003d3d18b6b58a717e4a4536)
+- feat(proxy_server): 添加SSE流式响应日志记录功能 (154a694f0e06fd3ca866ae878f688e981e90b10c)
+- feat(proxy_server): 添加请求ID和详细日志记录功能 (286fee26e675c2eb56c4a0be7026b11bef8f53cb)
+- feat(proxy_server): 实现 SSE 事件流处理与 OpenAI 格式规范化 (78d44e0569f563dd46ceb74d8a9316c1eb3054d8)
+## :bug: 修复
+- fix(proxy_server): 修复服务器关闭时可能的属性错误并添加端口占用检查 (cc3c116dd11c73e1bc82ce1261361f9dbbac9466)
+
+## v1.4.0
 ### :sparkles: 新功能
 - feat(proxy): 启动代理时自动修改hosts (187ddfc513f9666a646620dde666203b833314f7)
 - feat(macos): 简化macOS证书安装流程并自动设置信任 (b5cf97e0e81685dfbfbcdfc222f9cf5920660c4e)
