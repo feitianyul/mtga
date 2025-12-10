@@ -10,6 +10,7 @@ import os
 import ssl
 import threading
 import time
+import uuid
 
 import requests
 import yaml
@@ -133,6 +134,23 @@ class ProxyServer:
                 self.log_func(f"配置非严格 SSL 上下文失败，继续使用默认设置: {exc}")
         return session
 
+    @staticmethod
+    def _new_request_id() -> str:
+        """生成短请求ID，便于串联日志。"""
+        return uuid.uuid4().hex[:6]
+
+    @staticmethod
+    def _timestamp_ms() -> str:
+        """返回当前时间（HH:MM:SS.mmm）。"""
+        now = time.time()
+        base = time.strftime("%H:%M:%S", time.localtime(now))
+        ms = int((now % 1) * 1000)
+        return f"{base}.{ms:03d}"
+
+    def _log_request(self, request_id: str, message: str):
+        """带请求ID的统一日志输出。"""
+        self.log_func(f"{self._timestamp_ms()} [{request_id}] {message}")
+
     def _prepare_sse_log_path(self) -> str:
         """为 SSE 原始数据生成日志文件路径。"""
         base_dir = (
@@ -229,7 +247,12 @@ class ProxyServer:
 
     def _chat_completions(self):  # noqa: PLR0911, PLR0912, PLR0915
         """处理聊天补全请求"""
-        self.log_func("收到聊天补全请求 /v1/chat/completions")
+        request_id = self._new_request_id()
+
+        def log(message: str):
+            self._log_request(request_id, message)
+
+        log("收到聊天补全请求 /v1/chat/completions")
 
         if self.debug_mode:
             # 调试模式下记录请求头和请求体
@@ -246,16 +269,16 @@ class ProxyServer:
                 )
             except Exception as body_exc:
                 error_msg = f"读取请求体数据时出错: {body_exc}\\n"
-                self.log_func(error_msg)
+                log(error_msg)
                 log_message += error_msg
-            self.log_func(log_message)
+            log(log_message)
 
         # 尝试获取 JSON 数据
         request_data = request.get_json(silent=True)
 
         if request_data is None:
-            self.log_func("解析 JSON 失败或请求不是 JSON 格式")
-            self.log_func(f"Content-Type: {request.headers.get('Content-Type')}")
+            log("解析 JSON 失败或请求不是 JSON 格式")
+            log(f"Content-Type: {request.headers.get('Content-Type')}")
             return jsonify(
                 {
                     "error": "Invalid JSON or Content-Type",
@@ -268,15 +291,15 @@ class ProxyServer:
 
         # 记录客户端请求的流模式设置
         client_requested_stream = request_data.get("stream", False)
-        self.log_func(f"客户端请求的流模式: {client_requested_stream}")
+        log(f"客户端请求的流模式: {client_requested_stream}")
 
         # 替换请求体中的模型名
         if "model" in request_data:
             original_model = request_data["model"]
-            self.log_func(f"替换模型名: {original_model} -> {self.target_model_id}")
+            log(f"替换模型名: {original_model} -> {self.target_model_id}")
             request_data["model"] = self.target_model_id
         else:
-            self.log_func(f"请求中没有 model 字段，添加 model: {self.target_model_id}")
+            log(f"请求中没有 model 字段，添加 model: {self.target_model_id}")
             request_data["model"] = self.target_model_id
 
         # 强制修改流模式
@@ -284,17 +307,17 @@ class ProxyServer:
             stream_value = self.stream_mode == "true"
             if "stream" in request_data:
                 original_stream_value = request_data["stream"]
-                self.log_func(f"强制修改流模式: {original_stream_value} -> {stream_value}")
+                log(f"强制修改流模式: {original_stream_value} -> {stream_value}")
                 request_data["stream"] = stream_value
             else:
-                self.log_func(f"请求中没有 stream 参数，设置为 {stream_value}")
+                log(f"请求中没有 stream 参数，设置为 {stream_value}")
                 request_data["stream"] = stream_value
 
         # 准备转发的请求头
         # 验证MTGA鉴权（用于访问代理服务）
         auth_header = request.headers.get("Authorization")
         if not self._verify_auth(auth_header):
-            self.log_func("聊天补全请求MTGA鉴权失败")
+            log("聊天补全请求MTGA鉴权失败")
             return jsonify(
                 {"error": {"message": "Invalid authentication", "type": "authentication_error"}}
             ), 401
@@ -305,19 +328,19 @@ class ProxyServer:
         if target_api_key:
             # 使用配置组中的API key
             forward_headers["Authorization"] = f"Bearer {target_api_key}"
-            self.log_func("使用配置组中的API key")
+            log("使用配置组中的API key")
         elif auth_header:
             # 如果配置组没有API key，则透传原始的Authorization header
             forward_headers["Authorization"] = auth_header
-            self.log_func("透传原始Authorization header")
+            log("透传原始Authorization header")
 
         try:
             target_url = f"{self.target_api_base_url.rstrip('/')}/v1/chat/completions"
-            self.log_func(f"转发请求到: {target_url}")
+            log(f"转发请求到: {target_url}")
 
             # 从解析后的 request_data 中获取 stream 参数
             is_stream = request_data.get("stream", False)
-            self.log_func(f"流模式: {is_stream}")
+            log(f"流模式: {is_stream}")
 
             response_from_target = self.http_client.post(
                 target_url,
@@ -327,9 +350,11 @@ class ProxyServer:
                 timeout=300,
             )
             response_from_target.raise_for_status()
+            if self.debug_mode:
+                log(f"上游响应状态码: {response_from_target.status_code}")
 
             if is_stream:
-                self.log_func("返回流式响应")
+                log("返回流式响应")
 
                 log_file = None
                 log_file_stack = None
@@ -339,30 +364,48 @@ class ProxyServer:
                         log_path = self._prepare_sse_log_path()
                         log_file_stack = contextlib.ExitStack()
                         log_file = log_file_stack.enter_context(open(log_path, "wb"))  # noqa: SIM115
-                        self.log_func(f"SSE 原始数据将记录到: {log_path}")
+                        log(f"SSE 原始数据将记录到: {log_path}")
                     except Exception as log_exc:  # noqa: BLE001
-                        self.log_func(f"SSE 日志文件创建失败: {log_exc}")
+                        log(f"SSE 日志文件创建失败: {log_exc}")
 
                 def generate_stream():
                     nonlocal log_file, log_file_stack
+                    chunk_index = 0
                     try:
                         for chunk in response_from_target.iter_content(chunk_size=None):
+                            chunk_index += 1
                             if log_file:
                                 try:
                                     log_file.write(chunk)
                                     log_file.flush()
                                 except Exception as write_exc:  # noqa: BLE001
-                                    self.log_func(f"SSE 日志写入失败，停止记录: {write_exc}")
-                                    with contextlib.suppress(Exception):
-                                        log_file.close()
+                                    log(f"SSE 日志写入失败，停止记录: {write_exc}")
+                                    if log_file_stack:
+                                        with contextlib.suppress(Exception):
+                                            log_file_stack.close()
                                     log_file = None
-                            yield chunk
+                                    log_file_stack = None
+                            if self.debug_mode:
+                                display_chunk = chunk.decode("utf-8", errors="replace")
+                                log(f"UP<< chunk#{chunk_index}: {display_chunk.strip()}")
+                            try:
+                                yield chunk
+                            except GeneratorExit:
+                                log(f"DOWN 连接提前中断，已读取上游 chunk#{chunk_index}")
+                                raise
+                            except Exception as downstream_exc:  # noqa: BLE001
+                                log(f"DOWN 写入异常，停止向下游发送: {downstream_exc}")
+                                break
                     finally:
                         if log_file_stack:
                             with contextlib.suppress(Exception):
                                 log_file_stack.close()
                         if log_path:
-                            self.log_func(f"SSE 记录完成: {log_path}")
+                            log(f"SSE 记录完成: {log_path}")
+                        with contextlib.suppress(Exception):
+                            response_from_target.close()
+                        if self.debug_mode:
+                            log(f"UP 流结束，累计 {chunk_index} 个 chunk")
 
                 return Response(
                     generate_stream(),
@@ -376,13 +419,13 @@ class ProxyServer:
 
                 # 如果客户端请求了流式响应但我们强制使用了非流式请求，则将完整响应转换为流式格式
                 if client_requested_stream and self.stream_mode == "false":
-                    self.log_func("将非流式响应转换为流式格式返回给客户端")
+                    log("将非流式响应转换为流式格式返回给客户端")
 
                     def simulate_stream():
                         # 提取响应中的内容
                         choices = response_json.get("choices", [])
                         if not choices:
-                            self.log_func("响应中没有找到 choices 字段")
+                            log("响应中没有找到 choices 字段")
                             yield f"data: {json.dumps({'error': 'No choices in response'})}\\n\\n"
                             return
 
@@ -392,7 +435,7 @@ class ProxyServer:
                         content = message.get("content", "")
 
                         if not content:
-                            self.log_func("响应中没有找到内容")
+                            log("响应中没有找到内容")
                             yield f"data: {json.dumps({'error': 'No content in response'})}\\n\\n"
                             return
 
@@ -435,27 +478,27 @@ class ProxyServer:
                     # 正常返回非流式响应
                     if self.debug_mode:
                         response_str = json.dumps(response_json, indent=2, ensure_ascii=False)
-                        self.log_func(
+                        log(
                             f"--- 完整响应体 (调试模式) ---\\n{response_str}\\n"
                             "--------------------------------------"
                         )
                     else:
-                        self.log_func("返回非流式 JSON 响应")
+                        log("返回非流式 JSON 响应")
                     return jsonify(response_json), response_from_target.status_code
 
         except requests.exceptions.HTTPError as e:
             error_msg = f"目标 API HTTP 错误: {e.response.status_code} - {e.response.text}"
-            self.log_func(error_msg)
+            log(error_msg)
             return jsonify(
                 {"error": f"Target API error: {e.response.status_code}", "details": e.response.text}
             ), e.response.status_code
         except requests.exceptions.RequestException as e:
             error_msg = f"连接目标 API 时出错: {e}"
-            self.log_func(error_msg)
+            log(error_msg)
             return jsonify({"error": f"Error contacting target API: {str(e)}"}), 503
         except Exception as e:
             error_msg = f"发生意外错误: {e}"
-            self.log_func(error_msg)
+            log(error_msg)
             return jsonify({"error": "An internal server error occurred"}), 500
 
     def start(self, host="0.0.0.0", port=443):  # noqa: PLR0911, PLR0912, PLR0915
