@@ -7,12 +7,113 @@ import os
 import shutil
 import subprocess
 import sys
+from dataclasses import dataclass
 
+from .file_operability import (
+    FileOperabilityReport,
+    check_file_operability,
+    ensure_windows_file_writable,
+    is_windows_admin,
+)
 from .macos_privileged_helper import get_mac_privileged_session
 from .resource_manager import ResourceManager
 
 HOSTS_ENTRY_MARKER = "# Added by MTGA GUI"
 DEFAULT_HOSTS_IPS = ("127.0.0.1", "::1")
+
+ALLOW_UNSAFE_HOSTS_FLAG = "--allow-unsafe-hosts"
+
+@dataclass
+class _HostsModifyBlockState:
+    blocked: bool = False
+    reason: str | None = None
+    report: FileOperabilityReport | None = None
+
+
+_HOSTS_MODIFY_BLOCK_STATE = _HostsModifyBlockState()
+
+
+def configure_hosts_modify_block(
+    blocked: bool,
+    *,
+    reason: str | None = None,
+    report: FileOperabilityReport | None = None,
+) -> None:
+    """配置 hosts 自动修改的阻断开关（主要由 GUI 启动预检设置）。"""
+    state = _HOSTS_MODIFY_BLOCK_STATE
+    state.blocked = bool(blocked)
+    state.reason = reason
+    state.report = report
+
+
+def is_hosts_modify_blocked() -> bool:
+    return _HOSTS_MODIFY_BLOCK_STATE.blocked
+
+
+def get_hosts_modify_block_report() -> FileOperabilityReport | None:
+    return _HOSTS_MODIFY_BLOCK_STATE.report
+
+
+def _should_block_hosts_action(action: str) -> bool:
+    return action in {"remove", "restore"}
+
+
+def _guard_hosts_modify(action: str, log_func=print) -> bool:
+    """如需阻断则输出提示并返回 False；允许则返回 True。"""
+    state = _HOSTS_MODIFY_BLOCK_STATE
+    if not state.blocked:
+        return True
+    if not _should_block_hosts_action(action):
+        return True
+    report = state.report
+    reason = state.reason or (report.status.value if report else "unknown")
+    allow_flag = ALLOW_UNSAFE_HOSTS_FLAG
+    log_func(f"⚠️ 当前环境 hosts 写入受限（reason={reason}）。")
+    log_func("⚠️ 自动删除/还原需要原子性覆写，本环境下已禁用，请手动管理 hosts。")
+    log_func("⚠️ 你可以点击「打开hosts文件」手动修改后重试。")
+    log_func(f"⚠️ 如确需继续尝试自动修改，可使用启动参数 {allow_flag} 覆盖此检查（风险自负）。")
+    return False
+
+
+def _append_hosts_block_fallback(
+    hosts_file: str, hosts_block: str, encoding: str, *, log_func=print
+) -> bool:
+    """回退为追加写入（不做去重/删除/原子性写回）。"""
+    if not hosts_block:
+        return False
+    try:
+        try:
+            with open(hosts_file, encoding=encoding, errors="replace") as f:
+                content = f.read()
+        except OSError:
+            content = ""
+
+        if (
+            hosts_block in content
+            or f"\n{hosts_block}" in content
+            or f"\n\n{hosts_block}" in content
+        ):
+            log_func("hosts 文件已包含目标记录（检测为相同文本块），跳过追加")
+            return True
+
+        if not content or content.endswith("\n\n"):
+            prefix = ""
+        elif content.endswith("\n"):
+            prefix = "\n"
+        else:
+            prefix = "\n\n"
+
+        with open(hosts_file, "a", encoding=encoding) as f:
+            f.write(prefix)
+            f.write(hosts_block)
+        log_func("⚠️ 已回退为追加写入：无法保证原子性增删/去重，请手动管理 hosts 记录。")
+        return True
+    except PermissionError as e:
+        log_func(f"❌ 追加写入 hosts 文件失败: {e}")
+        return False
+    except OSError as e:
+        log_func(f"❌ 追加写入 hosts 文件失败: {e}")
+        return False
 
 
 def _normalize_ip_list(ip):
@@ -109,6 +210,11 @@ def _remove_hosts_block_from_content(content, domain, ip_list):
     return content, removed_entries
 
 
+def check_hosts_file_operability(hosts_file: str, *, log_func=print) -> FileOperabilityReport:
+    """对 hosts 文件做可写性预检（仅检查，不改变全局阻断开关）。"""
+    return check_file_operability(hosts_file, log_func=log_func)
+
+
 def get_hosts_file_path():
     """获取 hosts 文件路径"""
     if os.name == "nt":  # Windows
@@ -164,7 +270,7 @@ def backup_hosts_file(log_func=print):
         return False
 
 
-def restore_hosts_file(log_func=print):
+def restore_hosts_file(log_func=print):  # noqa: PLR0911
     """
     还原 hosts 文件
 
@@ -178,6 +284,8 @@ def restore_hosts_file(log_func=print):
     backup_file = get_backup_file_path()
 
     log_func("开始还原 hosts 文件...")
+    if not _guard_hosts_modify("restore", log_func=log_func):
+        return False
 
     if not os.path.exists(backup_file):
         log_func(f"错误: 备份文件不存在: {backup_file}")
@@ -225,15 +333,30 @@ def write_hosts_file_with_permission(hosts_file, content, encoding, log_func=pri
     else:
         # Windows 和其他系统：直接写入
         try:
+            if os.name == "nt":
+                check_file_operability(hosts_file, log_func=log_func)
+                ensure_windows_file_writable(hosts_file, log_func=log_func)
             with open(hosts_file, "w", encoding=encoding) as f:
                 f.write(content)
             return True
-        except PermissionError:
-            log_func("❌ 权限不足，请以管理员身份运行")
+        except PermissionError as e:
+            if os.name == "nt":
+                is_admin = is_windows_admin()
+                winerror = getattr(e, "winerror", None)
+                log_func(
+                    f"❌ 权限不足，请以管理员身份运行 "
+                    f"(is_admin={is_admin}, winerror={winerror})"
+                )
+                log_func("⚠️ 如果已是管理员，可能是安全软件或只读属性锁定了 hosts，请解除后重试")
+            else:
+                log_func("❌ 权限不足，请以管理员身份运行或使用 sudo")
+            return False
+        except OSError as e:
+            log_func(f"❌ 写入 hosts 文件失败: {e}")
             return False
 
 
-def add_hosts_entry(domain, ip=DEFAULT_HOSTS_IPS, log_func=print):
+def add_hosts_entry(domain, ip=DEFAULT_HOSTS_IPS, log_func=print):  # noqa: PLR0911
     """
     添加 hosts 条目
 
@@ -274,11 +397,6 @@ def add_hosts_entry(domain, ip=DEFAULT_HOSTS_IPS, log_func=print):
         with open(hosts_file, encoding=encoding, errors="replace") as f:
             content = f.read()
 
-        # 移除旧记录，保证写入是原子块
-        content, removed_entries = _remove_hosts_block_from_content(content, domain, ip_list)
-        if removed_entries:
-            log_func(f"检测到重复记录，已移除 {removed_entries} 个 {domain} 条目")
-
         hosts_block = _build_hosts_block(domain, ip_list)
         if not hosts_block:
             log_func("未能构造 hosts 写入数据，取消操作")
@@ -291,6 +409,23 @@ def add_hosts_entry(domain, ip=DEFAULT_HOSTS_IPS, log_func=print):
         ):
             log_func("hosts 文件已包含目标记录，无需修改")
             return True
+
+        state = _HOSTS_MODIFY_BLOCK_STATE
+        if state.blocked:
+            reason = state.reason or (state.report.status.value if state.report else "unknown")
+            log_func(f"⚠️ 当前环境 hosts 写入受限（reason={reason}），将回退为追加写入模式。")
+            log_func("⚠️ 追加写入无法进行原子性删除/去重；如需清理请手动编辑 hosts。")
+            return _append_hosts_block_fallback(
+                hosts_file,
+                hosts_block,
+                encoding,
+                log_func=log_func,
+            )
+
+        # 移除旧记录，保证写入是原子块
+        content, removed_entries = _remove_hosts_block_from_content(content, domain, ip_list)
+        if removed_entries:
+            log_func(f"检测到重复记录，已移除 {removed_entries} 个 {domain} 条目")
 
         # 添加统一的文本块并保留一个空行
         content = _append_hosts_block(content, hosts_block)
@@ -318,6 +453,8 @@ def remove_hosts_entry(domain, log_func=print, *, ip=None):
     返回:
         成功返回 True，失败返回 False
     """
+    if not _guard_hosts_modify("remove", log_func=log_func):
+        return False
     ip_list = _normalize_ip_list(ip)
 
     hosts_file = get_hosts_file_path()

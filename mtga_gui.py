@@ -149,7 +149,16 @@ try:
     from modules.cert_cleaner import clear_ca_cert
     from modules.cert_checker import has_existing_ca_cert
     from modules.cert_installer import install_ca_cert
-    from modules.hosts_manager import modify_hosts_file, open_hosts_file
+    from modules.file_operability import check_file_operability
+    from modules.hosts_manager import (
+        ALLOW_UNSAFE_HOSTS_FLAG,
+        configure_hosts_modify_block,
+        get_hosts_file_path,
+        get_hosts_modify_block_report,
+        is_hosts_modify_blocked,
+        modify_hosts_file,
+        open_hosts_file,
+    )
     from modules.proxy_server import ProxyServer
     from modules.resource_manager import (
         ResourceManager,
@@ -212,6 +221,43 @@ def setup_logging():
 
 
 ERROR_LOG_PATH = setup_logging()
+
+HOSTS_PREFLIGHT_REPORT = None
+
+
+def _startup_hosts_preflight():
+    """程序启动时预检 hosts 文件，必要时启用受限 hosts 模式。"""
+    logger = logging.getLogger("mtga_gui")
+
+    def warn(message: str):
+        logger.warning(message)
+
+    hosts_file = get_hosts_file_path()
+    report = check_file_operability(hosts_file, log_func=warn)
+
+    if report.ok:
+        return report
+
+    if ALLOW_UNSAFE_HOSTS_FLAG in sys.argv:
+        warn(
+            f"⚠️ hosts 预检未通过（status={report.status.value}），但已使用启动参数 "
+            f"{ALLOW_UNSAFE_HOSTS_FLAG} 覆盖；后续自动修改可能失败。"
+        )
+        return report
+
+    configure_hosts_modify_block(
+        True,
+        reason=report.status.value,
+        report=report,
+    )
+    warn(
+        f"⚠️ hosts 预检未通过（status={report.status.value}），已启用受限 hosts 模式："
+        "添加将回退为追加写入（无法保证原子性增删/去重），自动移除/还原将被禁用。"
+    )
+    return report
+
+
+HOSTS_PREFLIGHT_REPORT = _startup_hosts_preflight()
 
 
 def log_error(message: str, exc_info=None):
@@ -540,7 +586,7 @@ def test_chat_completion(config_group, log_func=print):
     thread_manager.run("test_chat_completion", run_test)
 
 
-def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
+def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
     """创建主窗口"""
     # 在 macOS 上，确保工作目录不是根目录
     if sys.platform == "darwin" and os.getcwd() == "/":
@@ -908,6 +954,23 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0915
             log("🔧 运行在开发环境中")
     else:
         log(f"❌ {env_msg}")
+
+    if is_hosts_modify_blocked():
+        report = get_hosts_modify_block_report()
+        status = report.status.value if report else "unknown"
+        log(
+            f"⚠️ 检测到 hosts 文件写入受限（status={status}），已启用受限 hosts 模式："
+            "添加将回退为追加写入（无法保证原子性增删/去重），自动移除/还原将被禁用。"
+        )
+        log(
+            f"⚠️ 你可以点击「打开hosts文件」手动修改；或使用启动参数 "
+            f"{ALLOW_UNSAFE_HOSTS_FLAG} 覆盖此检查以强制尝试原子写入（风险自负）。"
+        )
+    elif HOSTS_PREFLIGHT_REPORT is not None and not HOSTS_PREFLIGHT_REPORT.ok:
+        log(
+            f"⚠️ hosts 预检未通过（status={HOSTS_PREFLIGHT_REPORT.status.value}），"
+            f"但已使用启动参数 {ALLOW_UNSAFE_HOSTS_FLAG} 覆盖；后续自动修改可能失败。"
+        )
 
     # 配置组管理界面
     config_groups = []
