@@ -72,7 +72,7 @@ class ProxyServer:
         初始化代理服务器
 
         参数:
-            config: 配置字典，包含 api_url、model_id、target_model_id、stream_mode
+            config: 配置组字典，包含 api_url、model_id、stream_mode 等
             log_func: 日志输出函数
             thread_manager: 外部注入的线程管理器
         """
@@ -86,21 +86,26 @@ class ProxyServer:
         self.thread_manager = thread_manager
         self.server_task_id = None
 
-        # 从配置中获取参数
+        # 加载全局配置（用于模型映射和鉴权）
+        self.global_config = self._load_global_config()
+
+        # 从配置组中获取参数
         self.target_api_base_url = self.config.get(
             "api_url", "YOUR_REVERSE_ENGINEERED_API_ENDPOINT_BASE_URL"
         )
-        self.custom_model_id = self.config.get("model_id", "CUSTOM_MODEL_ID")
-        # 如果 target_model_id 为空或未设置，使用 custom_model_id
-        target_model_id = self.config.get("target_model_id", "").strip()
+        global_mapped_model_id = (self.global_config.get("mapped_model_id") or "").strip()
+        legacy_group_mapped_model_id = (self.config.get("mapped_model_id") or "").strip()
+        self.custom_model_id = (
+            global_mapped_model_id or legacy_group_mapped_model_id or "CUSTOM_MODEL_ID"
+        )
+
+        # 如果 model_id 为空或未设置，使用 custom_model_id
+        target_model_id = self.config.get("model_id", "").strip()
         self.target_model_id = target_model_id if target_model_id else self.custom_model_id
         self.stream_mode = self.config.get("stream_mode")  # None, 'true', 'false'
         self.debug_mode = self.config.get("debug_mode", False)
         self.disable_ssl_strict_mode = self.config.get("disable_ssl_strict_mode", False)
         self.http_client = self._create_http_client()
-
-        # 加载全局配置（用于模型映射和鉴权）
-        self.global_config = self._load_global_config()
 
         # 验证配置
         if self.target_api_base_url == "YOUR_REVERSE_ENGINEERED_API_ENDPOINT_BASE_URL":
@@ -245,7 +250,7 @@ class ProxyServer:
 
     def _get_mapped_model_id(self):
         """获取映射的模型ID，用于 /v1/models 接口返回"""
-        return self.global_config.get("mapped_model_id", self.custom_model_id)
+        return self.custom_model_id
 
     def _verify_auth(self, auth_header):
         """验证鉴权header"""
