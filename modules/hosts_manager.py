@@ -122,7 +122,7 @@ def _normalize_ip_list(ip):
         iterable = DEFAULT_HOSTS_IPS
     elif isinstance(ip, str):
         iterable = [ip]
-    elif isinstance(ip, (list, tuple, set)):
+    elif isinstance(ip, list | tuple | set):
         iterable = list(ip)
     else:
         iterable = [ip]

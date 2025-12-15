@@ -873,6 +873,23 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
         config["stream_mode"] = stream_mode_combo.get() if stream_mode_var.get() else None
         return config
 
+    def restart_proxy(
+        config,
+        *,
+        success_message="✅ 代理服务器启动成功",
+        hosts_modified=False,
+    ) -> bool:
+        """统一代理重启逻辑：输出 stream_mode 日志、停止旧实例并启动新实例。"""
+        stream_mode_value = config.get("stream_mode")
+        if stream_mode_value is not None:
+            log(f"启用强制流模式: {stream_mode_value}")
+        stop_proxy_instance(reason="restart")
+        return start_proxy_instance(
+            config,
+            success_message=success_message,
+            hosts_modified=hosts_modified,
+        )
+
     def stop_proxy_instance(reason="stop", show_idle_message=False):
         """统一停止代理实例，返回是否存在运行中的服务。"""
         instance = get_proxy_instance()
@@ -1674,11 +1691,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
             config = build_proxy_config()
             if not config:
                 return
-            stream_mode_value = config.get("stream_mode")
-            if stream_mode_value is not None:
-                log(f"启用强制流模式: {stream_mode_value}")
-            stop_proxy_instance(reason="restart")
-            start_proxy_instance(config)
+            restart_proxy(config)
 
         wait_targets = [proxy_stop_task_id] if proxy_stop_task_id else None
         proxy_start_task_id = thread_manager.run(
@@ -2227,11 +2240,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
             config = build_proxy_config()
             if not config:
                 return
-            stream_mode_value = config.get("stream_mode")
-            if stream_mode_value is not None:
-                log(f"启用强制流模式: {stream_mode_value}")
-            stop_proxy_instance(reason="restart")
-            if start_proxy_instance(
+            if restart_proxy(
                 config,
                 success_message="✅ 全部服务启动成功",
                 hosts_modified=hosts_modified,
