@@ -159,6 +159,7 @@ try:
         modify_hosts_file,
         open_hosts_file,
     )
+    from modules.network_environment import check_network_environment
     from modules.proxy_server import ProxyServer
     from modules.resource_manager import (
         ResourceManager,
@@ -223,6 +224,7 @@ def setup_logging():
 ERROR_LOG_PATH = setup_logging()
 
 HOSTS_PREFLIGHT_REPORT = None
+NETWORK_ENV_REPORT = None
 
 
 def _startup_hosts_preflight():
@@ -258,6 +260,19 @@ def _startup_hosts_preflight():
 
 
 HOSTS_PREFLIGHT_REPORT = _startup_hosts_preflight()
+
+
+def _startup_network_environment_preflight():
+    """程序启动时检查网络环境（显式代理），用于提示 hosts 导流可能被绕过。"""
+    logger = logging.getLogger("mtga_gui")
+
+    def warn(message: str):
+        logger.warning(message)
+
+    return check_network_environment(log_func=warn, emit_logs=True)
+
+
+NETWORK_ENV_REPORT = _startup_network_environment_preflight()
 
 
 def log_error(message: str, exc_info=None):
@@ -839,6 +854,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
     proxy_stop_task_id = None
     hosts_task_id = None
     shutdown_task_id = None
+    network_env_precheck_enabled = False
 
     def ensure_global_config_ready():
         """检查全局配置文件中的必填项。"""
@@ -933,6 +949,9 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
 
         hosts_modified=True 表示已在外部完成 hosts 更新，可跳过内置步骤。
         """
+        if network_env_precheck_enabled:
+            check_network_environment(log_func=log, emit_logs=True)
+
         if is_port_in_use(443):
             log("⚠️ 端口 443 已被其他进程占用，代理服务器未启动。请释放该端口后重试。")
             return False
@@ -988,6 +1007,11 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
             f"⚠️ hosts 预检未通过（status={HOSTS_PREFLIGHT_REPORT.status.value}），"
             f"但已使用启动参数 {ALLOW_UNSAFE_HOSTS_FLAG} 覆盖；后续自动修改可能失败。"
         )
+
+    if NETWORK_ENV_REPORT is not None and NETWORK_ENV_REPORT.explicit_proxy_detected:
+        log("⚠️" * 20 + "\n检测到显式代理配置：部分应用可能优先走代理，从而绕过 hosts 导流。")
+        log("建议：1. 关闭显式代理（如clash的系统代理），或改用 TUN/VPN")
+        log("      2. 检查 Trae 的代理设置。\n" + "⚠️" * 20)
 
     # 配置组管理界面
     config_groups = []
@@ -1487,10 +1511,27 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
     debug_ssl_frame = ttk.Frame(left_content)
     debug_ssl_frame.pack(fill=tk.X, padx=5, pady=2)
     debug_mode_var = tk.BooleanVar(value=False)
+
+    def on_debug_mode_toggle():
+        nonlocal network_env_precheck_enabled
+        enabled = bool(debug_mode_var.get())
+        network_env_precheck_enabled = enabled
+
     debug_mode_check = ttk.Checkbutton(
-        debug_ssl_frame, text="开启调试模式", variable=debug_mode_var
+        debug_ssl_frame,
+        text="开启调试模式",
+        variable=debug_mode_var,
+        command=on_debug_mode_toggle,
     )
     debug_mode_check.pack(side=tk.LEFT)
+    create_tooltip(
+        debug_mode_check,
+        "开启后：\n"
+        "1) 代理服务器输出更详细的调试日志，便于排查问题；\n"
+        "2) 启动代理服务器前会额外检查系统/环境变量的显式代理配置\n并提示其可能绕过 hosts 导流。\n"
+        "（默认不做第 2 项检查，仅在调试模式下启用）",
+        wraplength=500,
+    )
     disable_ssl_strict_var = tk.BooleanVar(value=False)
     disable_ssl_strict_check = ttk.Checkbutton(
         debug_ssl_frame,
@@ -1718,6 +1759,30 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
         fill=tk.X, padx=5, pady=5
     )
     ttk.Button(proxy_tab, text="停止代理服务器", command=stop_proxy_task).pack(
+        fill=tk.X, padx=5, pady=5
+    )
+
+    def check_network_environment_task():
+        """检查网络环境任务（系统代理/环境变量代理）。"""
+
+        def task():
+            log("开始检查网络环境...")
+            report = check_network_environment(
+                log_func=log,
+                emit_logs=True,
+            )
+            if report.explicit_proxy_detected:
+                log("⚠️ 检测到显式代理配置，hosts 导流可能被绕过。\n" + "⚠️" * 20)
+                return
+            log("✅ 未检测到系统/环境变量层面的显式代理配置。")
+            log(
+                "ℹ️ 若仍无法连接，请检查 Trae 的代理设置，"
+                "或是否启用了 TUN/VPN/安全软件网络防护。"
+            )
+
+        thread_manager.run("network_env_check", task)
+
+    ttk.Button(proxy_tab, text="检查网络环境", command=check_network_environment_task).pack(
         fill=tk.X, padx=5, pady=5
     )
 
