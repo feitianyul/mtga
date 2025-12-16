@@ -20,7 +20,6 @@ from pathlib import Path
 from tkinter import font as tkfont
 from tkinter import messagebox, scrolledtext, ttk
 from typing import Any, Literal, cast
-from types import ModuleType
 import requests
 import yaml
 
@@ -167,6 +166,7 @@ try:
         get_user_data_dir,
         is_packaged,
     )
+    from modules.tkhtml_compat import create_tkinterweb_html_widget
     from modules.thread_manager import ThreadManager
     from modules import macos_privileged_helper, update_checker
     from modules import resource_manager as resource_manager_module
@@ -2006,7 +2006,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
 
     check_updates_button = None
 
-    def show_release_notes_dialog(version_label, notes, release_url):  # noqa: PLR0915
+    def show_release_notes_dialog(version_label, notes, release_url):
         """显示包含 Markdown 说明的新版本弹窗。"""
         current_dark_mode = detect_macos_dark_mode()
         markdown_text = notes or "该版本暂无更新说明。"
@@ -2033,90 +2033,11 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
                 text="前往发布页",
                 command=lambda: webbrowser.open(release_url),
             ).pack(side=tk.RIGHT, padx=(8, 0))
-
-        def _init_tkhtml_dir():
-            base_dir = Path(resource_manager_module.get_program_resource_dir())
-            pkg_dir = base_dir / "tkinterweb_tkhtml"
-            candidate = pkg_dir / "tkhtml"
-
-            if not candidate.exists():
-                return None
-
-            # DLL 搜索路径
-            os.environ["PATH"] = f"{candidate}{os.pathsep}{os.environ.get('PATH', '')}"
-
-            # 伪造 tkinterweb_tkhtml 模块，强制指向解压目录
-            sys.modules.pop("tkinterweb_tkhtml", None)
-            binaries = sorted([f for f in os.listdir(candidate) if "libTkhtml" in f])
-
-            fake_mod = ModuleType("tkinterweb_tkhtml")
-            fake_mod.__file__ = str(pkg_dir / "__init__.py")
-            fake_mod.__path__ = [str(pkg_dir)]
-            cast(Any, fake_mod).TKHTML_ROOT_DIR = str(candidate)
-            cast(Any, fake_mod).ALL_TKHTML_BINARIES = binaries
-
-            def _get_tkhtml_file(version=None, index=-1, experimental=False):
-                files = sorted(cast(Any, fake_mod).ALL_TKHTML_BINARIES)
-                if not files:
-                    raise OSError("No Tkhtml binaries found in packaged root")
-                chosen = files[index]
-                exp = experimental or ("exp" in chosen)
-                ver = chosen.replace("libTkhtml", "").replace("exp", "").replace(".dll", "")
-                return os.path.join(cast(Any, fake_mod).TKHTML_ROOT_DIR, chosen), ver, exp
-
-            def _load_tkhtml_file(master, file):
-                master.tk.call("load", file)
-
-            def _load_tkhtml(master):
-                path, ver, exp = _get_tkhtml_file()
-                _load_tkhtml_file(master, path)
-                with suppress(Exception):
-                    master.tk.call("package", "provide", "Tkhtml", ver or "0")
-
-            def _get_loaded_tkhtml_version(master):
-                try:
-                    return master.tk.call("package", "present", "Tkhtml")
-                except Exception:
-                    return ""
-
-            cast(Any, fake_mod).get_tkhtml_file = _get_tkhtml_file
-            cast(Any, fake_mod).load_tkhtml_file = _load_tkhtml_file
-            cast(Any, fake_mod).load_tkhtml = _load_tkhtml
-            cast(Any, fake_mod).get_loaded_tkhtml_version = _get_loaded_tkhtml_version
-
-            sys.modules["tkinterweb_tkhtml"] = fake_mod
-
-            return candidate
-
-
-        _TKHTML_DIR = _init_tkhtml_dir()
-        if _TKHTML_DIR:
-            with suppress(Exception):
-                import tkinterweb_tkhtml as tkhtml_mod  # type: ignore  # noqa: PLC0415
-
-                load_fn = getattr(tkhtml_mod, "load_tkhtml", None)
-                if callable(load_fn):
-                    load_fn(dialog)
-
-        try:
-            from tkinterweb import HtmlFrame  # noqa: PLC0415
-            html_frame_cls: Any | None = HtmlFrame
-            notes_widget = HtmlFrame(
-                dialog,
-                horizontal_scrollbar="auto",
-                vertical_scrollbar="auto",
-                relief="solid",
-                borderwidth=1,
-                messages_enabled=False,
-            )
-        except Exception as e:
-            html_frame_cls = None
-            notes_widget = ttk.Label(
-                dialog,
-                anchor="w",
-                font=tkfont.nametofont("TkDefaultFont"),
-            )
-            log(f"tkhtml导入失败，捕获到异常:\n{e}")
+        html_frame_cls, notes_widget = create_tkinterweb_html_widget(
+            dialog,
+            program_resource_dir=resource_manager_module.get_program_resource_dir(),
+            log_fn=log,
+        )
         notes_widget.pack(fill=tk.BOTH, expand=True, padx=12, pady=(0, 10))
 
         if html_frame_cls and isinstance(notes_widget, html_frame_cls):
