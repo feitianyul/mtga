@@ -1461,6 +1461,13 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
     mapped_model_var = tk.StringVar()
     mapped_model_entry = ttk.Entry(mapped_model_frame, textvariable=mapped_model_var, width=25)
     mapped_model_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 0))
+    create_tooltip(
+        mapped_model_entry,
+        "必填：映射模型ID\n"
+        "对应 Trae 端填写的模型名，自定义，\n与实际模型ID是互相独立的概念。\n"
+        "示例：gpt-5",
+        wraplength=360,
+    )
 
     # MTGA鉴权key配置
     mtga_auth_frame = ttk.Frame(global_config_frame)
@@ -1469,6 +1476,14 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
     mtga_auth_var = tk.StringVar()
     mtga_auth_entry = ttk.Entry(mtga_auth_frame, textvariable=mtga_auth_var, width=25, show="*")
     mtga_auth_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 0))
+    create_tooltip(
+        mtga_auth_entry,
+        "必填：MTGA鉴权Key\n"
+        "对应 Trae 端填写的 API 密钥，自定义，\n与实际 API Key 是互相独立的概念。\n"
+        "作为 MTGA 代理服务的全局密钥。\n"
+        "示例：111",
+        wraplength=360,
+    )
 
     # 加载并初始化全局配置
     def load_global_config_values():
