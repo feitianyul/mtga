@@ -217,7 +217,7 @@ wheels = [
 
 [[package]]
 name = "mtga-gui"
-version = "1.5.1a4"
+version = "1.6.0"
 source = { editable = "." }
 dependencies = [
     { name = "certifi" },
