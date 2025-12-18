@@ -118,6 +118,27 @@ def _append_hosts_block_fallback(
         return False
 
 
+def _fallback_to_append(  # noqa: PLR0913
+    *,
+    hosts_file: str,
+    hosts_block: str,
+    encoding: str,
+    log_func,
+    reason: str,
+    removed_entries: int = 0,
+) -> bool:
+    log_func(f"⚠️ {reason}")
+    log_func("⚠️ 追加写入无法进行原子性删除/去重；如需清理请手动编辑 hosts。")
+    if removed_entries:
+        log_func("⚠️ 检测到历史重复记录：追加写入不会清理旧条目，请手动编辑 hosts。")
+    return _append_hosts_block_fallback(
+        hosts_file,
+        hosts_block,
+        encoding,
+        log_func=log_func,
+    )
+
+
 def _normalize_ip_list(ip):
     """将 IP 参数转换为去重后的字符串列表。"""
     if ip is None:
@@ -439,13 +460,12 @@ def add_hosts_entry(domain, ip=DEFAULT_HOSTS_IPS, log_func=print):  # noqa: PLR0
         state = _HOSTS_MODIFY_BLOCK_STATE
         if state.blocked:
             reason = state.reason or (state.report.status.value if state.report else "unknown")
-            log_func(f"⚠️ 当前环境 hosts 写入受限（reason={reason}），将回退为追加写入模式。")
-            log_func("⚠️ 追加写入无法进行原子性删除/去重；如需清理请手动编辑 hosts。")
-            return _append_hosts_block_fallback(
-                hosts_file,
-                hosts_block,
-                encoding,
+            return _fallback_to_append(
+                hosts_file=hosts_file,
+                hosts_block=hosts_block,
+                encoding=encoding,
                 log_func=log_func,
+                reason=f"当前环境 hosts 写入受限（reason={reason}），将回退为追加写入模式。",
             )
 
         # 移除旧记录，保证写入是原子块
@@ -460,7 +480,19 @@ def add_hosts_entry(domain, ip=DEFAULT_HOSTS_IPS, log_func=print):  # noqa: PLR0
         write_success = write_hosts_file_with_permission(hosts_file, content, encoding, log_func)
         if write_success:
             log_func("hosts 文件修改成功！")
-        return write_success
+            return True
+
+        if os.name == "nt":
+            return _fallback_to_append(
+                hosts_file=hosts_file,
+                hosts_block=hosts_block,
+                encoding=encoding,
+                log_func=log_func,
+                reason="原子写入 hosts 失败，尝试回退为追加写入模式（无法保证原子性增删/去重）。",
+                removed_entries=removed_entries,
+            )
+
+        return False
 
     except Exception as e:
         log_func(f"修改 hosts 文件失败: {e}")
