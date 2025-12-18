@@ -234,7 +234,7 @@ def _startup_hosts_preflight():
     def warn(message: str):
         logger.warning(message)
 
-    hosts_file = get_hosts_file_path()
+    hosts_file = get_hosts_file_path(log_func=print)
     report = check_file_operability(hosts_file, log_func=warn)
 
     if report.ok:

@@ -3,6 +3,7 @@ hosts 文件管理模块
 处理 hosts 文件的备份、修改、还原等操作
 """
 
+import ctypes
 import os
 import shutil
 import subprocess
@@ -31,6 +32,7 @@ class _HostsModifyBlockState:
 
 
 _HOSTS_MODIFY_BLOCK_STATE = _HostsModifyBlockState()
+_HOSTS_PATH_FALLBACK_STATE = {"warned": False}
 
 
 def configure_hosts_modify_block(
@@ -215,10 +217,34 @@ def check_hosts_file_operability(hosts_file: str, *, log_func=print) -> FileOper
     return check_file_operability(hosts_file, log_func=log_func)
 
 
-def get_hosts_file_path():
+def get_hosts_file_path(log_func=print):
     """获取 hosts 文件路径"""
     if os.name == "nt":  # Windows
-        return r"C:\Windows\System32\drivers\etc\hosts"
+        warned = _HOSTS_PATH_FALLBACK_STATE
+        system_root = os.environ.get("SYSTEMROOT") or os.environ.get("WINDIR")
+        if not system_root:
+            if not warned["warned"] and callable(log_func):
+                log_func(
+                    "⚠️ 环境变量 SYSTEMROOT/WINDIR 未设置，将尝试使用 WinAPI 获取 Windows 目录。"
+                )
+            try:
+                buffer = ctypes.create_unicode_buffer(260)
+                size = ctypes.windll.kernel32.GetWindowsDirectoryW(buffer, len(buffer))
+                if size:
+                    system_root = buffer.value
+            except Exception:
+                if not warned["warned"] and callable(log_func):
+                    log_func("⚠️ 调用 GetWindowsDirectoryW 失败，稍后将使用默认路径兜底。")
+                system_root = None
+
+        if not system_root and not warned["warned"]:
+            if callable(log_func):
+                log_func("⚠️ 无法确定 Windows 目录，hosts 路径将回退为 C:\\Windows\\System32\\...。")
+            warned["warned"] = True
+
+        system_root = system_root or r"C:\Windows"
+        log_func(f"[hosts] system_root={system_root}")
+        return os.path.join(system_root, "System32", "drivers", "etc", "hosts")
     else:  # Unix/Linux/macOS
         return "/etc/hosts"
 
@@ -252,7 +278,7 @@ def backup_hosts_file(log_func=print):
     返回:
         成功返回 True，失败返回 False
     """
-    hosts_file = get_hosts_file_path()
+    hosts_file = get_hosts_file_path(log_func)
     backup_file = get_backup_file_path()
 
     log_func("开始备份 hosts 文件...")
@@ -280,7 +306,7 @@ def restore_hosts_file(log_func=print):  # noqa: PLR0911
     返回:
         成功返回 True，失败返回 False
     """
-    hosts_file = get_hosts_file_path()
+    hosts_file = get_hosts_file_path(log_func)
     backup_file = get_backup_file_path()
 
     log_func("开始还原 hosts 文件...")
@@ -373,7 +399,7 @@ def add_hosts_entry(domain, ip=DEFAULT_HOSTS_IPS, log_func=print):  # noqa: PLR0
         log_func("未提供有效 IP，取消 hosts 修改")
         return False
 
-    hosts_file = get_hosts_file_path()
+    hosts_file = get_hosts_file_path(log_func)
     backup_file = get_backup_file_path()
 
     ip_text = ", ".join(f"{addr} {domain}" for addr in ip_list)
@@ -457,7 +483,7 @@ def remove_hosts_entry(domain, log_func=print, *, ip=None):
         return False
     ip_list = _normalize_ip_list(ip)
 
-    hosts_file = get_hosts_file_path()
+    hosts_file = get_hosts_file_path(log_func)
 
     log_func(f"开始删除 hosts 条目: {domain}")
 
@@ -500,7 +526,7 @@ def open_hosts_file(log_func=print):
     返回:
         成功返回 True，失败返回 False
     """
-    hosts_file = get_hosts_file_path()
+    hosts_file = get_hosts_file_path(log_func)
     result = False
 
     try:
