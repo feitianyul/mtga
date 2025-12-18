@@ -29,6 +29,7 @@ dependencies = [
     "urllib3",
     "idna",
     "certifi",
+    "platformdirs>=4.3.0",
     "PyYAML",
     "markdown>=3.10",
     "tkinterweb>=4.9.0",

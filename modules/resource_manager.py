@@ -9,6 +9,8 @@ import shutil
 import sys
 import tempfile
 
+from platformdirs import user_data_dir
+
 
 def safe_print(message):
     """Print helper tolerant of non-ASCII stdout."""
@@ -28,17 +30,14 @@ def is_packaged():
 
 
 def get_user_data_dir():
-    """获取用户数据目录，用于持久化存储"""
-    if os.name == "nt":  # Windows
-        # 使用 %APPDATA%\MTGA
-        appdata = os.environ.get("APPDATA")
-        if appdata:
-            user_dir = os.path.join(appdata, "MTGA")
-        else:
-            user_dir = os.path.join(os.path.expanduser("~"), "AppData", "Roaming", "MTGA")
-    else:  # Unix/Linux/macOS
-        # 使用 ~/.mtga
-        user_dir = os.path.join(os.path.expanduser("~"), ".mtga")
+    """获取用户数据目录，用于持久化存储。"""
+    app_name = "MTGA"
+    roaming = os.name == "nt"
+    platform_dir = user_data_dir(app_name, appauthor=False, roaming=roaming)
+
+    # 历史兼容：旧版在 macOS/Linux 使用 ~/.mtga
+    legacy_dir = os.path.join(os.path.expanduser("~"), ".mtga")
+    user_dir = legacy_dir if os.name != "nt" and os.path.isdir(legacy_dir) else platform_dir
 
     # 确保目录存在
     os.makedirs(user_dir, exist_ok=True)

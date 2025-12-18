@@ -22,6 +22,7 @@ from tkinter import messagebox, scrolledtext, ttk
 from typing import Any, Literal, cast
 import requests
 import yaml
+from platformdirs import user_data_dir
 
 
 try:  # Python 3.11+
@@ -1978,9 +1979,19 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
         # 创建按钮并添加提示
         btn_open = ttk.Button(button_frame, text="打开目录", command=open_user_data_directory)
         btn_open.pack(fill=tk.X, pady=2)
+        default_user_data_dir = user_data_dir("MTGA", appauthor=False, roaming=os.name == "nt")
+        actual_user_data_dir = get_user_data_dir()
+        if os.path.normpath(actual_user_data_dir) != os.path.normpath(default_user_data_dir):
+            open_dir_tooltip = (
+                "使用系统文件管理器打开用户数据目录\n"
+                f"当前：{actual_user_data_dir}\n"
+                f"默认：{default_user_data_dir}"
+            )
+        else:
+            open_dir_tooltip = f"使用系统文件管理器打开用户数据目录\n目录：{actual_user_data_dir}"
         create_tooltip(
             btn_open,
-            "使用系统文件管理器打开用户数据目录\nWindows: %APPDATA%\\MTGA\\\nmacOS/Linux: ~/.mtga/",
+            open_dir_tooltip,
         )
 
         btn_backup = ttk.Button(button_frame, text="备份数据", command=backup_user_data)
