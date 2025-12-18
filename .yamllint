@@ -6,7 +6,7 @@ rules:
   truthy:
     check-keys: false
   line-length:
-    max: 100
+    max: 150
     allow-non-breakable-words: true
     allow-non-breakable-inline-mappings: true
     level: warning
