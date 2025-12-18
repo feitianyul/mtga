@@ -30,6 +30,8 @@ try:  # Python 3.11+
 except ModuleNotFoundError:  # pragma: no cover
     tomllib = None
 
+from modules.tk_fonts import FontManager, apply_global_font
+
 if sys.platform == "darwin":
     try:
         import Cocoa  # pyright: ignore[reportMissingImports]
@@ -626,62 +628,17 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
 
     window.report_callback_exception = tk_error_handler
 
-    font_cache = {}
+    font_manager = FontManager()
 
     def get_preferred_font(
         size: int = 10,
         weight: Literal["normal", "bold"] = "normal",
     ) -> tkfont.Font:
-        """返回跨平台首选字体对象，缺失时回退到默认字体。"""
-        effective_size = size
-        if sys.platform == "darwin":
-            # macOS 上字号普遍偏小，整体放大约 15%
-            effective_size = max(size + 1, round(size * 1.15))
-
-        key = (effective_size, weight)
-        if key in font_cache:
-            font_obj = font_cache[key]
-            print(
-                f"[字体] 使用缓存字体: {font_obj.cget('family')} "
-                f"size={font_obj.cget('size')} weight={font_obj.cget('weight')}",
-            )
-            return font_obj
-
-        available = {name.lower(): name for name in tkfont.families()}
-        candidates = [
-            "Maple Mono NF CN",
-            "Microsoft YaHei UI",
-            "Microsoft YaHei",
-            "PingFang SC",
-            "Hiragino Sans GB",
-            "Segoe UI",
-            "Arial",
-        ]
-
-        chosen = None
-        for name in candidates:
-            matched = available.get(name.lower())
-            if matched:
-                chosen = matched
-                break
-
-        if chosen is None:
-            font_obj = tkfont.nametofont("TkDefaultFont").copy()
-            font_obj.configure(size=effective_size, weight=weight)
-        else:
-            font_obj = tkfont.Font(family=chosen, size=effective_size, weight=weight)
-
-        font_cache[key] = font_obj
-        print(
-            f"[字体] 选用字体: {font_obj.cget('family')} "
-            f"size={font_obj.cget('size')} weight={font_obj.cget('weight')}",
-        )
-        return font_obj
+        return font_manager.get_preferred_font(size=size, weight=weight)
 
     # 全局字体覆盖，避免 ttk 控件仍然使用系统默认字体
     default_font = get_preferred_font()
-    window.option_add("*Font", default_font)
-    ttk.Style().configure(".", font=default_font)
+    apply_global_font(root=window, default_font=default_font)
 
     # 设置窗口图标
     try:
@@ -2106,6 +2063,11 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
                     GITHUB_REPO,
                     timeout=10,
                     user_agent=f"{APP_DISPLAY_NAME}/{APP_VERSION}",
+                    font=update_checker.HtmlFontOptions(
+                        family=default_font.cget("family"),
+                        size=int(default_font.cget("size")),
+                        weight=default_font.cget("weight"),
+                    ),
                 )
             except requests.RequestException as exc:
                 error_msg = f"检查更新失败：网络异常 {exc}"
