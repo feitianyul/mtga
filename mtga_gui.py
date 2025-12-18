@@ -30,8 +30,6 @@ try:  # Python 3.11+
 except ModuleNotFoundError:  # pragma: no cover
     tomllib = None
 
-from modules.markdown_renderer import convert_markdown_to_html
-
 if sys.platform == "darwin":
     try:
         import Cocoa  # pyright: ignore[reportMissingImports]
@@ -2017,10 +2015,16 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
 
     check_updates_button = None
 
-    def show_release_notes_dialog(version_label, notes, release_url):
-        """显示包含 Markdown 说明的新版本弹窗。"""
-        current_dark_mode = detect_macos_dark_mode()
-        markdown_text = notes or "该版本暂无更新说明。"
+    def show_release_notes_dialog(version_label, notes_html, release_url):
+        """显示包含更新说明的新版本弹窗。"""
+        notes_html = (
+            notes_html
+            or (
+                "<html><head><meta charset='utf-8'></head><body>"
+                "<p>该版本暂无更新说明。</p>"
+                "</body></html>"
+            )
+        )
         dialog = tk.Toplevel(window)
         dialog.title("更新检查")
         dialog.geometry("520x420")
@@ -2053,17 +2057,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
 
         if html_frame_cls and isinstance(notes_widget, html_frame_cls):
             frame_widget = cast(Any, notes_widget)
-            def render_markdown(dark_mode):
-                notes_html = convert_markdown_to_html(
-                    markdown_text,
-                    dark_mode=dark_mode,
-                    font_family=default_font.cget("family"),
-                    font_size=int(default_font.cget("size")),
-                    font_weight=default_font.cget("weight"),
-                )
-                frame_widget.load_html(notes_html)
-
-            render_markdown(current_dark_mode)
+            frame_widget.load_html(notes_html)
 
             default_link_handler = frame_widget.html.on_link_click
 
@@ -2077,20 +2071,6 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
 
         theme_center = None
         theme_observer = None
-
-        def handle_theme_change():
-            if not (html_frame_cls and isinstance(notes_widget, html_frame_cls)):
-                return
-            nonlocal current_dark_mode
-            new_mode = detect_macos_dark_mode()
-            if new_mode != current_dark_mode:
-                current_dark_mode = new_mode
-                render_markdown(current_dark_mode)
-
-        if sys.platform == "darwin":
-            theme_center, theme_observer = register_macos_theme_observer(
-                lambda: window.after(0, handle_theme_change)
-            )
 
         def on_close():
             if theme_center and theme_observer:

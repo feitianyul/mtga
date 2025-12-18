@@ -31,7 +31,6 @@ dependencies = [
     "certifi",
     "platformdirs>=4.3.0",
     "PyYAML",
-    "markdown>=3.10",
     "tkinterweb>=4.9.0",
     "pyobjc>=12.1 ; sys_platform == 'darwin'",
     "charset-normalizer>=3.4.4",

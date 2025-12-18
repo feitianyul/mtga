@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import re
 from dataclasses import dataclass
 
@@ -17,6 +18,55 @@ class ReleaseInfo:
     version_label: str | None
     release_notes: str
     release_url: str
+
+
+def render_markdown_via_github_api(
+    markdown_text: str | None,
+    *,
+    repo: str,
+    timeout: int = 10,
+    user_agent: str | None = None,
+) -> str:
+    """调用 GitHub /markdown API 渲染 Markdown 为 HTML。
+
+    说明：
+    - 该接口返回的是 HTML 片段；这里会包装成一个完整 HTML 文档，便于 GUI 直接 load_html。
+    - 渲染失败时会降级为 <pre> 纯文本（不再手搓 CSS 样式）。
+    """
+    safe_source = markdown_text or ""
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "Content-Type": "application/json",
+    }
+    if user_agent:
+        headers["User-Agent"] = user_agent
+
+    try:
+        response = requests.post(
+            "https://api.github.com/markdown",
+            json={"text": safe_source, "mode": "gfm", "context": repo},
+            timeout=timeout,
+            headers=headers,
+        )
+        if response.status_code == requests.codes.ok:  # type: ignore[attr-defined]
+            rendered_fragment = response.text or ""
+            return "".join(
+                (
+                    "<html><head><meta charset='utf-8'></head><body>",
+                    rendered_fragment,
+                    "</body></html>",
+                )
+            )
+    except requests.RequestException:
+        pass
+
+    return "".join(
+        (
+            "<html><head><meta charset='utf-8'></head><body><pre>",
+            html.escape(safe_source),
+            "</pre></body></html>",
+        )
+    )
 
 
 def _normalize_version_tuple(version_text: str | None) -> tuple[int, ...]:
@@ -86,7 +136,12 @@ def fetch_latest_release(
     version_label = extract_version_label(data.get("name")) or extract_version_label(
         data.get("tag_name")
     )
-    release_notes = data.get("body") or ""
+    release_notes = render_markdown_via_github_api(
+        data.get("body") or "",
+        repo=repo,
+        timeout=timeout,
+        user_agent=user_agent,
+    )
     release_url = data.get("html_url") or ""
     return ReleaseInfo(
         version_label=version_label,
@@ -100,4 +155,5 @@ __all__ = [
     "extract_version_label",
     "is_remote_version_newer",
     "fetch_latest_release",
+    "render_markdown_via_github_api",
 ]
