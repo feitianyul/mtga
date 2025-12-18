@@ -1,4 +1,16 @@
-## v1.5.0 (Latest)
+## v1.6.0 (Latest)
+## :sparkles: 新功能
+- feat(hosts_manager): 添加 hosts 文件写入预检和受限模式支持 (47c2b8f14d3e9e7126b08c45df153e7435f24983)
+- feat(网络检查): 添加网络环境检测功能以识别显式代理配置 (ae3e5042d1b700105bbce7f093c533f75b42fbc8)
+- feat(界面): 为映射模型和MTGA鉴权字段添加工具提示 (9081116e0703be23e6e243f78a9fdcbc4921cd7d)
+- feat(资源管理): 使用platformdirs库改进跨平台用户数据目录处理 (3a280966edbfb1cd2696db65c9e5c14c1bba3c56)
+- feat(update_checker): 使用 GitHub API 渲染 Markdown 并移除本地渲染模块 (97765d2efcc2fbc9054a9cbcc7b9cfb7eae3dc5c)
+- feat(tk字体管理): 提取字体管理逻辑到独立模块并支持更新检查器字体配置 (fb2b1ace1405c1838fab51fca71665e88c7ee998)
+## :bug: 修复
+- fix(hosts_manager): 改进 Windows 系统下 hosts 文件路径获取逻辑 (7794f157861691e17b2870274970786d95d20a51)
+- fix(hosts): 原子写入失败时回退为追加写入 (71016307e726accbf6155e185021fb03705f4688)
+
+## v1.5.0
 ## :sparkles: 新功能
 - feat(proxy): 添加关闭SSL严格模式的选项 (8bf706b75f2b3909003d3d18b6b58a717e4a4536)
 - feat(proxy_server): 添加SSE流式响应日志记录功能 (154a694f0e06fd3ca866ae878f688e981e90b10c)
