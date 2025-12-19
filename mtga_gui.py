@@ -161,7 +161,8 @@ try:
     )
     from modules.tkhtml_compat import create_tkinterweb_html_widget
     from modules.thread_manager import ThreadManager
-    from modules import macos_privileged_helper, update_checker
+    from modules import macos_privileged_helper
+    from modules.services import update_service
     from modules import resource_manager as resource_manager_module
 except ImportError as e:
     print(f"导入模块失败: {e}")
@@ -1863,28 +1864,27 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
             window.after(0, _finish)
 
         def worker():
-            try:
-                release_info = update_checker.fetch_latest_release(
-                    GITHUB_REPO,
-                    timeout=10,
-                    user_agent=f"{APP_DISPLAY_NAME}/{APP_VERSION}",
-                    font=update_checker.HtmlFontOptions(
-                        family=default_font.cget("family"),
-                        size=int(default_font.cget("size")),
-                        weight=default_font.cget("weight"),
-                    ),
-                )
-            except requests.RequestException as exc:
-                error_msg = f"检查更新失败：网络异常 {exc}"
-                finalize(lambda: (messagebox.showerror("检查更新失败", error_msg), log(error_msg)))
-                return
-            except (ValueError, RuntimeError) as exc:
-                error_msg = f"检查更新失败：{exc}"
-                finalize(lambda: (messagebox.showerror("检查更新失败", error_msg), log(error_msg)))
-                return
+            result = update_service.check_for_updates(
+                repo=GITHUB_REPO,
+                app_version=APP_VERSION,
+                timeout=10,
+                user_agent=f"{APP_DISPLAY_NAME}/{APP_VERSION}",
+                font=update_service.UpdateFontOptions(
+                    family=default_font.cget("family"),
+                    size=int(default_font.cget("size")),
+                    weight=default_font.cget("weight"),
+                ),
+            )
 
-            latest_version = release_info.version_label
-            if not latest_version:
+            if result.status == "network_error":
+                error_msg = result.error_message or "检查更新失败：网络异常"
+                finalize(lambda: (messagebox.showerror("检查更新失败", error_msg), log(error_msg)))
+                return
+            if result.status == "remote_error":
+                error_msg = result.error_message or "检查更新失败"
+                finalize(lambda: (messagebox.showerror("检查更新失败", error_msg), log(error_msg)))
+                return
+            if result.status == "no_version":
                 finalize(
                     lambda: (
                         messagebox.showwarning("检查更新", "未能解析最新版本号，请稍后再试。"),
@@ -1892,8 +1892,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
                     )
                 )
                 return
-
-            if not update_checker.is_remote_version_newer(latest_version, APP_VERSION):
+            if result.status == "up_to_date":
                 finalize(
                     lambda: (
                         messagebox.showinfo("检查更新", f"当前版本 {APP_VERSION} 已是最新。"),
@@ -1902,8 +1901,9 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
                 )
                 return
 
-            release_notes = release_info.release_notes or "该版本暂无更新说明。"
-            release_url = release_info.release_url
+            latest_version = result.latest_version or "未知版本"
+            release_notes = result.release_notes or "该版本暂无更新说明。"
+            release_url = result.release_url or ""
 
             def _show_new_version():
                 show_release_notes_dialog(latest_version, release_notes, release_url)
