@@ -136,7 +136,6 @@ ensure_utf8_stdio()
 # 导入自定义模块
 try:
     from modules.cert_generator import generate_certificates
-    from modules.cert_cleaner import clear_ca_cert
     from modules.cert_checker import has_existing_ca_cert
     from modules.cert_installer import install_ca_cert
     from modules.file_operability import check_file_operability
@@ -160,7 +159,13 @@ try:
     from modules.tkhtml_compat import create_tkinterweb_html_widget
     from modules.thread_manager import ThreadManager
     from modules import macos_privileged_helper
-    from modules.actions import model_tests
+    from modules.actions import (
+        cert_actions,
+        hosts_actions,
+        model_tests,
+        network_actions,
+        proxy_actions,
+    )
     from modules.services.config_service import ConfigStore
     from modules.services import update_service
     from modules import resource_manager as resource_manager_module
@@ -471,6 +476,12 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
     log_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
     log = build_text_logger(log_text)
+    hosts_runner = hosts_actions.HostsTaskRunner(
+        log_func=log,
+        thread_manager=thread_manager,
+        modify_hosts_file=modify_hosts_file,
+        open_hosts_file=open_hosts_file,
+    )
 
     macos_dark_mode = detect_macos_dark_mode()
     tooltip = partial(
@@ -479,9 +490,6 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
         is_dark_mode=macos_dark_mode,
     )
 
-    proxy_start_task_id = None
-    proxy_stop_task_id = None
-    hosts_task_id = None
     shutdown_task_id = None
     network_env_precheck_enabled = False
 
@@ -592,6 +600,23 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
         stopped = stop_proxy_instance(show_idle_message=show_idle_message)
         modify_hosts_task("remove", block=block_hosts_cleanup)
         return stopped
+
+    proxy_runner = proxy_actions.ProxyTaskRunner(
+        log_func=log,
+        thread_manager=thread_manager,
+        deps=proxy_actions.ProxyTaskDependencies(
+            ensure_global_config_ready=ensure_global_config_ready,
+            build_proxy_config=build_proxy_config,
+            get_current_config=config_store.get_current_config,
+            restart_proxy=restart_proxy,
+            stop_proxy_and_restore=stop_proxy_and_restore,
+            has_existing_ca_cert=has_existing_ca_cert,
+            generate_certificates=generate_certificates,
+            install_ca_cert=install_ca_cert,
+            modify_hosts_file=modify_hosts_file,
+            ca_common_name=CA_COMMON_NAME,
+        ),
+    )
 
     # 显示环境检查结果
     env_ok, env_msg = check_environment()
@@ -1214,36 +1239,26 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
 
     def generate_certs_task():
         """生成证书任务"""
-
-        def task():  # noqa: PLR0912
-            log("开始生成证书...")
-            if generate_certificates(log_func=log, ca_common_name=CA_COMMON_NAME):
-                log("✅ 证书生成完成")
-            else:
-                log("❌ 证书生成失败")
-
-        thread_manager.run("cert_generate", task)
+        cert_actions.run_generate_certificates(
+            ca_common_name=CA_COMMON_NAME,
+            log_func=log,
+            thread_manager=thread_manager,
+        )
 
     def install_certs_task():
         """安装证书任务"""
-
-        def task():  # noqa: PLR0912
-            log("开始安装CA证书...")
-            # install_ca_cert 内部会处理权限请求
-            if install_ca_cert(log_func=log):
-                log("✅ CA证书安装完成")
-            else:
-                log("❌ CA证书安装失败")
-
-        thread_manager.run("cert_install", task)
+        cert_actions.run_install_ca_cert(
+            log_func=log,
+            thread_manager=thread_manager,
+        )
 
     def clear_ca_cert_task(ca_common_name: str):
         """清除系统钥匙串中的 CA 证书"""
-
-        def task():
-            clear_ca_cert(ca_common_name=ca_common_name, log_func=log)
-
-        thread_manager.run("cert_clear", task)
+        cert_actions.run_clear_ca_cert(
+            ca_common_name=ca_common_name,
+            log_func=log,
+            thread_manager=thread_manager,
+        )
 
     def confirm_clear_ca_cert():
         """确认后清除 CA 证书，可临时修改 Common Name。"""
@@ -1305,44 +1320,11 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
 
     def modify_hosts_task(action="add", *, block=False):
         """修改hosts文件任务"""
-        nonlocal hosts_task_id
-
-        def task():
-            # 使用字典获取动作名称
-            action_names = {"add": "修改", "remove": "移除", "backup": "备份", "restore": "还原"}
-            action_name = action_names.get(action, action)
-            log(f"开始{action_name} hosts文件...")
-            ip_tuple = ("127.0.0.1", "::1")
-            if modify_hosts_file(action=action, ip=ip_tuple, log_func=log):
-                log(f"✅ hosts文件{action_name}完成")
-            else:
-                log(f"❌ hosts文件{action_name}失败")
-
-        if block:
-            thread_manager.wait(hosts_task_id)
-            hosts_task_id = None
-            task()
-            return None
-
-        wait_targets = [hosts_task_id] if hosts_task_id else None
-        hosts_task_id = thread_manager.run(
-            "hosts_manage",
-            task,
-            wait_for=wait_targets,
-        )
-        return hosts_task_id
+        return hosts_runner.modify_hosts(action, block=block)
 
     def open_hosts_task():
         """打开hosts文件任务"""
-
-        def task():
-            log("正在打开hosts文件...")
-            if open_hosts_file(log_func=log):
-                log("✅ hosts文件已打开")
-            else:
-                log("❌ 打开hosts文件失败")
-
-        thread_manager.run("hosts_open", task)
+        hosts_runner.open_hosts()
 
     ttk.Button(hosts_tab, text="修改hosts文件", command=lambda: modify_hosts_task("add")).pack(
         fill=tk.X, padx=5, pady=5
@@ -1368,37 +1350,11 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
 
     def start_proxy_task():
         """启动代理服务器任务"""
-        nonlocal proxy_start_task_id, proxy_stop_task_id
-
-        if not ensure_global_config_ready():
-            return
-
-        def task():
-            config = build_proxy_config()
-            if not config:
-                return
-            restart_proxy(config)
-
-        wait_targets = [proxy_stop_task_id] if proxy_stop_task_id else None
-        proxy_start_task_id = thread_manager.run(
-            "proxy_start",
-            task,
-            wait_for=wait_targets,
-        )
+        proxy_runner.start_proxy()
 
     def stop_proxy_task():
         """停止代理服务器任务"""
-        nonlocal proxy_stop_task_id, proxy_start_task_id
-
-        def task():
-            stop_proxy_and_restore(show_idle_message=True)
-
-        wait_targets = [proxy_start_task_id] if proxy_start_task_id else None
-        proxy_stop_task_id = thread_manager.run(
-            "proxy_stop",
-            task,
-            wait_for=wait_targets,
-        )
+        proxy_runner.stop_proxy()
 
     ttk.Button(proxy_tab, text="启动代理服务器", command=start_proxy_task).pack(
         fill=tk.X, padx=5, pady=5
@@ -1409,23 +1365,10 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
 
     def check_network_environment_task():
         """检查网络环境任务（系统代理/环境变量代理）。"""
-
-        def task():
-            log("开始检查网络环境...")
-            report = check_network_environment(
-                log_func=log,
-                emit_logs=True,
-            )
-            if report.explicit_proxy_detected:
-                log("⚠️ 检测到显式代理配置，hosts 导流可能被绕过。\n" + "⚠️" * 20)
-                return
-            log("✅ 未检测到系统/环境变量层面的显式代理配置。")
-            log(
-                "ℹ️ 若仍无法连接，请检查 Trae 的代理设置，"
-                "或是否启用了 TUN/VPN/安全软件网络防护。"
-            )
-
-        thread_manager.run("network_env_check", task)
+        network_actions.run_network_environment_check(
+            log_func=log,
+            thread_manager=thread_manager,
+        )
 
     ttk.Button(proxy_tab, text="检查网络环境", command=check_network_environment_task).pack(
         fill=tk.X, padx=5, pady=5
@@ -1767,61 +1710,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
     # 一键启动按钮
     def start_all_task():
         """一键启动全部服务"""
-        nonlocal proxy_start_task_id, proxy_stop_task_id
-
-        if not ensure_global_config_ready():
-            return
-
-        def task():
-            thread_manager.wait(proxy_start_task_id)
-            thread_manager.wait(proxy_stop_task_id)
-
-            current_config = config_store.get_current_config()
-            if not current_config:
-                log("❌ 错误: 没有可用的配置组")
-                return
-
-            log("=== 开始一键启动全部服务 ===")
-
-            # 1. 生成证书
-            log("步骤 1/4: 生成证书")
-            has_existing_ca = has_existing_ca_cert(CA_COMMON_NAME, log_func=log)
-            if has_existing_ca:
-                log(f"检测到系统已存在 CA 证书 ({CA_COMMON_NAME})，跳过证书生成和安装")
-                log("ℹ️ 如有需要，请手动执行生成和安装")
-                log("步骤 2/4: 安装CA证书（已跳过）")
-            else:
-                if not generate_certificates(log_func=log, ca_common_name=CA_COMMON_NAME):
-                    log("❌ 生成证书失败，无法继续")
-                    return
-
-                # 2. 安装CA证书
-                log("步骤 2/4: 安装CA证书")
-                if not install_ca_cert(log_func=log):
-                    log("❌ 安装CA证书失败，无法继续")
-                    return
-
-            # 3. 修改hosts文件
-            log("步骤 3/4: 修改hosts文件")
-            hosts_modified = modify_hosts_file(log_func=log)
-            if not hosts_modified:
-                log("❌ 修改hosts文件失败，无法继续")
-                return
-
-            # 4. 启动代理服务器
-            log("步骤 4/4: 启动代理服务器")
-            config = build_proxy_config()
-            if not config:
-                return
-            if restart_proxy(
-                config,
-                success_message="✅ 全部服务启动成功",
-                hosts_modified=hosts_modified,
-            ):
-                return
-            log("❌ 全部服务启动失败：代理服务器未能启动")
-
-        thread_manager.run("start_all", task)
+        proxy_runner.start_all()
 
     start_button = ttk.Button(left_frame, text="一键启动全部服务", command=start_all_task)
     start_button.grid(row=1, column=0, sticky="ew", padx=5, pady=0)
@@ -1843,7 +1732,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
 
     # 窗口关闭处理
     def on_closing():
-        nonlocal proxy_start_task_id, proxy_stop_task_id, shutdown_task_id
+        nonlocal shutdown_task_id
         if shutdown_task_id:
             log("⌛ 正在退出程序，请稍候...")
             return
@@ -1853,8 +1742,8 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
         def cleanup():
             nonlocal shutdown_task_id
             try:
-                thread_manager.wait(proxy_start_task_id, timeout=5)
-                thread_manager.wait(proxy_stop_task_id, timeout=5)
+                thread_manager.wait(proxy_runner.proxy_start_task_id, timeout=5)
+                thread_manager.wait(proxy_runner.proxy_stop_task_id, timeout=5)
                 stopped = stop_proxy_and_restore(block_hosts_cleanup=True)
                 if stopped:
                     log("代理服务器已停止，程序即将退出")
