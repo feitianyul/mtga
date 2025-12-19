@@ -16,7 +16,6 @@ from pathlib import Path
 from tkinter import font as tkfont
 from tkinter import messagebox, scrolledtext, ttk
 from typing import Any, Literal, cast
-import requests
 from platformdirs import user_data_dir
 
 
@@ -161,6 +160,7 @@ try:
     from modules.tkhtml_compat import create_tkinterweb_html_widget
     from modules.thread_manager import ThreadManager
     from modules import macos_privileged_helper
+    from modules.actions import model_tests
     from modules.services.config_service import ConfigStore
     from modules.services import update_service
     from modules import resource_manager as resource_manager_module
@@ -179,8 +179,6 @@ proxy_server_instance = None
 resource_manager = ResourceManager()
 thread_manager = ThreadManager()
 
-HTTP_OK = 200
-CONTENT_PREVIEW_LEN = 50
 API_KEY_VISIBLE_CHARS = 4
 APP_DISPLAY_NAME = "MTGA GUI"
 GITHUB_REPO = "BiFangKNT/mtga"
@@ -391,135 +389,6 @@ def check_environment():
 # 配置文件路径（持久化到用户数据目录）
 CONFIG_FILE = resource_manager.get_user_config_file()
 config_store = ConfigStore(CONFIG_FILE)
-
-
-def test_model_connection(config_group, log_func=print):
-    """测试模型连接（GET /v1/models/{模型id}）"""
-
-    def run_test():
-        model_id = "未知模型"  # 提前初始化，避免未绑定问题
-        try:
-            api_url = config_group.get("api_url", "").rstrip("/")
-            model_id = config_group.get("model_id", "")
-            api_key = config_group.get("api_key", "")
-
-            if not api_url or not model_id:
-                log_func("测试失败: API URL或模型ID为空")
-                return
-
-            # 构建测试URL
-            test_url = f"{api_url}/v1/models/{model_id}"
-
-            # 准备请求头
-            headers = {}
-            if api_key:
-                headers["Authorization"] = f"Bearer {api_key}"
-
-            log_func(f"正在测试模型连接: {test_url}")
-
-            # 发送GET请求测试模型
-            response = requests.get(test_url, headers=headers, timeout=10)
-
-            if response.status_code == HTTP_OK:
-                log_func(f"✅ 模型测试成功: {model_id}")
-                try:
-                    model_info = response.json()
-                    if "id" in model_info:
-                        log_func(f"   模型ID: {model_info['id']}")
-                    if "object" in model_info:
-                        log_func(f"   对象类型: {model_info['object']}")
-                except Exception:
-                    log_func("   (响应解析成功，但无法获取详细信息)")
-            else:
-                log_func(f"❌ 模型测试失败: HTTP {response.status_code}")
-                try:
-                    error_info = response.text[:200]
-                    log_func(f"   错误信息: {error_info}")
-                except Exception:
-                    log_func("   (无法获取错误详情)")
-
-        except requests.exceptions.Timeout:
-            log_func(f"❌ 模型测试超时: {model_id}")
-        except requests.exceptions.RequestException as e:
-            log_func(f"❌ 模型测试网络错误: {str(e)}")
-        except Exception as e:
-            log_func(f"❌ 模型测试意外错误: {str(e)}")
-
-    # 交给统一线程管理器调度，避免阻塞UI且保留状态
-    thread_manager.run("test_model_connection", run_test)
-
-
-def test_chat_completion(config_group, log_func=print):
-    """测试聊天补全连接（POST /v1/chat/completions）"""
-
-    def run_test():
-        model_id = "未知模型"  # 提前初始化，避免未绑定问题
-        try:
-            api_url = config_group.get("api_url", "").rstrip("/")
-            model_id = config_group.get("model_id", "")
-            api_key = config_group.get("api_key", "")
-
-            if not api_url or not model_id:
-                log_func("测活失败: API URL或模型ID为空")
-                return
-
-            # 构建测试URL
-            test_url = f"{api_url}/v1/chat/completions"
-
-            # 准备请求头
-            headers = {"Content-Type": "application/json"}
-            if api_key:
-                headers["Authorization"] = f"Bearer {api_key}"
-
-            # 准备测试数据（最小输入）
-            test_data = {
-                "model": model_id,
-                "messages": [{"role": "user", "content": "1"}],
-                "max_tokens": 1,
-                "temperature": 0,
-            }
-
-            log_func(f"正在测活模型: {model_id} (会消耗少量tokens)")
-
-            # 发送POST请求测试聊天补全
-            response = requests.post(test_url, json=test_data, headers=headers, timeout=30)
-
-            if response.status_code == HTTP_OK:
-                log_func(f"✅ 模型测活成功: {model_id}")
-                try:
-                    completion_info = response.json()
-                    if "choices" in completion_info and completion_info["choices"]:
-                        content = (
-                            completion_info["choices"][0]
-                            .get("message", {})
-                            .get("content", "")
-                            .strip()
-                        )
-                        preview = content[:CONTENT_PREVIEW_LEN]
-                        suffix = "..." if len(content) > CONTENT_PREVIEW_LEN else ""
-                        log_func(f"   响应内容: {preview}{suffix}")
-                    if "usage" in completion_info:
-                        usage = completion_info["usage"]
-                        log_func(f"   消耗tokens: {usage.get('total_tokens', '未知')}")
-                except Exception:
-                    log_func("   (响应成功，但无法解析详细信息)")
-            else:
-                log_func(f"❌ 模型测活失败: HTTP {response.status_code}")
-                try:
-                    error_info = response.text[:200]
-                    log_func(f"   错误信息: {error_info}")
-                except Exception:
-                    log_func("   (无法获取错误详情)")
-
-        except requests.exceptions.Timeout:
-            log_func(f"❌ 模型测活超时: {model_id}")
-        except requests.exceptions.RequestException as e:
-            log_func(f"❌ 模型测活网络错误: {str(e)}")
-        except Exception as e:
-            log_func(f"❌ 模型测活意外错误: {str(e)}")
-
-    # 使用线程管理器调度任务
-    thread_manager.run("test_chat_completion", run_test)
 
 
 def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
@@ -790,7 +659,11 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
             return
 
         config_group = config_groups[selected_index]
-        test_chat_completion(config_group, log)
+        model_tests.test_chat_completion(
+            config_group,
+            log_func=log,
+            thread_manager=thread_manager,
+        )
 
     # 测活按钮
     test_btn = ttk.Button(list_header_frame, text="测活", command=test_selected_config, width=6)
@@ -933,7 +806,11 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
                 add_window.destroy()
 
                 # 保存后测试模型
-                test_model_connection(new_group, log)
+                model_tests.test_model_in_list(
+                    new_group,
+                    log_func=log,
+                    thread_manager=thread_manager,
+                )
             else:
                 log("保存配置组失败")
 
@@ -1030,7 +907,11 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
                 edit_window.destroy()
 
                 # 保存后测试模型
-                test_model_connection(config_groups[selected_index], log)
+                model_tests.test_model_in_list(
+                    config_groups[selected_index],
+                    log_func=log,
+                    thread_manager=thread_manager,
+                )
             else:
                 log("保存配置组失败")
 
