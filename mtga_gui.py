@@ -2253,6 +2253,8 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
 
     log("MTGA GUI 已启动")
     log("请选择操作或直接使用一键启动...")
+    # GUI 启动后自动检查一次更新
+    window.after(200, check_for_updates)
 
     return window
 
