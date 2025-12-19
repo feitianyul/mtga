@@ -17,7 +17,6 @@ from tkinter import font as tkfont
 from tkinter import messagebox, scrolledtext, ttk
 from typing import Any, Literal, cast
 import requests
-import yaml
 from platformdirs import user_data_dir
 
 
@@ -162,6 +161,7 @@ try:
     from modules.tkhtml_compat import create_tkinterweb_html_widget
     from modules.thread_manager import ThreadManager
     from modules import macos_privileged_helper
+    from modules.services.config_service import ConfigStore
     from modules.services import update_service
     from modules import resource_manager as resource_manager_module
 except ImportError as e:
@@ -390,79 +390,7 @@ def check_environment():
 
 # 配置文件路径（持久化到用户数据目录）
 CONFIG_FILE = resource_manager.get_user_config_file()
-
-
-def load_config_groups():
-    """从配置文件加载配置组"""
-    try:
-        if os.path.exists(CONFIG_FILE):
-            with open(CONFIG_FILE, encoding="utf-8") as f:
-                config = yaml.safe_load(f)
-                if config and "config_groups" in config:
-                    config_groups = config["config_groups"]
-                    current_index = config.get("current_config_index", 0)
-                    return config_groups, current_index
-    except Exception:
-        pass
-    return [], 0
-
-
-def load_global_config():
-    """从配置文件加载全局配置"""
-    try:
-        if os.path.exists(CONFIG_FILE):
-            with open(CONFIG_FILE, encoding="utf-8") as f:
-                config = yaml.safe_load(f)
-                if config:
-                    mapped_model_id = config.get("mapped_model_id", "")
-                    mtga_auth_key = config.get("mtga_auth_key", "")
-                    return mapped_model_id, mtga_auth_key
-    except Exception:
-        pass
-    return "", ""
-
-
-def save_config_groups(config_groups, current_index=0, mapped_model_id=None, mtga_auth_key=None):
-    """保存配置组和全局配置到配置文件"""
-    try:
-        # 首先读取现有配置，保留其他字段
-        config_data = {}
-        if os.path.exists(CONFIG_FILE):
-            with open(CONFIG_FILE, encoding="utf-8") as f:
-                config_data = yaml.safe_load(f) or {}
-
-        # 更新配置组和索引
-        config_data["config_groups"] = config_groups
-        config_data["current_config_index"] = current_index
-
-        # 更新全局配置（如果提供）
-        if mapped_model_id is not None:
-            config_data["mapped_model_id"] = mapped_model_id
-        if mtga_auth_key is not None:
-            config_data["mtga_auth_key"] = mtga_auth_key
-
-        os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
-
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            yaml.dump(
-                config_data,
-                f,
-                default_flow_style=False,
-                allow_unicode=True,
-                indent=2,
-                sort_keys=False,
-            )
-        return True
-    except Exception:
-        return False
-
-
-def get_current_config():
-    """获取当前选中的配置"""
-    config_groups, current_index = load_config_groups()
-    if config_groups and 0 <= current_index < len(config_groups):
-        return config_groups[current_index]
-    return {}
+config_store = ConfigStore(CONFIG_FILE)
 
 
 def test_model_connection(config_group, log_func=print):
@@ -690,7 +618,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
 
     def ensure_global_config_ready():
         """检查全局配置文件中的必填项。"""
-        mapped_model_id, mtga_auth_key = load_global_config()
+        mapped_model_id, mtga_auth_key = config_store.load_global_config()
         mapped_model_id = (mapped_model_id or "").strip()
         mtga_auth_key = (mtga_auth_key or "").strip()
 
@@ -711,7 +639,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
 
     def build_proxy_config():
         """根据当前 UI 状态生成代理配置"""
-        current_config = get_current_config()
+        current_config = config_store.get_current_config()
         if not current_config:
             log("❌ 错误: 没有可用的配置组")
             return None
@@ -922,7 +850,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
     def refresh_config_tree():
         """刷新配置组列表"""
         nonlocal config_groups, current_config_index
-        config_groups, current_config_index = load_config_groups()
+        config_groups, current_config_index = config_store.load_config_groups()
 
         for item in config_tree.get_children():
             config_tree.delete(item)
@@ -971,7 +899,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
         selected_index = get_selected_index()
         if selected_index >= 0:
             current_config_index = selected_index
-            save_config_groups(config_groups, current_config_index)
+            config_store.save_config_groups(config_groups, current_config_index)
 
     config_tree.bind("<<TreeviewSelect>>", on_config_select)
 
@@ -998,7 +926,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
             }
 
             config_groups.append(new_group)
-            if save_config_groups(config_groups, current_config_index):
+            if config_store.save_config_groups(config_groups, current_config_index):
                 display_name = name if name else f"配置组 {len(config_groups)}"
                 log(f"已添加配置组: {display_name}")
                 refresh_config_list()
@@ -1095,7 +1023,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
                 "api_key": api_key,  # API key字段
             }
 
-            if save_config_groups(config_groups, current_config_index):
+            if config_store.save_config_groups(config_groups, current_config_index):
                 display_name = name if name else f"配置组 {selected_index + 1}"
                 log(f"已修改配置组: {display_name}")
                 refresh_config_list()
@@ -1186,7 +1114,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
             elif current_config_index > selected_index:
                 current_config_index -= 1
 
-            if save_config_groups(config_groups, current_config_index):
+            if config_store.save_config_groups(config_groups, current_config_index):
                 log(f"已删除配置组: {group_name}")
                 refresh_config_list()
             else:
@@ -1211,7 +1139,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
         elif current_config_index == selected_index - 1:
             current_config_index = selected_index
 
-        if save_config_groups(config_groups, current_config_index):
+        if config_store.save_config_groups(config_groups, current_config_index):
             refresh_config_list()
             # 保持选中状态
             children = config_tree.get_children()
@@ -1240,7 +1168,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
         elif current_config_index == selected_index + 1:
             current_config_index = selected_index
 
-        if save_config_groups(config_groups, current_config_index):
+        if config_store.save_config_groups(config_groups, current_config_index):
             refresh_config_list()
             # 保持选中状态
             children = config_tree.get_children()
@@ -1304,7 +1232,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
     # 加载并初始化全局配置
     def load_global_config_values():
         """加载并设置全局配置值到GUI"""
-        mapped_model_id, mtga_auth_key = load_global_config()
+        mapped_model_id, mtga_auth_key = config_store.load_global_config()
         mapped_model_var.set(mapped_model_id)
         mtga_auth_var.set(mtga_auth_key)
 
@@ -1319,10 +1247,15 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
             return False
 
         # 获取当前配置组信息
-        config_groups, current_config_index = load_config_groups()
+        config_groups, current_config_index = config_store.load_config_groups()
 
         # 保存全局配置
-        if save_config_groups(config_groups, current_config_index, mapped_model_id, mtga_auth_key):
+        if config_store.save_config_groups(
+            config_groups,
+            current_config_index,
+            mapped_model_id,
+            mtga_auth_key,
+        ):
             log("全局配置已保存")
             return True
         else:
@@ -1962,7 +1895,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
             thread_manager.wait(proxy_start_task_id)
             thread_manager.wait(proxy_stop_task_id)
 
-            current_config = get_current_config()
+            current_config = config_store.get_current_config()
             if not current_config:
                 log("❌ 错误: 没有可用的配置组")
                 return
