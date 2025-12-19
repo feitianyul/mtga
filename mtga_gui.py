@@ -16,7 +16,6 @@ from pathlib import Path
 from tkinter import font as tkfont
 from tkinter import messagebox, scrolledtext, ttk
 from typing import Any, Literal, cast
-from platformdirs import user_data_dir
 
 
 try:  # Python 3.11+
@@ -33,14 +32,6 @@ from modules.ui_helpers import (
 )
 from modules.macos_theme import detect_macos_dark_mode
 from modules.network_utils import is_port_in_use
-from modules.services.user_data_service import (
-    BackupNotFoundError,
-    NoBackupsError,
-    backup_user_data as backup_user_data_service,
-    clear_user_data as clear_user_data_service,
-    find_latest_backup,
-    restore_backup,
-)
 
 os.environ.setdefault("LANG", "zh_CN.UTF-8")
 os.environ.setdefault("LC_ALL", "zh_CN.UTF-8")
@@ -159,15 +150,10 @@ try:
     from modules.tkhtml_compat import create_tkinterweb_html_widget
     from modules.thread_manager import ThreadManager
     from modules import macos_privileged_helper
-    from modules.actions import (
-        cert_actions,
-        hosts_actions,
-        model_tests,
-        network_actions,
-        proxy_actions,
-    )
+    from modules.actions import hosts_actions, model_tests, proxy_actions
     from modules.services.config_service import ConfigStore
     from modules.services import update_service
+    from modules.ui import tab_builders
     from modules import resource_manager as resource_manager_module
 except ImportError as e:
     print(f"导入模块失败: {e}")
@@ -598,7 +584,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
         block_hosts_cleanup=True 时会同步等待 hosts 操作完成，避免程序退出前记录未清理。
         """
         stopped = stop_proxy_instance(show_idle_message=show_idle_message)
-        modify_hosts_task("remove", block=block_hosts_cleanup)
+        hosts_runner.modify_hosts("remove", block=block_hosts_cleanup)
         return stopped
 
     proxy_runner = proxy_actions.ProxyTaskRunner(
@@ -1232,305 +1218,42 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
     # 功能标签页
     notebook = ttk.Notebook(left_content)
     notebook.pack(fill=tk.BOTH, expand=True, pady=0)
-
-    # 证书管理标签页
-    cert_tab = ttk.Frame(notebook)
-    notebook.add(cert_tab, text="证书管理")
-
-    def generate_certs_task():
-        """生成证书任务"""
-        cert_actions.run_generate_certificates(
+    tab_builders.build_cert_tab(
+        tab_builders.CertTabDeps(
+            notebook=notebook,
+            window=window,
+            log=log,
+            tooltip=tooltip,
+            center_window=center_window,
             ca_common_name=CA_COMMON_NAME,
-            log_func=log,
             thread_manager=thread_manager,
         )
-
-    def install_certs_task():
-        """安装证书任务"""
-        cert_actions.run_install_ca_cert(
-            log_func=log,
+    )
+    tab_builders.build_hosts_tab(
+        tab_builders.HostsTabDeps(
+            notebook=notebook,
+            hosts_runner=hosts_runner,
+        )
+    )
+    tab_builders.build_proxy_tab(
+        tab_builders.ProxyTabDeps(
+            notebook=notebook,
+            proxy_runner=proxy_runner,
+            log=log,
             thread_manager=thread_manager,
         )
-
-    def clear_ca_cert_task(ca_common_name: str):
-        """清除系统钥匙串中的 CA 证书"""
-        cert_actions.run_clear_ca_cert(
-            ca_common_name=ca_common_name,
-            log_func=log,
-            thread_manager=thread_manager,
-        )
-
-    def confirm_clear_ca_cert():
-        """确认后清除 CA 证书，可临时修改 Common Name。"""
-
-        dialog = tk.Toplevel(window)
-        dialog.title("确认清除 CA 证书")
-        dialog.transient(window)
-
-        ttk.Label(
-            dialog,
-            text="将从系统信任存储中删除匹配的 CA 证书，是否继续？",
-            anchor="w",
-            justify="left",
-        ).pack(fill=tk.X, padx=12, pady=(12, 6))
-
-        ttk.Label(dialog, text="Common Name:", anchor="w").pack(
-            fill=tk.X, padx=12, pady=(0, 4)
-        )
-        cn_var = tk.StringVar(value=CA_COMMON_NAME)
-        ttk.Entry(dialog, textvariable=cn_var).pack(fill=tk.X, padx=12, pady=(0, 12))
-
-        button_frame = ttk.Frame(dialog)
-        button_frame.pack(fill=tk.X, padx=12, pady=(0, 12))
-
-        def on_cancel():
-            dialog.destroy()
-
-        def on_confirm():
-            cn_value = cn_var.get().strip() or CA_COMMON_NAME
-            dialog.destroy()
-            log(f"准备清除 CA 证书，Common Name: {cn_value}")
-            clear_ca_cert_task(cn_value)
-
-        ttk.Button(button_frame, text="取消", command=on_cancel).pack(side=tk.RIGHT, padx=(8, 0))
-        ttk.Button(button_frame, text="确定", command=on_confirm).pack(side=tk.RIGHT)
-        center_window(dialog)
-        dialog.grab_set()
-
-    ttk.Button(cert_tab, text="生成CA和服务器证书", command=generate_certs_task).pack(
-        fill=tk.X, padx=5, pady=5
-    )
-    ttk.Button(cert_tab, text="安装CA证书", command=install_certs_task).pack(
-        fill=tk.X, padx=5, pady=5
-    )
-    clear_ca_btn = ttk.Button(cert_tab, text="清除系统CA证书", command=confirm_clear_ca_cert)
-    clear_ca_btn.pack(fill=tk.X, padx=5, pady=5)
-    tooltip(
-        clear_ca_btn,
-        "macOS: 删除系统钥匙串中匹配的CA证书；"
-        "Windows: 删除本地计算机/Root 中匹配的CA证书\n"
-        f"Common Name: {CA_COMMON_NAME}\n"
-        "需要管理员权限，建议仅在需要重置证书时使用",
-        wraplength=280,
     )
 
-    # hosts文件管理标签页
-    hosts_tab = ttk.Frame(notebook)
-    notebook.add(hosts_tab, text="hosts文件管理")
-
-    def modify_hosts_task(action="add", *, block=False):
-        """修改hosts文件任务"""
-        return hosts_runner.modify_hosts(action, block=block)
-
-    def open_hosts_task():
-        """打开hosts文件任务"""
-        hosts_runner.open_hosts()
-
-    ttk.Button(hosts_tab, text="修改hosts文件", command=lambda: modify_hosts_task("add")).pack(
-        fill=tk.X, padx=5, pady=5
-    )
-
-    hosts_buttons_frame = ttk.Frame(hosts_tab)
-    hosts_buttons_frame.pack(fill=tk.X, padx=5, pady=5)
-
-    ttk.Button(
-        hosts_buttons_frame, text="备份hosts", command=lambda: modify_hosts_task("backup")
-    ).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=2)
-    ttk.Button(
-        hosts_buttons_frame, text="还原hosts", command=lambda: modify_hosts_task("restore")
-    ).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=2)
-
-    ttk.Button(hosts_tab, text="打开hosts文件", command=open_hosts_task).pack(
-        fill=tk.X, padx=5, pady=5
-    )
-
-    # 代理服务器标签页
-    proxy_tab = ttk.Frame(notebook)
-    notebook.add(proxy_tab, text="代理服务器操作")
-
-    def start_proxy_task():
-        """启动代理服务器任务"""
-        proxy_runner.start_proxy()
-
-    def stop_proxy_task():
-        """停止代理服务器任务"""
-        proxy_runner.stop_proxy()
-
-    ttk.Button(proxy_tab, text="启动代理服务器", command=start_proxy_task).pack(
-        fill=tk.X, padx=5, pady=5
-    )
-    ttk.Button(proxy_tab, text="停止代理服务器", command=stop_proxy_task).pack(
-        fill=tk.X, padx=5, pady=5
-    )
-
-    def check_network_environment_task():
-        """检查网络环境任务（系统代理/环境变量代理）。"""
-        network_actions.run_network_environment_check(
-            log_func=log,
-            thread_manager=thread_manager,
-        )
-
-    ttk.Button(proxy_tab, text="检查网络环境", command=check_network_environment_task).pack(
-        fill=tk.X, padx=5, pady=5
-    )
-
-    # 用户数据管理标签页（仅在单文件模式下显示）
     if is_packaged():
-        data_mgmt_tab = ttk.Frame(notebook)
-        notebook.add(data_mgmt_tab, text="用户数据管理")
-
-        def open_user_data_directory():
-            """打开用户数据目录"""
-            try:
-                user_data_dir = get_user_data_dir()
-                if os.name == "nt":  # Windows
-                    os.startfile(user_data_dir)
-                elif sys.platform == "darwin":  # macOS
-                    os.system(f'open "{user_data_dir}"')
-                else:  # Linux
-                    os.system(f'xdg-open "{user_data_dir}"')
-                log(f"已打开用户数据目录: {user_data_dir}")
-            except Exception as e:
-                log(f"打开用户数据目录失败: {e}")
-
-        def backup_user_data():
-            """备份用户数据"""
-            try:
-                user_data_dir = get_user_data_dir()
-                result = backup_user_data_service(
-                    user_data_dir,
-                    error_log_filename=ERROR_LOG_FILENAME,
-                )
-                if result.item_count:
-                    log(f"✅ 用户数据备份成功: {result.backup_dir}")
-                    log(f"备份了 {result.item_count} 个项目")
-                else:
-                    log("没有需要备份的用户数据")
-
-            except Exception as e:
-                log(f"❌ 备份用户数据失败: {e}")
-
-        def clear_user_data():
-            """清除用户数据（保留备份文件夹）"""
-            try:
-                # 确认对话框
-                result = messagebox.askyesno(
-                    "确认清除",
-                    "此操作将删除所有用户数据（配置文件、证书等），但保留备份文件夹。\n\n确定要继续吗？",
-                    icon="warning",
-                )
-
-                if not result:
-                    log("用户取消了清除操作")
-                    return
-
-                user_data_dir = get_user_data_dir()
-                result = clear_user_data_service(
-                    user_data_dir,
-                    error_log_filename=ERROR_LOG_FILENAME,
-                    copy_template_files_fn=copy_template_files,
-                )
-                if result.removed_count:
-                    log(f"✅ 用户数据清除成功，删除了 {result.removed_count} 个项目")
-                    log("备份文件夹已保留")
-                    if result.copied_files_count:
-                        log(f"✅ 已复制 {result.copied_files_count} 个模板文件")
-                    else:
-                        log("模板文件已存在或复制完成")
-                else:
-                    log("没有需要清除的用户数据")
-
-            except Exception as e:
-                log(f"❌ 清除用户数据失败: {e}")
-
-        def restore_user_data():
-            """从最新备份还原用户数据"""
-            try:
-                user_data_dir = get_user_data_dir()
-                try:
-                    latest_info = find_latest_backup(user_data_dir)
-                except BackupNotFoundError:
-                    log("❌ 没有找到备份文件夹")
-                    messagebox.showwarning("无备份", "没有找到备份文件夹，无法执行还原操作。")
-                    return
-                except NoBackupsError:
-                    log("❌ 没有找到任何备份")
-                    messagebox.showwarning("无备份", "没有找到任何备份文件，无法执行还原操作。")
-                    return
-
-                # 确认对话框
-                result = messagebox.askyesno(
-                    "确认还原",
-                    "将从最新备份还原数据：\n"
-                    f"{latest_info.backup_name}\n\n"
-                    "此操作将覆盖当前的配置文件、证书等数据。\n\n确定要继续吗？",
-                    icon="question",
-                )
-
-                if not result:
-                    log("用户取消了还原操作")
-                    return
-
-                latest_result = restore_backup(
-                    user_data_dir,
-                    backup_path=latest_info.backup_path,
-                )
-                log(
-                    f"✅ 数据还原成功，从备份 {latest_result.backup_name} "
-                    f"还原了 {latest_result.restored_count} 个项目"
-                )
-                messagebox.showinfo(
-                    "还原成功",
-                    "数据还原完成！\n\n"
-                    f"从备份：{latest_result.backup_name}\n"
-                    f"还原项目：{latest_result.restored_count} 个",
-                )
-
-            except Exception as e:
-                log(f"❌ 还原用户数据失败: {e}")
-                messagebox.showerror("还原失败", f"还原操作失败：\n{e}")
-
-        # 按钮区域（仅包含按钮）
-        button_frame = ttk.Frame(data_mgmt_tab)
-        button_frame.pack(fill=tk.X, padx=5, pady=5)
-
-        # 创建按钮并添加提示
-        btn_open = ttk.Button(button_frame, text="打开目录", command=open_user_data_directory)
-        btn_open.pack(fill=tk.X, pady=2)
-        default_user_data_dir = user_data_dir("MTGA", appauthor=False, roaming=os.name == "nt")
-        actual_user_data_dir = get_user_data_dir()
-        if os.path.normpath(actual_user_data_dir) != os.path.normpath(default_user_data_dir):
-            open_dir_tooltip = (
-                "使用系统文件管理器打开用户数据目录\n"
-                f"当前：{actual_user_data_dir}\n"
-                f"默认：{default_user_data_dir}"
+        tab_builders.build_data_management_tab(
+            tab_builders.DataManagementTabDeps(
+                notebook=notebook,
+                log=log,
+                tooltip=tooltip,
+                get_user_data_dir=get_user_data_dir,
+                copy_template_files=copy_template_files,
+                error_log_filename=ERROR_LOG_FILENAME,
             )
-        else:
-            open_dir_tooltip = f"使用系统文件管理器打开用户数据目录\n目录：{actual_user_data_dir}"
-        tooltip(
-            btn_open,
-            open_dir_tooltip,
-        )
-
-        btn_backup = ttk.Button(button_frame, text="备份数据", command=backup_user_data)
-        btn_backup.pack(fill=tk.X, pady=2)
-        tooltip(
-            btn_backup,
-            "创建带时间戳的完整数据备份\n备份内容：配置文件、SSL证书、hosts备份\n备份位置：用户数据目录/backups/backup_时间戳/",
-        )
-
-        btn_restore = ttk.Button(button_frame, text="还原数据", command=restore_user_data)
-        btn_restore.pack(fill=tk.X, pady=2)
-        tooltip(
-            btn_restore,
-            "从最新备份恢复用户数据（覆盖现有数据）\n自动选择最新时间戳的备份进行还原\n注意：此操作会覆盖当前的配置和证书",
-        )
-
-        btn_clear = ttk.Button(button_frame, text="清除数据", command=clear_user_data)
-        btn_clear.pack(fill=tk.X, pady=2)
-        tooltip(
-            btn_clear,
-            "删除所有用户数据（保留历史备份）\n清除内容：配置文件、SSL证书、hosts备份\n保留内容：backups文件夹及其历史备份",
         )
 
     check_updates_button = None
@@ -1670,42 +1393,15 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
 
         update_check_task_id = thread_manager.run("check_updates", worker)
 
-    # 关于标签页
-    style = ttk.Style()
-    style.configure("About.TFrame", background="#f0f0f0")
-    style.configure(
-        "AboutTitle.TLabel",
-        background="#f0f0f0",
-        font=get_preferred_font(size=11, weight="bold"),
+    _, check_updates_button = tab_builders.build_about_tab(
+        tab_builders.AboutTabDeps(
+            notebook=notebook,
+            app_display_name=APP_DISPLAY_NAME,
+            app_version=APP_VERSION,
+            get_preferred_font=get_preferred_font,
+            on_check_updates=check_for_updates,
+        )
     )
-    style.configure(
-        "AboutFooter.TLabel",
-        background="#f0f0f0",
-        foreground="#666666",
-        font=get_preferred_font(size=9),
-    )
-    about_tab = ttk.Frame(notebook, style="About.TFrame")
-    notebook.add(about_tab, text="关于")
-
-    version_label = ttk.Label(
-        about_tab,
-        text=f"{APP_DISPLAY_NAME} {APP_VERSION}",
-        style="AboutTitle.TLabel",
-        anchor="w",
-    )
-    version_label.pack(anchor="w", fill=tk.X, padx=8, pady=(8, 4))
-
-    check_updates_button = ttk.Button(about_tab, text="检查更新", command=check_for_updates)
-    check_updates_button.pack(anchor="w", padx=8, pady=(0, 8))
-
-    about_footer = ttk.Label(
-        about_tab,
-        text="powered by BiFangKNT",
-        style="AboutFooter.TLabel",
-        anchor="center",
-        justify="center",
-    )
-    about_footer.pack(side=tk.BOTTOM, fill=tk.X, padx=8, pady=(0, 8))
 
     # 一键启动按钮
     def start_all_task():
