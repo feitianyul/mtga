@@ -9,13 +9,12 @@ import locale
 import logging
 import os
 import shutil
-import socket
-import subprocess
 import sys
 import tkinter as tk
 import webbrowser
 from contextlib import suppress
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 from tkinter import font as tkfont
 from tkinter import messagebox, scrolledtext, ttk
@@ -31,26 +30,14 @@ except ModuleNotFoundError:  # pragma: no cover
     tomllib = None
 
 from modules.tk_fonts import FontManager, apply_global_font
-
-if sys.platform == "darwin":
-    try:
-        import Cocoa  # pyright: ignore[reportMissingImports]
-        import Foundation  # pyright: ignore[reportMissingImports]
-        import objc  # pyright: ignore[reportMissingImports]
-    except ImportError:
-        Cocoa = None
-        Foundation = None
-        objc = None
-    NSDistributedNotificationCenter = (
-        getattr(Cocoa, "NSDistributedNotificationCenter", None) if Cocoa else None
-    )
-    NSObject = getattr(Foundation, "NSObject", None) if Foundation else None
-else:  # 非 macOS 平台仅作占位
-    Cocoa = None
-    Foundation = None
-    objc = None
-    NSDistributedNotificationCenter = None
-    NSObject = None
+from modules.ui_helpers import (
+    build_text_logger,
+    build_tk_error_handler,
+    center_window,
+    create_tooltip,
+)
+from modules.macos_theme import detect_macos_dark_mode
+from modules.network_utils import is_port_in_use
 
 os.environ.setdefault("LANG", "zh_CN.UTF-8")
 os.environ.setdefault("LC_ALL", "zh_CN.UTF-8")
@@ -193,7 +180,6 @@ APP_DISPLAY_NAME = "MTGA GUI"
 GITHUB_REPO = "BiFangKNT/mtga"
 ERROR_LOG_FILENAME = "mtga_gui_error.log"
 CA_COMMON_NAME = "MTGA_CA"
-THEME_OBSERVER_CLASS = None
 
 
 def setup_logging():
@@ -623,10 +609,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
         except tk.TclError:
             pass
 
-    def tk_error_handler(exc, val, tb):
-        log_error("Tkinter 回调异常", exc_info=(exc, val, tb))
-
-    window.report_callback_exception = tk_error_handler
+    window.report_callback_exception = build_tk_error_handler(log_error, "Tkinter 回调异常")
 
     font_manager = FontManager()
 
@@ -684,127 +667,14 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
     log_text = scrolledtext.ScrolledText(log_frame, height=10, width=1)
     log_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-    def log(message):
-        """日志输出函数"""
-        # 将 \\n 替换为真正的换行符
-        formatted_message = message.replace("\\n", "\n")
-        log_text.insert(tk.END, f"{formatted_message}\n")
-        log_text.see(tk.END)
-        log_text.update()  # 强制更新显示
-        try:
-            print(formatted_message)  # 同时输出到控制台
-        except UnicodeEncodeError:
-            fallback = formatted_message.encode("unicode_escape").decode("ascii", errors="replace")
-            print(fallback)
-
-    def detect_macos_dark_mode():
-        """检测 macOS 是否处于深色模式"""
-        if sys.platform != "darwin":
-            return False
-
-        apple_script = (
-            'tell application "System Events" to tell appearance preferences to get dark mode'
-        )
-        commands = [
-            (["osascript", "-e", apple_script], {"true"}),
-            (["defaults", "read", "-g", "AppleInterfaceStyle"], {"dark"}),
-        ]
-        for cmd, expected in commands:
-            try:
-                result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-            except (FileNotFoundError, OSError):
-                continue
-            output = (result.stdout or "").strip().lower()
-            if result.returncode == 0 and output in expected:
-                return True
-        return False
+    log = build_text_logger(log_text)
 
     macos_dark_mode = detect_macos_dark_mode()
-
-    def register_macos_theme_observer(callback):
-        """监听 macOS 主题切换通知并返回 (center, observer)。"""
-        if (
-            sys.platform != "darwin"
-            or NSDistributedNotificationCenter is None
-            or NSObject is None
-            or objc is None
-        ):
-            return None, None
-
-        global THEME_OBSERVER_CLASS  # noqa: PLW0603
-        if THEME_OBSERVER_CLASS is None:
-
-            class ThemeObserver(NSObject):  # type: ignore[misc]
-                """在 macOS 上监听主题切换通知。"""
-
-                def initWithCallback_(self, cb):
-                    obj = objc.super(ThemeObserver, self).init()  # type: ignore[attr-defined]
-                    if obj is None:
-                        return None
-                    obj._callback = cb
-                    return obj
-
-                def themeChanged_(self, _notification):
-                    if getattr(self, "_callback", None):
-                        self._callback()
-
-            THEME_OBSERVER_CLASS = ThemeObserver
-
-        observer = THEME_OBSERVER_CLASS.alloc().initWithCallback_(callback)  # type: ignore[call-arg]
-        center = NSDistributedNotificationCenter.defaultCenter()
-        selector_factory: Any = objc.selector  # type: ignore[attr-defined]
-        selector = selector_factory(  # type: ignore[call-arg]
-            THEME_OBSERVER_CLASS.themeChanged_, signature=b"v@:@"
-        )
-        center.addObserver_selector_name_object_(
-            observer,
-            selector,
-            "AppleInterfaceThemeChangedNotification",
-            None,
-        )
-        return center, observer
-
-    def create_tooltip(widget, text, wraplength=300):
-        """为控件创建可复用悬浮提示"""
-        tooltip_window = None
-        bg_color = "#2C2C2E" if macos_dark_mode else "lightyellow"
-        fg_color = "#F5F5F7" if macos_dark_mode else "black"
-
-        def on_enter(event):
-            nonlocal tooltip_window
-            tooltip_window = tk.Toplevel()
-            tooltip_window.wm_overrideredirect(True)
-            tooltip_window.wm_geometry(f"+{event.x_root + 10}+{event.y_root + 10}")
-            tooltip_window.configure(bg=bg_color, relief="solid", bd=1, highlightthickness=0)
-            label = tk.Label(
-                tooltip_window,
-                text=text,
-                bg=bg_color,
-                fg=fg_color,
-                font=get_preferred_font(size=9),
-                wraplength=wraplength,
-            )
-            label.pack()
-
-        def on_leave(event):
-            nonlocal tooltip_window
-            if tooltip_window:
-                tooltip_window.destroy()
-                tooltip_window = None
-
-        widget.bind("<Enter>", on_enter)
-        widget.bind("<Leave>", on_leave)
-
-    def center_window(toplevel: tk.Toplevel | tk.Tk):
-        """隐藏后再居中显示，避免 macOS 上先闪到左上角。"""
-        toplevel.withdraw()
-        toplevel.update_idletasks()
-        width = max(toplevel.winfo_width(), toplevel.winfo_reqwidth())
-        height = max(toplevel.winfo_height(), toplevel.winfo_reqheight())
-        x = (toplevel.winfo_screenwidth() // 2) - (width // 2)
-        y = (toplevel.winfo_screenheight() // 2) - (height // 2)
-        toplevel.geometry(f"+{x}+{y}")
-        toplevel.deiconify()
+    tooltip = partial(
+        create_tooltip,
+        font_getter=get_preferred_font,
+        is_dark_mode=macos_dark_mode,
+    )
 
     proxy_start_task_id = None
     proxy_stop_task_id = None
@@ -880,22 +750,6 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
             return True
         if show_idle_message:
             log("代理服务器未运行")
-        return False
-
-    def is_port_in_use(port: int) -> bool:
-        """检查本地端口是否已被占用。"""
-        checks = [("127.0.0.1", socket.AF_INET)]
-        if socket.has_ipv6:
-            checks.append(("::1", socket.AF_INET6))
-
-        for host, family in checks:
-            with socket.socket(family, socket.SOCK_STREAM) as sock:
-                sock.settimeout(0.2)
-                try:
-                    if sock.connect_ex((host, port)) == 0:
-                        return True
-                except OSError:
-                    continue
         return False
 
     def start_proxy_instance(
@@ -1008,7 +862,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
     test_btn = ttk.Button(list_header_frame, text="测活", command=test_selected_config, width=6)
     test_btn.pack(side=tk.RIGHT, padx=5)
 
-    create_tooltip(
+    tooltip(
         test_btn,
         "测试选中配置组的实际对话功能\n会发送最小请求并消耗少量tokens\n请确保配置正确后使用",
         wraplength=250,
@@ -1017,7 +871,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
     refresh_btn = ttk.Button(list_header_frame, text="刷新", command=refresh_config_list, width=6)
     refresh_btn.pack(side=tk.RIGHT, padx=16)
 
-    create_tooltip(
+    tooltip(
         refresh_btn,
         "重新加载配置文件中的配置组\n用于同步外部修改或恢复意外更改",
         wraplength=250,
@@ -1417,7 +1271,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
     mapped_model_var = tk.StringVar()
     mapped_model_entry = ttk.Entry(mapped_model_frame, textvariable=mapped_model_var, width=25)
     mapped_model_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 0))
-    create_tooltip(
+    tooltip(
         mapped_model_entry,
         "必填：映射模型ID\n"
         "对应 Trae 端填写的模型名，自定义，\n与实际模型ID是互相独立的概念。\n"
@@ -1432,7 +1286,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
     mtga_auth_var = tk.StringVar()
     mtga_auth_entry = ttk.Entry(mtga_auth_frame, textvariable=mtga_auth_var, width=25, show="*")
     mtga_auth_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 0))
-    create_tooltip(
+    tooltip(
         mtga_auth_entry,
         "必填：MTGA鉴权Key\n"
         "对应 Trae 端填写的 API 密钥，自定义，\n与实际 API Key 是互相独立的概念。\n"
@@ -1495,7 +1349,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
         command=on_debug_mode_toggle,
     )
     debug_mode_check.pack(side=tk.LEFT)
-    create_tooltip(
+    tooltip(
         debug_mode_check,
         "开启后：\n"
         "1) 代理服务器输出更详细的调试日志，便于排查问题；\n"
@@ -1616,7 +1470,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
     )
     clear_ca_btn = ttk.Button(cert_tab, text="清除系统CA证书", command=confirm_clear_ca_cert)
     clear_ca_btn.pack(fill=tk.X, padx=5, pady=5)
-    create_tooltip(
+    tooltip(
         clear_ca_btn,
         "macOS: 删除系统钥匙串中匹配的CA证书；"
         "Windows: 删除本地计算机/Root 中匹配的CA证书\n"
@@ -1944,28 +1798,28 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
             )
         else:
             open_dir_tooltip = f"使用系统文件管理器打开用户数据目录\n目录：{actual_user_data_dir}"
-        create_tooltip(
+        tooltip(
             btn_open,
             open_dir_tooltip,
         )
 
         btn_backup = ttk.Button(button_frame, text="备份数据", command=backup_user_data)
         btn_backup.pack(fill=tk.X, pady=2)
-        create_tooltip(
+        tooltip(
             btn_backup,
             "创建带时间戳的完整数据备份\n备份内容：配置文件、SSL证书、hosts备份\n备份位置：用户数据目录/backups/backup_时间戳/",
         )
 
         btn_restore = ttk.Button(button_frame, text="还原数据", command=restore_user_data)
         btn_restore.pack(fill=tk.X, pady=2)
-        create_tooltip(
+        tooltip(
             btn_restore,
             "从最新备份恢复用户数据（覆盖现有数据）\n自动选择最新时间戳的备份进行还原\n注意：此操作会覆盖当前的配置和证书",
         )
 
         btn_clear = ttk.Button(button_frame, text="清除数据", command=clear_user_data)
         btn_clear.pack(fill=tk.X, pady=2)
-        create_tooltip(
+        tooltip(
             btn_clear,
             "删除所有用户数据（保留历史备份）\n清除内容：配置文件、SSL证书、hosts备份\n保留内容：backups文件夹及其历史备份",
         )
