@@ -3,17 +3,14 @@
 
 # 在最早阶段设置 UTF-8 编码环境变量 - 必须在任何导入之前
 import ctypes
-import glob
 import io
 import locale
 import logging
 import os
-import shutil
 import sys
 import tkinter as tk
 import webbrowser
 from contextlib import suppress
-from datetime import datetime
 from functools import partial
 from pathlib import Path
 from tkinter import font as tkfont
@@ -38,6 +35,14 @@ from modules.ui_helpers import (
 )
 from modules.macos_theme import detect_macos_dark_mode
 from modules.network_utils import is_port_in_use
+from modules.services.user_data_service import (
+    BackupNotFoundError,
+    NoBackupsError,
+    backup_user_data as backup_user_data_service,
+    clear_user_data as clear_user_data_service,
+    find_latest_backup,
+    restore_backup,
+)
 
 os.environ.setdefault("LANG", "zh_CN.UTF-8")
 os.environ.setdefault("LC_ALL", "zh_CN.UTF-8")
@@ -1634,34 +1639,13 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
             """备份用户数据"""
             try:
                 user_data_dir = get_user_data_dir()
-                backup_base_dir = os.path.join(user_data_dir, "backups")
-
-                # 创建备份基础目录
-                os.makedirs(backup_base_dir, exist_ok=True)
-
-                # 生成时间戳文件夹名
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                backup_dir = os.path.join(backup_base_dir, f"backup_{timestamp}")
-
-                # 复制除备份文件夹外的所有文件和文件夹
-                items_to_backup = []
-                for item in os.listdir(user_data_dir):
-                    item_path = os.path.join(user_data_dir, item)
-                    if item not in {"backups", ERROR_LOG_FILENAME}:  # 排除备份文件夹和日志
-                        items_to_backup.append((item, item_path))
-
-                if items_to_backup:
-                    os.makedirs(backup_dir, exist_ok=True)
-
-                    for item_name, item_path in items_to_backup:
-                        dest_path = os.path.join(backup_dir, item_name)
-                        if os.path.isfile(item_path):
-                            shutil.copy2(item_path, dest_path)
-                        elif os.path.isdir(item_path):
-                            shutil.copytree(item_path, dest_path)
-
-                    log(f"✅ 用户数据备份成功: {backup_dir}")
-                    log(f"备份了 {len(items_to_backup)} 个项目")
+                result = backup_user_data_service(
+                    user_data_dir,
+                    error_log_filename=ERROR_LOG_FILENAME,
+                )
+                if result.item_count:
+                    log(f"✅ 用户数据备份成功: {result.backup_dir}")
+                    log(f"备份了 {result.item_count} 个项目")
                 else:
                     log("没有需要备份的用户数据")
 
@@ -1683,29 +1667,16 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
                     return
 
                 user_data_dir = get_user_data_dir()
-
-                # 删除除备份文件夹外的所有文件和文件夹
-                items_to_remove = []
-                for item in os.listdir(user_data_dir):
-                    if item not in {"backups", ERROR_LOG_FILENAME}:  # 保留备份文件夹与日志
-                        item_path = os.path.join(user_data_dir, item)
-                        items_to_remove.append((item, item_path))
-
-                if items_to_remove:
-                    for _item_name, item_path in items_to_remove:
-                        if os.path.isfile(item_path):
-                            os.remove(item_path)
-                        elif os.path.isdir(item_path):
-                            shutil.rmtree(item_path)
-
-                    log(f"✅ 用户数据清除成功，删除了 {len(items_to_remove)} 个项目")
+                result = clear_user_data_service(
+                    user_data_dir,
+                    error_log_filename=ERROR_LOG_FILENAME,
+                    copy_template_files_fn=copy_template_files,
+                )
+                if result.removed_count:
+                    log(f"✅ 用户数据清除成功，删除了 {result.removed_count} 个项目")
                     log("备份文件夹已保留")
-
-                    # 清除数据后复制模板文件
-                    log("正在复制模板文件...")
-                    copied_files = copy_template_files()
-                    if copied_files:
-                        log(f"✅ 已复制 {len(copied_files)} 个模板文件")
+                    if result.copied_files_count:
+                        log(f"✅ 已复制 {result.copied_files_count} 个模板文件")
                     else:
                         log("模板文件已存在或复制完成")
                 else:
@@ -1718,31 +1689,23 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
             """从最新备份还原用户数据"""
             try:
                 user_data_dir = get_user_data_dir()
-                backup_base_dir = os.path.join(user_data_dir, "backups")
-
-                # 检查是否存在备份
-                if not os.path.exists(backup_base_dir):
+                try:
+                    latest_info = find_latest_backup(user_data_dir)
+                except BackupNotFoundError:
                     log("❌ 没有找到备份文件夹")
                     messagebox.showwarning("无备份", "没有找到备份文件夹，无法执行还原操作。")
                     return
-
-                # 查找所有备份文件夹
-                backup_pattern = os.path.join(backup_base_dir, "backup_*")
-                backup_folders = glob.glob(backup_pattern)
-
-                if not backup_folders:
+                except NoBackupsError:
                     log("❌ 没有找到任何备份")
                     messagebox.showwarning("无备份", "没有找到任何备份文件，无法执行还原操作。")
                     return
 
-                # 找到最新的备份（按文件夹名排序，时间戳格式保证了字典序就是时间序）
-                latest_backup = max(backup_folders, key=lambda x: os.path.basename(x))
-                backup_name = os.path.basename(latest_backup)
-
                 # 确认对话框
                 result = messagebox.askyesno(
                     "确认还原",
-                    f"将从最新备份还原数据：\n{backup_name}\n\n此操作将覆盖当前的配置文件、证书等数据。\n\n确定要继续吗？",
+                    "将从最新备份还原数据：\n"
+                    f"{latest_info.backup_name}\n\n"
+                    "此操作将覆盖当前的配置文件、证书等数据。\n\n确定要继续吗？",
                     icon="question",
                 )
 
@@ -1750,31 +1713,19 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
                     log("用户取消了还原操作")
                     return
 
-                # 执行还原操作
-                restored_count = 0
-                for item in os.listdir(latest_backup):
-                    src_path = os.path.join(latest_backup, item)
-                    dest_path = os.path.join(user_data_dir, item)
-
-                    # 如果目标已存在，先删除
-                    if os.path.exists(dest_path):
-                        if os.path.isfile(dest_path):
-                            os.remove(dest_path)
-                        elif os.path.isdir(dest_path):
-                            shutil.rmtree(dest_path)
-
-                    # 复制文件或目录
-                    if os.path.isfile(src_path):
-                        shutil.copy2(src_path, dest_path)
-                    elif os.path.isdir(src_path):
-                        shutil.copytree(src_path, dest_path)
-
-                    restored_count += 1
-
-                log(f"✅ 数据还原成功，从备份 {backup_name} 还原了 {restored_count} 个项目")
+                latest_result = restore_backup(
+                    user_data_dir,
+                    backup_path=latest_info.backup_path,
+                )
+                log(
+                    f"✅ 数据还原成功，从备份 {latest_result.backup_name} "
+                    f"还原了 {latest_result.restored_count} 个项目"
+                )
                 messagebox.showinfo(
                     "还原成功",
-                    f"数据还原完成！\n\n从备份：{backup_name}\n还原项目：{restored_count} 个",
+                    "数据还原完成！\n\n"
+                    f"从备份：{latest_result.backup_name}\n"
+                    f"还原项目：{latest_result.restored_count} 个",
                 )
 
             except Exception as e:

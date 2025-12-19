@@ -1,0 +1,162 @@
+from __future__ import annotations
+
+import glob
+import os
+import shutil
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import datetime
+
+
+@dataclass(frozen=True)
+class BackupResult:
+    backup_dir: str | None
+    item_count: int
+
+
+@dataclass(frozen=True)
+class ClearResult:
+    removed_count: int
+    copied_files_count: int
+
+
+@dataclass(frozen=True)
+class RestoreResult:
+    backup_name: str
+    restored_count: int
+
+
+@dataclass(frozen=True)
+class LatestBackupInfo:
+    backup_name: str
+    backup_path: str
+
+
+class BackupNotFoundError(FileNotFoundError):
+    pass
+
+
+class NoBackupsError(FileNotFoundError):
+    pass
+
+
+def _collect_user_items(
+    user_data_dir: str,
+    *,
+    exclude_names: set[str],
+) -> list[tuple[str, str]]:
+    items: list[tuple[str, str]] = []
+    for item in os.listdir(user_data_dir):
+        if item in exclude_names:
+            continue
+        item_path = os.path.join(user_data_dir, item)
+        items.append((item, item_path))
+    return items
+
+
+def backup_user_data(
+    user_data_dir: str,
+    *,
+    error_log_filename: str,
+) -> BackupResult:
+    backup_base_dir = os.path.join(user_data_dir, "backups")
+    os.makedirs(backup_base_dir, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_dir = os.path.join(backup_base_dir, f"backup_{timestamp}")
+
+    items_to_backup = _collect_user_items(
+        user_data_dir,
+        exclude_names={"backups", error_log_filename},
+    )
+
+    if not items_to_backup:
+        return BackupResult(None, 0)
+
+    os.makedirs(backup_dir, exist_ok=True)
+    for item_name, item_path in items_to_backup:
+        dest_path = os.path.join(backup_dir, item_name)
+        if os.path.isfile(item_path):
+            shutil.copy2(item_path, dest_path)
+        elif os.path.isdir(item_path):
+            shutil.copytree(item_path, dest_path)
+
+    return BackupResult(backup_dir, len(items_to_backup))
+
+
+def clear_user_data(
+    user_data_dir: str,
+    *,
+    error_log_filename: str,
+    copy_template_files_fn: Callable[[], list[str]] | None = None,
+) -> ClearResult:
+    items_to_remove = _collect_user_items(
+        user_data_dir,
+        exclude_names={"backups", error_log_filename},
+    )
+    if not items_to_remove:
+        return ClearResult(0, 0)
+
+    for _item_name, item_path in items_to_remove:
+        if os.path.isfile(item_path):
+            os.remove(item_path)
+        elif os.path.isdir(item_path):
+            shutil.rmtree(item_path)
+
+    copied_files_count = 0
+    if copy_template_files_fn is not None:
+        copied_files = copy_template_files_fn()
+        copied_files_count = len(copied_files) if copied_files else 0
+
+    return ClearResult(len(items_to_remove), copied_files_count)
+
+
+def find_latest_backup(
+    user_data_dir: str,
+) -> LatestBackupInfo:
+    backup_base_dir = os.path.join(user_data_dir, "backups")
+    if not os.path.exists(backup_base_dir):
+        raise BackupNotFoundError("未找到备份目录")
+
+    backup_pattern = os.path.join(backup_base_dir, "backup_*")
+    backup_folders = glob.glob(backup_pattern)
+    if not backup_folders:
+        raise NoBackupsError("未找到任何备份")
+
+    latest_backup = max(backup_folders, key=lambda x: os.path.basename(x))
+    backup_name = os.path.basename(latest_backup)
+    return LatestBackupInfo(backup_name=backup_name, backup_path=latest_backup)
+
+
+def restore_backup(
+    user_data_dir: str,
+    *,
+    backup_path: str,
+) -> RestoreResult:
+    backup_name = os.path.basename(backup_path)
+    restored_count = 0
+    for item in os.listdir(backup_path):
+        src_path = os.path.join(backup_path, item)
+        dest_path = os.path.join(user_data_dir, item)
+
+        if os.path.exists(dest_path):
+            if os.path.isfile(dest_path):
+                os.remove(dest_path)
+            elif os.path.isdir(dest_path):
+                shutil.rmtree(dest_path)
+
+        if os.path.isfile(src_path):
+            shutil.copy2(src_path, dest_path)
+        elif os.path.isdir(src_path):
+            shutil.copytree(src_path, dest_path)
+
+        restored_count += 1
+
+    return RestoreResult(backup_name, restored_count)
+
+
+def restore_latest_backup(
+    user_data_dir: str,
+) -> RestoreResult:
+    latest = find_latest_backup(user_data_dir)
+    return restore_backup(user_data_dir, backup_path=latest.backup_path)
