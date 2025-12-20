@@ -146,6 +146,7 @@ try:
         model_tests,
         proxy_actions,
         shutdown_actions,
+        update_actions,
     )
     from modules.services.config_service import ConfigStore
     from modules.services import proxy_orchestration, startup_checks, update_service
@@ -617,81 +618,13 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
 
     check_updates_button = None
 
-    update_check_task_id = None
+    update_state = update_actions.UpdateCheckState()
+    update_deps: update_actions.UpdateCheckDeps | None = None
 
-    def check_for_updates():
-        """后台检查 GitHub 最新发行版，并在主线程更新 UI。"""
-        nonlocal check_updates_button, update_check_task_id
-        if check_updates_button:
-            check_updates_button.state(["disabled"])
-
-        def finalize(callback):
-            def _finish():
-                if check_updates_button:
-                    check_updates_button.state(["!disabled"])
-                callback()
-
-            window.after(0, _finish)
-
-        def worker():
-            result = update_service.check_for_updates(
-                repo=GITHUB_REPO,
-                app_version=APP_VERSION,
-                timeout=10,
-                user_agent=f"{APP_DISPLAY_NAME}/{APP_VERSION}",
-                font=update_service.UpdateFontOptions(
-                    family=default_font.cget("family"),
-                    size=int(default_font.cget("size")),
-                    weight=default_font.cget("weight"),
-                ),
-            )
-
-            if result.status == "network_error":
-                error_msg = result.error_message or "检查更新失败：网络异常"
-                finalize(lambda: (messagebox.showerror("检查更新失败", error_msg), log(error_msg)))
-                return
-            if result.status == "remote_error":
-                error_msg = result.error_message or "检查更新失败"
-                finalize(lambda: (messagebox.showerror("检查更新失败", error_msg), log(error_msg)))
-                return
-            if result.status == "no_version":
-                finalize(
-                    lambda: (
-                        messagebox.showwarning("检查更新", "未能解析最新版本号，请稍后再试。"),
-                        log("检查更新失败：未解析到版本号"),
-                    )
-                )
-                return
-            if result.status == "up_to_date":
-                finalize(
-                    lambda: (
-                        messagebox.showinfo("检查更新", f"当前版本 {APP_VERSION} 已是最新。"),
-                        log("检查更新：当前已是最新版本"),
-                    )
-                )
-                return
-
-            latest_version = result.latest_version or "未知版本"
-            release_notes = result.release_notes or "该版本暂无更新说明。"
-            release_url = result.release_url or ""
-
-            def _show_new_version():
-                update_dialog.show_release_notes_dialog(
-                    update_dialog.UpdateDialogDeps(
-                        window=window,
-                        notes_html=release_notes,
-                        release_url=release_url,
-                        version_label=latest_version,
-                        create_tkinterweb_html_widget=create_tkinterweb_html_widget,
-                        program_resource_dir=resource_manager_module.get_program_resource_dir(),
-                        log=log,
-                    )
-                )
-                log(f"发现新版本：{latest_version}")
-
-            finalize(_show_new_version)
-
-        update_check_task_id = thread_manager.run("check_updates", worker)
+    def check_for_updates() -> None:
+        if update_deps is None:
+            return
+        update_actions.run_update_check(deps=update_deps, state=update_state)
 
     _, check_updates_button = tab_builders.build_about_tab(
         tab_builders.AboutTabDeps(
@@ -701,6 +634,21 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
             get_preferred_font=get_preferred_font,
             on_check_updates=check_for_updates,
         )
+    )
+    update_deps = update_actions.UpdateCheckDeps(
+        window=window,
+        log=log,
+        thread_manager=thread_manager,
+        check_button=check_updates_button,
+        app_display_name=APP_DISPLAY_NAME,
+        app_version=APP_VERSION,
+        repo=GITHUB_REPO,
+        default_font=default_font,
+        update_service=update_service,
+        update_dialog=update_dialog,
+        messagebox=messagebox,
+        create_tkinterweb_html_widget=create_tkinterweb_html_widget,
+        program_resource_dir=resource_manager_module.get_program_resource_dir(),
     )
 
     # 一键启动按钮
