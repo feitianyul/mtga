@@ -153,7 +153,12 @@ try:
     from modules.actions import hosts_actions, model_tests, proxy_actions
     from modules.services.config_service import ConfigStore
     from modules.services import update_service
-    from modules.ui import config_group_panel, global_config_panel, tab_builders
+    from modules.ui import (
+        config_group_panel,
+        global_config_panel,
+        runtime_options_panel,
+        tab_builders,
+    )
     from modules import resource_manager as resource_manager_module
 except ImportError as e:
     print(f"导入模块失败: {e}")
@@ -507,9 +512,13 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
             log("❌ 错误: 没有可用的配置组")
             return None
         config = current_config.copy()
-        config["debug_mode"] = debug_mode_var.get()
-        config["disable_ssl_strict_mode"] = disable_ssl_strict_var.get()
-        config["stream_mode"] = stream_mode_combo.get() if stream_mode_var.get() else None
+        config["debug_mode"] = runtime_options.debug_mode_var.get()
+        config["disable_ssl_strict_mode"] = runtime_options.disable_ssl_strict_var.get()
+        config["stream_mode"] = (
+            runtime_options.stream_mode_combo.get()
+            if runtime_options.stream_mode_var.get()
+            else None
+        )
         return config
 
     def restart_proxy(
@@ -662,57 +671,18 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
         )
     )
 
-    # 调试与 SSL 模式选项
-    debug_ssl_frame = ttk.Frame(left_content)
-    debug_ssl_frame.pack(fill=tk.X, padx=5, pady=2)
-    debug_mode_var = tk.BooleanVar(value=False)
-
     def on_debug_mode_toggle():
         nonlocal network_env_precheck_enabled
-        enabled = bool(debug_mode_var.get())
+        enabled = bool(runtime_options.debug_mode_var.get())
         network_env_precheck_enabled = enabled
 
-    debug_mode_check = ttk.Checkbutton(
-        debug_ssl_frame,
-        text="开启调试模式",
-        variable=debug_mode_var,
-        command=on_debug_mode_toggle,
+    runtime_options = runtime_options_panel.build_runtime_options_panel(
+        runtime_options_panel.RuntimeOptionsPanelDeps(
+            parent=left_content,
+            tooltip=tooltip,
+            on_debug_mode_toggle=on_debug_mode_toggle,
+        )
     )
-    debug_mode_check.pack(side=tk.LEFT)
-    tooltip(
-        debug_mode_check,
-        "开启后：\n"
-        "1) 代理服务器输出更详细的调试日志，便于排查问题；\n"
-        "2) 启动代理服务器前会额外检查系统/环境变量的显式代理配置\n并提示其可能绕过 hosts 导流。\n"
-        "（默认不做第 2 项检查，仅在调试模式下启用）",
-        wraplength=500,
-    )
-    disable_ssl_strict_var = tk.BooleanVar(value=False)
-    disable_ssl_strict_check = ttk.Checkbutton(
-        debug_ssl_frame,
-        text="关闭SSL严格模式",
-        variable=disable_ssl_strict_var,
-    )
-    disable_ssl_strict_check.pack(side=tk.LEFT, padx=(20, 0))
-
-    # 强制流模式选项
-    stream_mode_frame = ttk.Frame(left_content)
-    stream_mode_frame.pack(fill=tk.X, padx=5, pady=2)
-    stream_mode_var = tk.BooleanVar(value=False)
-    stream_mode_check = ttk.Checkbutton(
-        stream_mode_frame,
-        text="强制流模式:",
-        variable=stream_mode_var,
-        command=lambda: stream_mode_combo.config(
-            state="readonly" if stream_mode_var.get() else "disabled"
-        ),
-    )
-    stream_mode_check.pack(side=tk.LEFT)
-    stream_mode_combo = ttk.Combobox(
-        stream_mode_frame, values=["true", "false"], state="disabled", width=10
-    )
-    stream_mode_combo.pack(side=tk.LEFT, padx=(10, 0))  # 改为左对齐，减小间距
-    stream_mode_combo.set("true")  # 默认值
 
     # 功能标签页
     notebook = ttk.Notebook(left_content)
