@@ -129,8 +129,6 @@ try:
         ALLOW_UNSAFE_HOSTS_FLAG,
         configure_hosts_modify_block,
         get_hosts_file_path,
-        get_hosts_modify_block_report,
-        is_hosts_modify_blocked,
         modify_hosts_file,
         open_hosts_file,
     )
@@ -147,7 +145,7 @@ try:
     from modules import macos_privileged_helper
     from modules.actions import hosts_actions, model_tests, proxy_actions
     from modules.services.config_service import ConfigStore
-    from modules.services import update_service
+    from modules.services import startup_checks, update_service
     from modules.ui import (
         config_group_panel,
         global_config_panel,
@@ -558,38 +556,13 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
         ),
     )
 
-    # 显示环境检查结果
-    env_ok, env_msg = check_environment()
-    if env_ok:
-        log(f"✅ {env_msg}")
-        if is_packaged():
-            log("📦 运行在 Nuitka 打包环境中")
-        else:
-            log("🔧 运行在开发环境中")
-    else:
-        log(f"❌ {env_msg}")
-
-    if is_hosts_modify_blocked():
-        report = get_hosts_modify_block_report()
-        status = report.status.value if report else "unknown"
-        log(
-            f"⚠️ 检测到 hosts 文件写入受限（status={status}），已启用受限 hosts 模式："
-            "添加将回退为追加写入（无法保证原子性增删/去重），自动移除/还原将被禁用。"
-        )
-        log(
-            f"⚠️ 你可以点击「打开hosts文件」手动修改；或使用启动参数 "
-            f"{ALLOW_UNSAFE_HOSTS_FLAG} 覆盖此检查以强制尝试原子写入（风险自负）。"
-        )
-    elif HOSTS_PREFLIGHT_REPORT is not None and not HOSTS_PREFLIGHT_REPORT.ok:
-        log(
-            f"⚠️ hosts 预检未通过（status={HOSTS_PREFLIGHT_REPORT.status.value}），"
-            f"但已使用启动参数 {ALLOW_UNSAFE_HOSTS_FLAG} 覆盖；后续自动修改可能失败。"
-        )
-
-    if NETWORK_ENV_REPORT is not None and NETWORK_ENV_REPORT.explicit_proxy_detected:
-        log("⚠️" * 20 + "\n检测到显式代理配置：部分应用可能优先走代理，从而绕过 hosts 导流。")
-        log("建议：1. 关闭显式代理（如clash的系统代理），或改用 TUN/VPN")
-        log("      2. 检查 Trae 的代理设置。\n" + "⚠️" * 20)
+    startup_checks.emit_startup_logs(
+        log=log,
+        check_environment=check_environment,
+        is_packaged=is_packaged,
+        hosts_preflight_report=HOSTS_PREFLIGHT_REPORT,
+        network_env_report=NETWORK_ENV_REPORT,
+    )
 
     config_group_panel.build_config_group_panel(
         config_group_panel.ConfigGroupPanelDeps(
