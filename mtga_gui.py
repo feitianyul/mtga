@@ -141,7 +141,12 @@ try:
     from modules.tkhtml_compat import create_tkinterweb_html_widget
     from modules.thread_manager import ThreadManager
     from modules import macos_privileged_helper
-    from modules.actions import hosts_actions, model_tests, proxy_actions
+    from modules.actions import (
+        hosts_actions,
+        model_tests,
+        proxy_actions,
+        shutdown_actions,
+    )
     from modules.services.config_service import ConfigStore
     from modules.services import proxy_orchestration, startup_checks, update_service
     from modules.ui import (
@@ -422,7 +427,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
         is_dark_mode=macos_dark_mode,
     )
 
-    shutdown_task_id = None
+    shutdown_state = shutdown_actions.ShutdownState()
     network_env_precheck_enabled = False
 
     def ensure_global_config_ready() -> bool:
@@ -722,33 +727,19 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
     layout_builders.init_paned_layout(main_paned, main_frame, window)
 
     # 窗口关闭处理
-    def on_closing():
-        nonlocal shutdown_task_id
-        if shutdown_task_id:
-            log("⌛ 正在退出程序，请稍候...")
-            return
-
-        log("正在退出程序，请稍候...")
-
-        def cleanup():
-            nonlocal shutdown_task_id
-            try:
-                thread_manager.wait(proxy_runner.proxy_start_task_id, timeout=5)
-                thread_manager.wait(proxy_runner.proxy_stop_task_id, timeout=5)
-                stopped = stop_proxy_and_restore(block_hosts_cleanup=True)
-                if stopped:
-                    log("代理服务器已停止，程序即将退出")
-            finally:
-                shutdown_task_id = None
-                window.after(0, window.destroy)
-
-        shutdown_task_id = thread_manager.run(
-            "app_shutdown",
-            cleanup,
-            allow_parallel=False,
-        )
-
-    window.protocol("WM_DELETE_WINDOW", on_closing)
+    window.protocol(
+        "WM_DELETE_WINDOW",
+        lambda: shutdown_actions.handle_window_close(
+            deps=shutdown_actions.ShutdownDeps(
+                window=window,
+                log=log,
+                thread_manager=thread_manager,
+                stop_proxy_and_restore=stop_proxy_and_restore,
+                proxy_runner=proxy_runner,
+            ),
+            state=shutdown_state,
+        ),
+    )
 
     log("MTGA GUI 已启动")
     log("请选择操作或直接使用一键启动...")
