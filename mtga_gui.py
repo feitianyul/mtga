@@ -14,7 +14,7 @@ from contextlib import suppress
 from functools import partial
 from pathlib import Path
 from tkinter import font as tkfont
-from tkinter import messagebox, scrolledtext, ttk
+from tkinter import messagebox, ttk
 from typing import Any, Literal, cast
 
 
@@ -25,7 +25,6 @@ except ModuleNotFoundError:  # pragma: no cover
 
 from modules.tk_fonts import FontManager, apply_global_font
 from modules.ui_helpers import (
-    build_text_logger,
     build_tk_error_handler,
     center_window,
     create_tooltip,
@@ -156,6 +155,7 @@ try:
     from modules.ui import (
         config_group_panel,
         global_config_panel,
+        layout_builders,
         runtime_options_panel,
         tab_builders,
     )
@@ -431,42 +431,12 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
     except Exception:
         pass
 
-    # 创建主框架
-    main_frame = ttk.Frame(window, padding=10)
-    main_frame.pack(fill=tk.BOTH, expand=True)
-
-    # 添加标题
-    title_label = ttk.Label(
-        main_frame,
-        text="MTGA - 代理服务器管理工具",
-        font=get_preferred_font(size=16, weight="bold"),
-    )
-    title_label.pack(pady=10)
-
-    # 创建左右分栏
-    main_paned = ttk.PanedWindow(main_frame, orient=tk.HORIZONTAL)
-    main_paned.pack(fill=tk.BOTH, expand=True, pady=5)
-
-    # 左侧功能区域
-    left_frame = ttk.Frame(main_paned, width=1)
-    main_paned.add(left_frame, weight=1)
-
-    left_frame.grid_rowconfigure(0, weight=1)
-    left_frame.grid_columnconfigure(0, weight=1)
-    left_content = ttk.Frame(left_frame)
-    left_content.grid(row=0, column=0, sticky="nsew")
-
-    # 右侧日志区域
-    right_frame = ttk.Frame(main_paned, width=1)
-    main_paned.add(right_frame, weight=1)
-
-    # 创建日志文本框
-    log_frame = ttk.LabelFrame(right_frame, text="日志")
-    log_frame.pack(fill=tk.BOTH, expand=True)
-    log_text = scrolledtext.ScrolledText(log_frame, height=10, width=1)
-    log_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-
-    log = build_text_logger(log_text)
+    layout = layout_builders.build_main_layout(window)
+    main_frame = layout.main_frame
+    main_paned = layout.main_paned
+    left_frame = layout.left_frame
+    left_content = layout.left_content
+    log = layout.log
     hosts_runner = hosts_actions.HostsTaskRunner(
         log_func=log,
         thread_manager=thread_manager,
@@ -893,7 +863,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
             first_layout_done = True
             main_paned.unbind("<Configure>")
 
-    main_paned.bind("<Configure>", on_main_paned_configure)
+    layout_builders.init_paned_layout(main_paned, main_frame, window)
 
     # 窗口关闭处理
     def on_closing():
