@@ -9,13 +9,12 @@ import logging
 import os
 import sys
 import tkinter as tk
-import webbrowser
 from contextlib import suppress
 from functools import partial
 from pathlib import Path
 from tkinter import font as tkfont
 from tkinter import messagebox, ttk
-from typing import Any, Literal, cast
+from typing import Literal
 
 
 try:  # Python 3.11+
@@ -158,6 +157,7 @@ try:
         layout_builders,
         runtime_options_panel,
         tab_builders,
+        update_dialog,
     )
     from modules import resource_manager as resource_manager_module
 except ImportError as e:
@@ -697,75 +697,6 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
 
     check_updates_button = None
 
-    def show_release_notes_dialog(version_label, notes_html, release_url):
-        """显示包含更新说明的新版本弹窗。"""
-        notes_html = (
-            notes_html
-            or (
-                "<html><head><meta charset='utf-8'></head><body>"
-                "<p>该版本暂无更新说明。</p>"
-                "</body></html>"
-            )
-        )
-        dialog = tk.Toplevel(window)
-        dialog.title("更新检查")
-        dialog.geometry("520x420")
-        dialog.minsize(480, 360)
-        dialog.transient(window)
-
-        heading_font = tkfont.nametofont("TkDefaultFont").copy()
-        heading_font.configure(weight="bold", size=heading_font.cget("size") + 1)
-
-        header_frame = ttk.Frame(dialog)
-        header_frame.pack(fill=tk.X, padx=12, pady=(12, 6))
-        ttk.Label(
-            header_frame,
-            text=f"发现新版本：{version_label}",
-            anchor="w",
-            font=heading_font,
-        ).pack(side=tk.LEFT, fill=tk.X, expand=True)
-        if release_url:
-            ttk.Button(
-                header_frame,
-                text="前往发布页",
-                command=lambda: webbrowser.open(release_url),
-            ).pack(side=tk.RIGHT, padx=(8, 0))
-        html_frame_cls, notes_widget = create_tkinterweb_html_widget(
-            dialog,
-            program_resource_dir=resource_manager_module.get_program_resource_dir(),
-            log_fn=log,
-        )
-        notes_widget.pack(fill=tk.BOTH, expand=True, padx=12, pady=(0, 10))
-
-        if html_frame_cls and isinstance(notes_widget, html_frame_cls):
-            frame_widget = cast(Any, notes_widget)
-            frame_widget.load_html(notes_html)
-
-            default_link_handler = frame_widget.html.on_link_click
-
-            def handle_link_click(url, decode=None, force=False):
-                if url.startswith(("http://", "https://")):
-                    webbrowser.open(url)
-                else:
-                    default_link_handler(url, decode=decode, force=force)
-
-            frame_widget.html.on_link_click = handle_link_click
-
-        theme_center = None
-        theme_observer = None
-
-        def on_close():
-            if theme_center and theme_observer:
-                with suppress(Exception):
-                    theme_center.removeObserver_(theme_observer)
-            dialog.destroy()
-
-        dialog.protocol("WM_DELETE_WINDOW", on_close)
-        center_window(dialog)
-        dialog.grab_set()
-
-        # 保留对窗口关闭的清理逻辑，关闭按钮改用系统自带按钮
-
     update_check_task_id = None
 
     def check_for_updates():
@@ -825,7 +756,17 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
             release_url = result.release_url or ""
 
             def _show_new_version():
-                show_release_notes_dialog(latest_version, release_notes, release_url)
+                update_dialog.show_release_notes_dialog(
+                    update_dialog.UpdateDialogDeps(
+                        window=window,
+                        notes_html=release_notes,
+                        release_url=release_url,
+                        version_label=latest_version,
+                        create_tkinterweb_html_widget=create_tkinterweb_html_widget,
+                        program_resource_dir=resource_manager_module.get_program_resource_dir(),
+                        log=log,
+                    )
+                )
                 log(f"发现新版本：{latest_version}")
 
             finalize(_show_new_version)
