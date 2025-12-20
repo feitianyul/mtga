@@ -10,6 +10,20 @@ class UpdateCheckState:
     task_id: Any | None = None
 
 
+@dataclass
+class UpdateCheckController:
+    state: UpdateCheckState
+    deps: UpdateCheckDeps | None = None
+
+    def configure(self, deps: UpdateCheckDeps) -> None:
+        self.deps = deps
+
+    def trigger(self) -> None:
+        if self.deps is None:
+            return
+        run_update_check(deps=self.deps, state=self.state)
+
+
 @dataclass(frozen=True)
 class UpdateCheckDeps:
     window: Any

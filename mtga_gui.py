@@ -145,11 +145,13 @@ try:
         hosts_actions,
         model_tests,
         proxy_actions,
+        proxy_ui_coordinator,
+        runtime_options_actions,
         shutdown_actions,
         update_actions,
     )
     from modules.services.config_service import ConfigStore
-    from modules.services import proxy_orchestration, startup_checks, update_service
+    from modules.services import startup_checks, update_service
     from modules.ui import (
         config_group_panel,
         global_config_panel,
@@ -429,105 +431,9 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
     )
 
     shutdown_state = shutdown_actions.ShutdownState()
-    network_env_precheck_enabled = False
-
-    def ensure_global_config_ready() -> bool:
-        result = proxy_orchestration.ensure_global_config_ready(
-            load_global_config=config_store.load_global_config,
-        )
-        if not result.ok:
-            missing_display = "、".join(result.missing_fields)
-            log(
-                f"⚠️ 全局配置缺失: {missing_display} 不能为空，请在左侧“全局配置”中填写后再试。"
-            )
-            return False
-        return True
-
-    def build_proxy_config():
-        """根据当前 UI 状态生成代理配置"""
-        config = proxy_orchestration.build_proxy_config(
-            get_current_config=config_store.get_current_config,
-            debug_mode=runtime_options.debug_mode_var.get(),
-            disable_ssl_strict_mode=runtime_options.disable_ssl_strict_var.get(),
-            stream_mode=(
-                runtime_options.stream_mode_combo.get()
-                if runtime_options.stream_mode_var.get()
-                else None
-            ),
-        )
-        if not config:
-            log("❌ 错误: 没有可用的配置组")
-            return None
-        return config
-
-    def restart_proxy(
-        config,
-        *,
-        success_message="✅ 代理服务器启动成功",
-        hosts_modified=False,
-    ) -> bool:
-        return proxy_orchestration.restart_proxy(
-            config=config,
-            deps=proxy_orchestration.RestartProxyDeps(
-                log=log,
-                stop_proxy_instance=stop_proxy_instance,
-                start_proxy_instance=start_proxy_instance,
-            ),
-            success_message=success_message,
-            hosts_modified=hosts_modified,
-        )
-
-    def stop_proxy_instance(reason="stop", show_idle_message=False):
-        return proxy_orchestration.stop_proxy_instance(
-            get_proxy_instance=get_proxy_instance,
-            set_proxy_instance=set_proxy_instance,
-            log=log,
-            reason=reason,
-            show_idle_message=show_idle_message,
-        )
-
-    def start_proxy_instance(
-        config, success_message="✅ 代理服务器启动成功", *, hosts_modified=False
-    ):
-        return proxy_orchestration.start_proxy_instance(
-            config=config,
-            deps=proxy_orchestration.StartProxyDeps(
-                log=log,
-                thread_manager=thread_manager,
-                check_network_environment=check_network_environment,
-                set_proxy_instance=set_proxy_instance,
-                modify_hosts_file=modify_hosts_file,
-                network_env_precheck_enabled=network_env_precheck_enabled,
-            ),
-            success_message=success_message,
-            hosts_modified=hosts_modified,
-        )
-
-    def stop_proxy_and_restore(show_idle_message=False, *, block_hosts_cleanup=False):
-        """停止代理并移除模块写入的 hosts 记录。
-
-        block_hosts_cleanup=True 时会同步等待 hosts 操作完成，避免程序退出前记录未清理。
-        """
-        stopped = stop_proxy_instance(show_idle_message=show_idle_message)
-        hosts_runner.modify_hosts("remove", block=block_hosts_cleanup)
-        return stopped
-
-    proxy_runner = proxy_actions.ProxyTaskRunner(
-        log_func=log,
-        thread_manager=thread_manager,
-        deps=proxy_actions.ProxyTaskDependencies(
-            ensure_global_config_ready=ensure_global_config_ready,
-            build_proxy_config=build_proxy_config,
-            get_current_config=config_store.get_current_config,
-            restart_proxy=restart_proxy,
-            stop_proxy_and_restore=stop_proxy_and_restore,
-            has_existing_ca_cert=has_existing_ca_cert,
-            generate_certificates=generate_certificates,
-            install_ca_cert=install_ca_cert,
-            modify_hosts_file=modify_hosts_file,
-            ca_common_name=CA_COMMON_NAME,
-        ),
-    )
+    proxy_ui = None
+    runtime_options = None
+    debug_toggle_handler = runtime_options_actions.DebugModeToggleHandler()
 
     startup_checks.emit_startup_logs(
         log=log,
@@ -562,17 +468,43 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
         )
     )
 
-    def on_debug_mode_toggle():
-        nonlocal network_env_precheck_enabled
-        enabled = bool(runtime_options.debug_mode_var.get())
-        network_env_precheck_enabled = enabled
-
     runtime_options = runtime_options_panel.build_runtime_options_panel(
         runtime_options_panel.RuntimeOptionsPanelDeps(
             parent=left_content,
             tooltip=tooltip,
-            on_debug_mode_toggle=on_debug_mode_toggle,
+            on_debug_mode_toggle=debug_toggle_handler,
         )
+    )
+    proxy_ui = proxy_ui_coordinator.ProxyUiCoordinator(
+        proxy_ui_coordinator.ProxyUiDeps(
+            log=log,
+            config_store=config_store,
+            runtime_options=runtime_options,
+            thread_manager=thread_manager,
+            check_network_environment=check_network_environment,
+            modify_hosts_file=modify_hosts_file,
+            get_proxy_instance=get_proxy_instance,
+            set_proxy_instance=set_proxy_instance,
+            hosts_runner=hosts_runner,
+        )
+    )
+    debug_toggle_handler.bind(proxy_ui=proxy_ui, runtime_options=runtime_options)
+    proxy_ui.set_network_env_precheck_enabled(bool(runtime_options.debug_mode_var.get()))
+    proxy_runner = proxy_actions.ProxyTaskRunner(
+        log_func=log,
+        thread_manager=thread_manager,
+        deps=proxy_actions.ProxyTaskDependencies(
+            ensure_global_config_ready=proxy_ui.ensure_global_config_ready,
+            build_proxy_config=proxy_ui.build_proxy_config,
+            get_current_config=proxy_ui.get_current_config,
+            restart_proxy=proxy_ui.restart_proxy,
+            stop_proxy_and_restore=proxy_ui.stop_proxy_and_restore,
+            has_existing_ca_cert=has_existing_ca_cert,
+            generate_certificates=generate_certificates,
+            install_ca_cert=install_ca_cert,
+            modify_hosts_file=modify_hosts_file,
+            ca_common_name=CA_COMMON_NAME,
+        ),
     )
 
     # 功能标签页
@@ -616,15 +548,8 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
             )
         )
 
-    check_updates_button = None
-
     update_state = update_actions.UpdateCheckState()
-    update_deps: update_actions.UpdateCheckDeps | None = None
-
-    def check_for_updates() -> None:
-        if update_deps is None:
-            return
-        update_actions.run_update_check(deps=update_deps, state=update_state)
+    update_controller = update_actions.UpdateCheckController(state=update_state)
 
     _, check_updates_button = tab_builders.build_about_tab(
         tab_builders.AboutTabDeps(
@@ -632,10 +557,10 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
             app_display_name=APP_DISPLAY_NAME,
             app_version=APP_VERSION,
             get_preferred_font=get_preferred_font,
-            on_check_updates=check_for_updates,
+            on_check_updates=update_controller.trigger,
         )
     )
-    update_deps = update_actions.UpdateCheckDeps(
+    update_controller.configure(update_actions.UpdateCheckDeps(
         window=window,
         log=log,
         thread_manager=thread_manager,
@@ -649,28 +574,11 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
         messagebox=messagebox,
         create_tkinterweb_html_widget=create_tkinterweb_html_widget,
         program_resource_dir=resource_manager_module.get_program_resource_dir(),
-    )
+    ))
 
     # 一键启动按钮
-    def start_all_task():
-        """一键启动全部服务"""
-        proxy_runner.start_all()
-
-    start_button = ttk.Button(left_frame, text="一键启动全部服务", command=start_all_task)
+    start_button = ttk.Button(left_frame, text="一键启动全部服务", command=proxy_runner.start_all)
     start_button.grid(row=1, column=0, sticky="ew", padx=5, pady=0)
-
-    first_layout_done = False
-
-    def on_main_paned_configure(_event):
-        nonlocal first_layout_done
-        if first_layout_done:
-            return
-        window.update_idletasks()
-        total_width = main_paned.winfo_width() or main_frame.winfo_width() or window.winfo_width()
-        if total_width > 0:
-            main_paned.sashpos(0, total_width // 2)
-            first_layout_done = True
-            main_paned.unbind("<Configure>")
 
     layout_builders.init_paned_layout(main_paned, main_frame, window)
 
@@ -682,7 +590,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
                 window=window,
                 log=log,
                 thread_manager=thread_manager,
-                stop_proxy_and_restore=stop_proxy_and_restore,
+                stop_proxy_and_restore=proxy_ui.stop_proxy_and_restore,
                 proxy_runner=proxy_runner,
             ),
             state=shutdown_state,
@@ -692,7 +600,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
     log("MTGA GUI 已启动")
     log("请选择操作或直接使用一键启动...")
     # GUI 启动后自动检查一次更新
-    window.after(200, check_for_updates)
+    window.after(200, update_controller.trigger)
 
     return window
 
