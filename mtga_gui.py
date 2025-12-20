@@ -153,7 +153,7 @@ try:
     from modules.actions import hosts_actions, model_tests, proxy_actions
     from modules.services.config_service import ConfigStore
     from modules.services import update_service
-    from modules.ui import config_group_panel, tab_builders
+    from modules.ui import config_group_panel, global_config_panel, tab_builders
     from modules import resource_manager as resource_manager_module
 except ImportError as e:
     print(f"导入模块失败: {e}")
@@ -653,82 +653,14 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
         )
     )
 
-    # 全局配置框架
-    global_config_frame = ttk.LabelFrame(left_content, text="全局配置")
-    global_config_frame.pack(fill=tk.X, padx=5, pady=5)
-
-    # 映射模型ID配置
-    mapped_model_frame = ttk.Frame(global_config_frame)
-    mapped_model_frame.pack(fill=tk.X, padx=5, pady=2)
-    ttk.Label(mapped_model_frame, text="映射模型ID", width=12).pack(side=tk.LEFT)
-    mapped_model_var = tk.StringVar()
-    mapped_model_entry = ttk.Entry(mapped_model_frame, textvariable=mapped_model_var, width=25)
-    mapped_model_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 0))
-    tooltip(
-        mapped_model_entry,
-        "必填：映射模型ID\n"
-        "对应 Trae 端填写的模型名，自定义，\n与实际模型ID是互相独立的概念。\n"
-        "示例：gpt-5",
-        wraplength=360,
+    global_config_panel.build_global_config_panel(
+        global_config_panel.GlobalConfigPanelDeps(
+            parent=left_content,
+            log=log,
+            tooltip=tooltip,
+            config_store=config_store,
+        )
     )
-
-    # MTGA鉴权key配置
-    mtga_auth_frame = ttk.Frame(global_config_frame)
-    mtga_auth_frame.pack(fill=tk.X, padx=5, pady=2)
-    ttk.Label(mtga_auth_frame, text="MTGA鉴权Key", width=12).pack(side=tk.LEFT)
-    mtga_auth_var = tk.StringVar()
-    mtga_auth_entry = ttk.Entry(mtga_auth_frame, textvariable=mtga_auth_var, width=25, show="*")
-    mtga_auth_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 0))
-    tooltip(
-        mtga_auth_entry,
-        "必填：MTGA鉴权Key\n"
-        "对应 Trae 端填写的 API 密钥，自定义，\n与实际 API Key 是互相独立的概念。\n"
-        "作为 MTGA 代理服务的全局密钥。\n"
-        "示例：111",
-        wraplength=360,
-    )
-
-    # 加载并初始化全局配置
-    def load_global_config_values():
-        """加载并设置全局配置值到GUI"""
-        mapped_model_id, mtga_auth_key = config_store.load_global_config()
-        mapped_model_var.set(mapped_model_id)
-        mtga_auth_var.set(mtga_auth_key)
-
-    def save_global_config_values():
-        """保存全局配置值"""
-        mapped_model_id = mapped_model_var.get().strip()
-        mtga_auth_key = mtga_auth_var.get().strip()
-
-        # 验证必填字段
-        if not mapped_model_id or not mtga_auth_key:
-            log("错误: 映射模型ID和MTGA鉴权Key都是必填项")
-            return False
-
-        # 获取当前配置组信息
-        config_groups, current_config_index = config_store.load_config_groups()
-
-        # 保存全局配置
-        if config_store.save_config_groups(
-            config_groups,
-            current_config_index,
-            mapped_model_id,
-            mtga_auth_key,
-        ):
-            log("全局配置已保存")
-            return True
-        else:
-            log("保存全局配置失败")
-            return False
-
-    # 初始化全局配置值
-    load_global_config_values()
-
-    # 为全局配置添加保存按钮
-    global_save_btn = ttk.Button(
-        global_config_frame, text="保存全局配置", command=save_global_config_values
-    )
-    global_save_btn.pack(pady=5)
 
     # 调试与 SSL 模式选项
     debug_ssl_frame = ttk.Frame(left_content)
