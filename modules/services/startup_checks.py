@@ -1,19 +1,67 @@
 from __future__ import annotations
 
+import logging
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from modules.file_operability import check_file_operability
 from modules.hosts_manager import (
     ALLOW_UNSAFE_HOSTS_FLAG,
+    configure_hosts_modify_block,
+    get_hosts_file_path,
     get_hosts_modify_block_report,
     is_hosts_modify_blocked,
 )
+from modules.network_environment import check_network_environment
 
 
 @dataclass(frozen=True)
 class StartupReport:
     env_ok: bool
     env_message: str
+
+
+def run_hosts_preflight():
+    """程序启动时预检 hosts 文件，必要时启用受限 hosts 模式。"""
+    logger = logging.getLogger("mtga_gui")
+
+    def warn(message: str) -> None:
+        logger.warning(message)
+
+    hosts_file = get_hosts_file_path(log_func=print)
+    report = check_file_operability(hosts_file, log_func=warn)
+
+    if report.ok:
+        return report
+
+    if ALLOW_UNSAFE_HOSTS_FLAG in sys.argv:
+        warn(
+            f"⚠️ hosts 预检未通过（status={report.status.value}），但已使用启动参数 "
+            f"{ALLOW_UNSAFE_HOSTS_FLAG} 覆盖；后续自动修改可能失败。"
+        )
+        return report
+
+    configure_hosts_modify_block(
+        True,
+        reason=report.status.value,
+        report=report,
+    )
+    warn(
+        f"⚠️ hosts 预检未通过（status={report.status.value}），已启用受限 hosts 模式："
+        "添加将回退为追加写入（无法保证原子性增删/去重），自动移除/还原将被禁用。"
+    )
+    return report
+
+
+def run_network_environment_preflight():
+    """程序启动时检查网络环境（显式代理），用于提示 hosts 导流可能被绕过。"""
+    logger = logging.getLogger("mtga_gui")
+
+    def warn(message: str) -> None:
+        logger.warning(message)
+
+    return check_network_environment(log_func=warn, emit_logs=True)
 
 
 def emit_startup_logs(
