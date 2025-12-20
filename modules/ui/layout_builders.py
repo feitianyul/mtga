@@ -4,6 +4,7 @@ import tkinter as tk
 from collections.abc import Callable
 from dataclasses import dataclass
 from tkinter import scrolledtext, ttk
+from typing import Any
 
 from modules.ui_helpers import build_text_logger
 
@@ -19,14 +20,23 @@ class WindowLayout:
     log: Callable[[str], None]
 
 
-def build_main_layout(window: tk.Tk) -> WindowLayout:
+def build_main_layout(
+    window: tk.Tk,
+    *,
+    get_preferred_font: Callable[..., Any] | None = None,
+) -> WindowLayout:
     main_frame = ttk.Frame(window, padding=10)
     main_frame.pack(fill=tk.BOTH, expand=True)
 
+    title_font = (
+        get_preferred_font(size=16, weight="bold")
+        if get_preferred_font is not None
+        else ("TkDefaultFont", 16, "bold")
+    )
     title_label = ttk.Label(
         main_frame,
         text="MTGA - 代理服务器管理工具",
-        font=("TkDefaultFont", 16, "bold"),
+        font=title_font,
     )
     title_label.pack(pady=10)
 

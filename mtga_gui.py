@@ -12,9 +12,7 @@ import tkinter as tk
 from contextlib import suppress
 from functools import partial
 from pathlib import Path
-from tkinter import font as tkfont
 from tkinter import messagebox, ttk
-from typing import Literal
 
 
 try:  # Python 3.11+
@@ -22,7 +20,6 @@ try:  # Python 3.11+
 except ModuleNotFoundError:  # pragma: no cover
     tomllib = None
 
-from modules.tk_fonts import FontManager, apply_global_font
 from modules.ui_helpers import (
     build_tk_error_handler,
     center_window,
@@ -158,6 +155,7 @@ try:
         runtime_options_panel,
         tab_builders,
         update_dialog,
+        window_setup,
     )
     from modules import resource_manager as resource_manager_module
 except ImportError as e:
@@ -395,43 +393,20 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
             os.chdir(os.path.expanduser("~"))
 
     window = tk.Tk()
-    window.title("MTGA GUI")
-    window.geometry("1250x750")
-    window.resizable(True, True)
-
-    if sys.platform == "darwin":
-        try:
-            # Retina 屏幕上 Tk 默认按 72 DPI 渲染，字号偏小，这里按实际 DPI 调整缩放
-            scaling = window.winfo_fpixels("1i") / 72.0
-            if scaling > 0:
-                window.tk.call("tk", "scaling", scaling)
-        except tk.TclError:
-            pass
 
     window.report_callback_exception = build_tk_error_handler(log_error, "Tkinter 回调异常")
 
-    font_manager = FontManager()
-
-    def get_preferred_font(
-        size: int = 10,
-        weight: Literal["normal", "bold"] = "normal",
-    ) -> tkfont.Font:
-        return font_manager.get_preferred_font(size=size, weight=weight)
-
-    # 全局字体覆盖，避免 ttk 控件仍然使用系统默认字体
+    window_setup_result = window_setup.setup_main_window(
+        window,
+        get_icon_file=resource_manager.get_icon_file,
+    )
+    get_preferred_font = window_setup_result.get_preferred_font
     default_font = get_preferred_font()
-    apply_global_font(root=window, default_font=default_font)
 
-    # 设置窗口图标
-    try:
-        if os.name == "nt":
-            icon_path = resource_manager.get_icon_file("f0bb32_bg-black.ico")
-            if os.path.exists(icon_path):
-                window.iconbitmap(icon_path)
-    except Exception:
-        pass
-
-    layout = layout_builders.build_main_layout(window)
+    layout = layout_builders.build_main_layout(
+        window,
+        get_preferred_font=get_preferred_font,
+    )
     main_frame = layout.main_frame
     main_paned = layout.main_paned
     left_frame = layout.left_frame
