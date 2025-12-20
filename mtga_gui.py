@@ -26,7 +26,6 @@ from modules.ui_helpers import (
     create_tooltip,
 )
 from modules.macos_theme import detect_macos_dark_mode
-from modules.network_utils import is_port_in_use
 
 os.environ.setdefault("LANG", "zh_CN.UTF-8")
 os.environ.setdefault("LC_ALL", "zh_CN.UTF-8")
@@ -133,7 +132,6 @@ try:
         open_hosts_file,
     )
     from modules.network_environment import check_network_environment
-    from modules.proxy_server import ProxyServer
     from modules.resource_manager import (
         ResourceManager,
         copy_template_files,
@@ -145,7 +143,7 @@ try:
     from modules import macos_privileged_helper
     from modules.actions import hosts_actions, model_tests, proxy_actions
     from modules.services.config_service import ConfigStore
-    from modules.services import startup_checks, update_service
+    from modules.services import proxy_orchestration, startup_checks, update_service
     from modules.ui import (
         config_group_panel,
         global_config_panel,
@@ -427,41 +425,33 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
     shutdown_task_id = None
     network_env_precheck_enabled = False
 
-    def ensure_global_config_ready():
-        """检查全局配置文件中的必填项。"""
-        mapped_model_id, mtga_auth_key = config_store.load_global_config()
-        mapped_model_id = (mapped_model_id or "").strip()
-        mtga_auth_key = (mtga_auth_key or "").strip()
-
-        missing_fields = []
-        if not mapped_model_id:
-            missing_fields.append("映射模型ID")
-        if not mtga_auth_key:
-            missing_fields.append("MTGA鉴权Key")
-
-        if missing_fields:
-            missing_display = "、".join(missing_fields)
+    def ensure_global_config_ready() -> bool:
+        result = proxy_orchestration.ensure_global_config_ready(
+            load_global_config=config_store.load_global_config,
+        )
+        if not result.ok:
+            missing_display = "、".join(result.missing_fields)
             log(
                 f"⚠️ 全局配置缺失: {missing_display} 不能为空，请在左侧“全局配置”中填写后再试。"
             )
             return False
-
         return True
 
     def build_proxy_config():
         """根据当前 UI 状态生成代理配置"""
-        current_config = config_store.get_current_config()
-        if not current_config:
+        config = proxy_orchestration.build_proxy_config(
+            get_current_config=config_store.get_current_config,
+            debug_mode=runtime_options.debug_mode_var.get(),
+            disable_ssl_strict_mode=runtime_options.disable_ssl_strict_var.get(),
+            stream_mode=(
+                runtime_options.stream_mode_combo.get()
+                if runtime_options.stream_mode_var.get()
+                else None
+            ),
+        )
+        if not config:
             log("❌ 错误: 没有可用的配置组")
             return None
-        config = current_config.copy()
-        config["debug_mode"] = runtime_options.debug_mode_var.get()
-        config["disable_ssl_strict_mode"] = runtime_options.disable_ssl_strict_var.get()
-        config["stream_mode"] = (
-            runtime_options.stream_mode_combo.get()
-            if runtime_options.stream_mode_var.get()
-            else None
-        )
         return config
 
     def restart_proxy(
@@ -470,65 +460,42 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
         success_message="✅ 代理服务器启动成功",
         hosts_modified=False,
     ) -> bool:
-        """统一代理重启逻辑：输出 stream_mode 日志、停止旧实例并启动新实例。"""
-        stream_mode_value = config.get("stream_mode")
-        if stream_mode_value is not None:
-            log(f"启用强制流模式: {stream_mode_value}")
-        stop_proxy_instance(reason="restart")
-        return start_proxy_instance(
-            config,
+        return proxy_orchestration.restart_proxy(
+            config=config,
+            deps=proxy_orchestration.RestartProxyDeps(
+                log=log,
+                stop_proxy_instance=stop_proxy_instance,
+                start_proxy_instance=start_proxy_instance,
+            ),
             success_message=success_message,
             hosts_modified=hosts_modified,
         )
 
     def stop_proxy_instance(reason="stop", show_idle_message=False):
-        """统一停止代理实例，返回是否存在运行中的服务。"""
-        instance = get_proxy_instance()
-        if instance and instance.is_running():
-            if reason == "restart":
-                log("检测到代理服务器正在运行，正在停止旧实例...")
-            else:
-                log("正在停止代理服务器...")
-            try:
-                instance.stop()
-                log("✅ 代理服务器已停止")
-            except Exception as exc:  # noqa: BLE001
-                log(f"停止代理服务器时出错: {exc}")
-            finally:
-                set_proxy_instance(None)
-            return True
-        if show_idle_message:
-            log("代理服务器未运行")
-        return False
+        return proxy_orchestration.stop_proxy_instance(
+            get_proxy_instance=get_proxy_instance,
+            set_proxy_instance=set_proxy_instance,
+            log=log,
+            reason=reason,
+            show_idle_message=show_idle_message,
+        )
 
     def start_proxy_instance(
         config, success_message="✅ 代理服务器启动成功", *, hosts_modified=False
     ):
-        """启动代理实例并输出统一日志。
-
-        hosts_modified=True 表示已在外部完成 hosts 更新，可跳过内置步骤。
-        """
-        if network_env_precheck_enabled:
-            check_network_environment(log_func=log, emit_logs=True)
-
-        if is_port_in_use(443):
-            log("⚠️ 端口 443 已被其他进程占用，代理服务器未启动。请释放该端口后重试。")
-            return False
-
-        if not hosts_modified:
-            log("正在修改hosts文件...")
-            if not modify_hosts_file(log_func=log):
-                log("❌ 修改hosts文件失败，代理服务器未启动")
-                return False
-        log("开始启动代理服务器...")
-        instance = ProxyServer(config, log_func=log, thread_manager=thread_manager)
-        set_proxy_instance(instance)
-        if instance.start():
-            log(success_message)
-            return True
-        log("❌ 代理服务器启动失败")
-        set_proxy_instance(None)
-        return False
+        return proxy_orchestration.start_proxy_instance(
+            config=config,
+            deps=proxy_orchestration.StartProxyDeps(
+                log=log,
+                thread_manager=thread_manager,
+                check_network_environment=check_network_environment,
+                set_proxy_instance=set_proxy_instance,
+                modify_hosts_file=modify_hosts_file,
+                network_env_precheck_enabled=network_env_precheck_enabled,
+            ),
+            success_message=success_message,
+            hosts_modified=hosts_modified,
+        )
 
     def stop_proxy_and_restore(show_idle_message=False, *, block_hosts_cleanup=False):
         """停止代理并移除模块写入的 hosts 记录。
