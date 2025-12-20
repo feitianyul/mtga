@@ -100,8 +100,8 @@ def emit_startup_logs(
         )
 
     if network_env_report is not None and network_env_report.explicit_proxy_detected:
-        log("⚠️" * 20 + "\n检测到显式代理配置：部分应用可能优先走代理，从而绕过 hosts 导流。")
+        log("⚠️" * 21 + "\n检测到显式代理配置：部分应用可能优先走代理，从而绕过 hosts 导流。")
         log("建议：1. 关闭显式代理（如clash的系统代理），或改用 TUN/VPN")
-        log("      2. 检查 Trae 的代理设置。\n" + "⚠️" * 20)
+        log("      2. 检查 Trae 的代理设置。\n" + "⚠️" * 21)
 
     return StartupReport(env_ok=env_ok, env_message=env_msg)

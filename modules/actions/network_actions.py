@@ -17,7 +17,7 @@ def run_network_environment_check(
             emit_logs=True,
         )
         if report.explicit_proxy_detected:
-            log_func("⚠️ 检测到显式代理配置，hosts 导流可能被绕过。\n" + "⚠️" * 20)
+            log_func("⚠️ 检测到显式代理配置，hosts 导流可能被绕过。\n" + "⚠️" * 21)
             return
         log_func("✅ 未检测到系统/环境变量层面的显式代理配置。")
         log_func(

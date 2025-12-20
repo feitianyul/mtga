@@ -229,7 +229,7 @@ def check_network_environment(
 
 
 def _emit_proxy_warnings(report: NetworkEnvironmentReport, log_func) -> None:
-    log_func("⚠️" * 20 + "\n检测到显式代理配置：部分应用可能优先走代理，从而绕过 hosts 导流。")
+    log_func("⚠️" * 21 + "\n检测到显式代理配置：部分应用可能优先走代理，从而绕过 hosts 导流。")
     if report.wininet_proxy_enabled:
         server = report.wininet_proxy_server or "none"
         log_func(f"ℹ️ 系统代理(WinINET): enabled=True, server={server}")
