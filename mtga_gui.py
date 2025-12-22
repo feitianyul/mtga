@@ -83,7 +83,7 @@ try:
         logging_service,
         privilege_service,
         proxy_state,
-        startup_checks,
+        startup_context,
         update_service,
     )
     from modules.ui import (
@@ -121,8 +121,7 @@ ERROR_LOG_PATH = logging_service.setup_error_logging(
 log_error = logging_service.log_error
 logging_service.install_global_exception_hook(log_error=log_error)
 
-HOSTS_PREFLIGHT_REPORT = startup_checks.run_hosts_preflight()
-NETWORK_ENV_REPORT = startup_checks.run_network_environment_preflight()
+STARTUP_CONTEXT = startup_context.build_startup_context()
 
 APP_VERSION = app_version.resolve_app_version(project_root=Path(__file__).resolve().parent)
 
@@ -175,12 +174,10 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
 
     shutdown_state = shutdown_actions.ShutdownState()
 
-    startup_checks.emit_startup_logs(
+    STARTUP_CONTEXT.emit_logs(
         log=log,
         check_environment=check_environment,
         is_packaged=is_packaged,
-        hosts_preflight_report=HOSTS_PREFLIGHT_REPORT,
-        network_env_report=NETWORK_ENV_REPORT,
     )
 
     config_group_panel.build_config_group_panel(
