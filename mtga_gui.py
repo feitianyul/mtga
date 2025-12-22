@@ -43,7 +43,7 @@ MTGA GUI - 重构版本
 
 
 try:
-    from modules.services import env_setup, io_service
+    from modules.services import env_setup, io_service, environment_service
 except ImportError as e:
     print(f"导入模块失败: {e}")
     print("请确保 modules 目录及其模块文件存在")
@@ -142,15 +142,10 @@ check_is_admin = privilege_service.check_is_admin
 run_as_admin = privilege_service.run_as_admin
 
 
-def check_environment():
-    """检查运行环境"""
-    missing_resources = resource_manager.check_resources()
-
-    if missing_resources:
-        error_msg = "环境检查失败，缺少以下资源:\n" + "\n".join(missing_resources)
-        return False, error_msg
-
-    return True, "环境检查通过"
+check_environment = partial(
+    environment_service.check_environment,
+    check_resources=resource_manager.check_resources,
+)
 
 
 # 配置文件路径（持久化到用户数据目录）
