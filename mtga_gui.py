@@ -69,13 +69,6 @@ try:
     )
     from modules.tkhtml_compat import create_tkinterweb_html_widget
     from modules import macos_privileged_helper
-    from modules.actions import (
-        hosts_actions,
-        model_tests,
-        shutdown_actions,
-        update_bootstrap,
-        update_actions,
-    )
     from modules.services import (
         bootstrap,
         app_metadata,
@@ -87,15 +80,8 @@ try:
         update_service,
     )
     from modules.ui import (
-        config_group_panel,
-        footer_actions,
-        global_config_panel,
-        layout_builders,
-        proxy_context,
-        tab_builders,
+        main_window_builder,
         update_dialog,
-        window_context,
-        window_lifecycle,
     )
     from modules import resource_manager as resource_manager_module
 except ImportError as e:
@@ -146,158 +132,37 @@ check_environment = partial(
 config_store = APP_CONTEXT.config_store
 
 
-def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
+def create_main_window() -> tk.Tk | None:
     """创建主窗口"""
-    # 在 macOS 上，确保工作目录不是根目录
-    if sys.platform == "darwin" and os.getcwd() == "/":
-        with suppress(OSError):
-            os.chdir(os.path.expanduser("~"))
-
-    window_context_result = window_context.build_window_context(
-        log_error=log_error,
-        get_icon_file=resource_manager.get_icon_file,
-    )
-    window = window_context_result.window
-    get_preferred_font = window_context_result.get_preferred_font
-    default_font = window_context_result.default_font
-    main_frame = window_context_result.main_frame
-    main_paned = window_context_result.main_paned
-    left_frame = window_context_result.left_frame
-    left_content = window_context_result.left_content
-    log = window_context_result.log
-    hosts_runner = hosts_actions.HostsTaskRunner(
-        log_func=log,
-        thread_manager=thread_manager,
-        modify_hosts_file=modify_hosts_file,
-        open_hosts_file=open_hosts_file,
-    )
-
-    tooltip = window_context_result.tooltip
-
-    shutdown_state = shutdown_actions.ShutdownState()
-
-    STARTUP_CONTEXT.emit_logs(
-        log=log,
-        check_environment=check_environment,
-        is_packaged=is_packaged,
-    )
-
-    config_group_panel.build_config_group_panel(
-        config_group_panel.ConfigGroupPanelDeps(
-            parent=left_content,
-            window=window,
-            log=log,
-            tooltip=tooltip,
-            center_window=center_window,
-            get_preferred_font=get_preferred_font,
-            config_store=config_store,
+    return main_window_builder.build_main_window(
+        main_window_builder.MainWindowDeps(
+            get_icon_file=resource_manager.get_icon_file,
             thread_manager=thread_manager,
-            api_key_visible_chars=APP_METADATA.api_key_visible_chars,
-            test_chat_completion=model_tests.test_chat_completion,
-            test_model_in_list=model_tests.test_model_in_list,
-        )
-    )
-
-    global_config_panel.build_global_config_panel(
-        global_config_panel.GlobalConfigPanelDeps(
-            parent=left_content,
-            log=log,
-            tooltip=tooltip,
             config_store=config_store,
-        )
-    )
-
-    proxy_context_result = proxy_context.build_proxy_context(
-        proxy_context.ProxyContextDeps(
-            parent=left_content,
-            tooltip=tooltip,
-            log=log,
-            config_store=config_store,
-            thread_manager=thread_manager,
+            log_error=log_error,
+            check_environment=check_environment,
+            is_packaged=is_packaged,
             check_network_environment=check_network_environment,
             modify_hosts_file=modify_hosts_file,
-            get_proxy_instance=get_proxy_instance,
-            set_proxy_instance=set_proxy_instance,
-            hosts_runner=hosts_runner,
-            has_existing_ca_cert=has_existing_ca_cert,
-            generate_certificates=generate_certificates,
-            install_ca_cert=install_ca_cert,
-            ca_common_name=APP_METADATA.ca_common_name,
-        )
-    )
-    proxy_ui = proxy_context_result.proxy_ui
-    proxy_runner = proxy_context_result.proxy_runner
-
-    update_controller = update_actions.UpdateCheckController(
-        state=update_actions.UpdateCheckState()
-    )
-
-    _, check_updates_button = tab_builders.build_main_tabs(
-        tab_builders.MainTabsDeps(
-            parent=left_content,
-            window=window,
-            log=log,
-            tooltip=tooltip,
-            center_window=center_window,
-            ca_common_name=APP_METADATA.ca_common_name,
-            thread_manager=thread_manager,
-            hosts_runner=hosts_runner,
-            proxy_runner=proxy_runner,
-            is_packaged=is_packaged,
+            open_hosts_file=open_hosts_file,
             get_user_data_dir=get_user_data_dir,
             copy_template_files=copy_template_files,
-            error_log_filename=APP_METADATA.error_log_filename,
-            app_display_name=APP_METADATA.display_name,
+            app_metadata=APP_METADATA,
             app_version=APP_VERSION,
-            get_preferred_font=get_preferred_font,
-            on_check_updates=update_controller.trigger,
-        )
-    )
-
-    update_bootstrap.configure_update_controller(
-        update_controller,
-        update_bootstrap.UpdateBootstrapDeps(
-            window=window,
-            log=log,
-            thread_manager=thread_manager,
-            check_button=check_updates_button,
-            app_display_name=APP_METADATA.display_name,
-            app_version=APP_VERSION,
-            repo=APP_METADATA.github_repo,
-            default_font=default_font,
             update_service=update_service,
             update_dialog=update_dialog,
-            messagebox=messagebox,
             create_tkinterweb_html_widget=create_tkinterweb_html_widget,
             program_resource_dir=resource_manager_module.get_program_resource_dir(),
+            startup_context=STARTUP_CONTEXT,
+            generate_certificates=generate_certificates,
+            install_ca_cert=install_ca_cert,
+            has_existing_ca_cert=has_existing_ca_cert,
+            center_window=center_window,
+            get_proxy_instance=get_proxy_instance,
+            set_proxy_instance=set_proxy_instance,
+            messagebox=messagebox,
         )
     )
-
-    footer_actions.build_footer_actions(
-        footer_actions.FooterActionsDeps(
-            left_frame=left_frame,
-            start_all=proxy_runner.start_all,
-        )
-    )
-    window_lifecycle.bind_window_close(
-        window_lifecycle.WindowLifecycleDeps(
-            window=window,
-            log=log,
-            thread_manager=thread_manager,
-            stop_proxy_and_restore=proxy_ui.stop_proxy_and_restore,
-            proxy_runner=proxy_runner,
-            shutdown_state=shutdown_state,
-        )
-    )
-
-    layout_builders.init_paned_layout(main_paned, main_frame, window)
-
-    log("MTGA GUI 已启动")
-    log("请选择操作或直接使用一键启动...")
-    # GUI 启动后自动检查一次更新
-    window.after(200, update_controller.trigger)
-
-    return window
 
 
 def main():
