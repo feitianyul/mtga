@@ -2,7 +2,6 @@
 # ruff: noqa: E402,I001
 
 # 在最早阶段设置 UTF-8 编码环境变量 - 必须在任何导入之前
-import ctypes
 import io
 import locale
 import os
@@ -141,7 +140,13 @@ try:
         update_actions,
     )
     from modules.services.config_service import ConfigStore
-    from modules.services import app_version, logging_service, startup_checks, update_service
+    from modules.services import (
+        app_version,
+        logging_service,
+        privilege_service,
+        startup_checks,
+        update_service,
+    )
     from modules.ui import (
         config_group_panel,
         global_config_panel,
@@ -198,35 +203,8 @@ def set_proxy_instance(instance):
     globals()["proxy_server_instance"] = instance
 
 
-def check_is_admin():
-    """检查是否具有管理员权限"""
-    try:
-        if os.name == "nt":  # Windows
-            return ctypes.windll.shell32.IsUserAnAdmin()
-        elif os.name == "posix":  # Unix/Linux/macOS
-            return os.geteuid() == 0
-        else:
-            return False
-    except Exception:
-        return False
-
-
-def run_as_admin():
-    """请求管理员权限并重启脚本"""
-    if not check_is_admin():
-        if os.name == "nt":  # Windows
-            ctypes.windll.shell32.ShellExecuteW(
-                None, "runas", sys.executable, " ".join(sys.argv), None, 1
-            )
-            sys.exit(0)
-        elif os.name == "posix":  # Unix/Linux/macOS
-            print("此程序需要管理员权限才能运行。")
-            print("请使用以下命令重新运行：")
-            print(f"sudo {sys.executable} {' '.join(sys.argv)}")
-            sys.exit(1)
-        else:
-            print("不支持的操作系统")
-            sys.exit(1)
+check_is_admin = privilege_service.check_is_admin
+run_as_admin = privilege_service.run_as_admin
 
 
 def check_environment():
