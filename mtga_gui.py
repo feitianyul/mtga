@@ -144,6 +144,7 @@ try:
         app_version,
         logging_service,
         privilege_service,
+        proxy_state,
         startup_checks,
         update_service,
     )
@@ -168,7 +169,6 @@ if macos_privileged_helper.HELPER_FLAG in sys.argv:
     sys.exit(0)
 
 # 全局变量
-proxy_server_instance = None
 resource_manager = ResourceManager()
 thread_manager = ThreadManager()
 
@@ -193,14 +193,8 @@ APP_VERSION = app_version.resolve_app_version(project_root=Path(__file__).resolv
 
 
 
-def get_proxy_instance():
-    """读取当前代理实例"""
-    return globals().get("proxy_server_instance")
-
-
-def set_proxy_instance(instance):
-    """更新当前代理实例"""
-    globals()["proxy_server_instance"] = instance
+get_proxy_instance = proxy_state.get_proxy_instance
+set_proxy_instance = proxy_state.set_proxy_instance
 
 
 check_is_admin = privilege_service.check_is_admin
