@@ -4,6 +4,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from modules.runtime.error_codes import ErrorCode
+
 
 @dataclass
 class UpdateCheckState:
@@ -74,7 +76,7 @@ def run_update_check(*, deps: UpdateCheckDeps, state: UpdateCheckState) -> None:
         status = getattr(update_result, "status", None) if update_result else None
 
         if not result.ok:
-            if status == "no_version":
+            if result.code == ErrorCode.NO_VERSION or status == "no_version":
                 def _warn_no_version() -> None:
                     deps.messagebox.showwarning("检查更新", "未能解析最新版本号，请稍后再试。")
                     deps.log("检查更新失败：未解析到版本号")

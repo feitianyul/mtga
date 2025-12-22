@@ -12,6 +12,7 @@ from typing import Any
 from platformdirs import user_data_dir as platform_user_data_dir
 
 from modules.actions import cert_actions, network_actions
+from modules.runtime.error_codes import ErrorCode
 from modules.services.user_data_service import (
     backup_user_data_result,
     clear_user_data_result,
@@ -268,10 +269,9 @@ def _restore_user_data_action(deps: DataManagementTabDeps) -> None:
         user_data_dir = deps.get_user_data_dir()
         latest_result = find_latest_backup_result(user_data_dir)
         if not latest_result.ok:
-            reason = latest_result.details.get("reason") if latest_result.details else None
-            if reason == "backup_dir_missing":
+            if latest_result.code == ErrorCode.BACKUP_DIR_MISSING:
                 warn_no_backup("❌ 没有找到备份文件夹", "没有找到备份文件夹，无法执行还原操作。")
-            elif reason == "no_backups":
+            elif latest_result.code == ErrorCode.NO_BACKUPS:
                 warn_no_backup("❌ 没有找到任何备份", "没有找到任何备份文件，无法执行还原操作。")
             else:
                 show_restore_error(

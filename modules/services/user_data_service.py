@@ -7,6 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 
+from modules.runtime.error_codes import ErrorCode
 from modules.runtime.operation_result import OperationResult
 
 
@@ -200,11 +201,14 @@ def find_latest_backup_result(
         result = find_latest_backup(user_data_dir)
         return OperationResult.success(latest_backup=result)
     except BackupNotFoundError as exc:
-        return OperationResult.failure(str(exc), reason="backup_dir_missing")
+        return OperationResult.failure(str(exc), code=ErrorCode.BACKUP_DIR_MISSING)
     except NoBackupsError as exc:
-        return OperationResult.failure(str(exc), reason="no_backups")
+        return OperationResult.failure(str(exc), code=ErrorCode.NO_BACKUPS)
     except Exception as exc:
-        return OperationResult.failure(f"读取备份失败: {exc}")
+        return OperationResult.failure(
+            f"读取备份失败: {exc}",
+            code=ErrorCode.UNKNOWN,
+        )
 
 
 def restore_backup_result(

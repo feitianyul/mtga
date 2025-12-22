@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 from werkzeug.serving import BaseWSGIServer, WSGIRequestHandler
 
+from modules.runtime.error_codes import ErrorCode
 from modules.runtime.operation_result import OperationResult
 from modules.runtime.resource_manager import ResourceManager
 from modules.runtime.thread_manager import ThreadManager
@@ -85,11 +86,11 @@ class ProxyRuntime:
 
         if not cert_file or not key_file:
             self._log("证书路径为空")
-            return OperationResult.failure("证书路径为空")
+            return OperationResult.failure("证书路径为空", code=ErrorCode.CONFIG_INVALID)
 
         if not (os.path.exists(cert_file) and os.path.exists(key_file)):
             self._log(f"证书文件不存在: {cert_file} 或 {key_file}")
-            return OperationResult.failure("证书文件不存在")
+            return OperationResult.failure("证书文件不存在", code=ErrorCode.FILE_NOT_FOUND)
 
         try:
             ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -113,7 +114,7 @@ class ProxyRuntime:
                 self._log("服务器实例创建成功")
             except Exception as exc:
                 self._log(f"创建服务器实例失败: {exc}")
-                return OperationResult.failure("创建服务器实例失败")
+                return OperationResult.failure("创建服务器实例失败", code=ErrorCode.UNKNOWN)
 
             server_ready_event = threading.Event()
 
@@ -146,27 +147,27 @@ class ProxyRuntime:
 
             if not server_ready_event.wait(timeout=5):
                 self._log("代理服务器启动超时")
-                return OperationResult.failure("代理服务器启动超时")
+                return OperationResult.failure("代理服务器启动超时", code=ErrorCode.UNKNOWN)
 
             if self._state.running:
                 self._log("代理服务器已成功启动")
                 return OperationResult.success()
 
             self._log("代理服务器启动失败")
-            return OperationResult.failure("代理服务器启动失败")
+            return OperationResult.failure("代理服务器启动失败", code=ErrorCode.UNKNOWN)
 
         except PermissionError:
             self._log(f"权限不足，无法监听 {port} 端口。请以管理员身份运行。")
-            return OperationResult.failure("权限不足")
+            return OperationResult.failure("权限不足", code=ErrorCode.PERMISSION_DENIED)
         except OSError as exc:
             if "address already in use" in str(exc).lower():
                 self._log(f"端口 {port} 已被占用。请检查是否有其他服务占用了该端口。")
-                return OperationResult.failure("端口已被占用")
+                return OperationResult.failure("端口已被占用", code=ErrorCode.PORT_IN_USE)
             self._log(f"启动服务器时发生 OS 错误: {exc}")
-            return OperationResult.failure("启动服务器时发生 OS 错误")
+            return OperationResult.failure("启动服务器时发生 OS 错误", code=ErrorCode.UNKNOWN)
         except Exception as exc:
             self._log(f"启动代理服务器时发生意外错误: {exc}")
-            return OperationResult.failure("启动代理服务器时发生意外错误")
+            return OperationResult.failure("启动代理服务器时发生意外错误", code=ErrorCode.UNKNOWN)
 
     def stop(self) -> OperationResult:
         if not self._state.running:
@@ -210,7 +211,7 @@ class ProxyRuntime:
             return OperationResult.success()
 
         self._log("代理服务器仍在后台清理，请稍后关注日志")
-        return OperationResult.failure("代理服务器未完全停止")
+        return OperationResult.failure("代理服务器未完全停止", code=ErrorCode.UNKNOWN)
 
 
 __all__ = ["ProxyRuntime"]

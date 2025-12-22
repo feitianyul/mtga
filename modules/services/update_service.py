@@ -5,6 +5,7 @@ from typing import Literal
 
 import requests
 
+from modules.runtime.error_codes import ErrorCode
 from modules.runtime.operation_result import OperationResult
 from modules.update import update_checker
 
@@ -101,13 +102,24 @@ def check_for_updates_result(
 
     if result.status == "network_error":
         message = result.error_message or "检查更新失败：网络异常"
-        return OperationResult.failure(message, status=result.status, update_result=result)
+        return OperationResult.failure(
+            message,
+            code=ErrorCode.NETWORK_ERROR,
+            status=result.status,
+            update_result=result,
+        )
     if result.status == "remote_error":
         message = result.error_message or "检查更新失败"
-        return OperationResult.failure(message, status=result.status, update_result=result)
+        return OperationResult.failure(
+            message,
+            code=ErrorCode.REMOTE_ERROR,
+            status=result.status,
+            update_result=result,
+        )
     if result.status == "no_version":
         return OperationResult.failure(
             "未解析到版本号，请稍后再试。",
+            code=ErrorCode.NO_VERSION,
             status=result.status,
             update_result=result,
         )
