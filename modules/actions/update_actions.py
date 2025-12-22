@@ -58,7 +58,7 @@ def run_update_check(*, deps: UpdateCheckDeps, state: UpdateCheckState) -> None:
             deps.messagebox.showerror(title, message)
             deps.log(message)
 
-        result = deps.update_service.check_for_updates(
+        result = deps.update_service.check_for_updates_result(
             repo=deps.repo,
             app_version=deps.app_version,
             timeout=10,
@@ -70,22 +70,23 @@ def run_update_check(*, deps: UpdateCheckDeps, state: UpdateCheckState) -> None:
             ),
         )
 
-        if result.status == "network_error":
-            error_msg = result.error_message or "检查更新失败：网络异常"
-            finalize(lambda: show_error("检查更新失败", error_msg))
-            return
-        if result.status == "remote_error":
-            error_msg = result.error_message or "检查更新失败"
-            finalize(lambda: show_error("检查更新失败", error_msg))
-            return
-        if result.status == "no_version":
-            def _warn_no_version() -> None:
-                deps.messagebox.showwarning("检查更新", "未能解析最新版本号，请稍后再试。")
-                deps.log("检查更新失败：未解析到版本号")
+        update_result = result.details.get("update_result") if result.details else None
+        status = getattr(update_result, "status", None) if update_result else None
 
-            finalize(_warn_no_version)
+        if not result.ok:
+            if status == "no_version":
+                def _warn_no_version() -> None:
+                    deps.messagebox.showwarning("检查更新", "未能解析最新版本号，请稍后再试。")
+                    deps.log("检查更新失败：未解析到版本号")
+
+                finalize(_warn_no_version)
+                return
+
+            error_msg = result.message or "检查更新失败"
+            finalize(lambda: show_error("检查更新失败", error_msg))
             return
-        if result.status == "up_to_date":
+
+        if status == "up_to_date":
             def _info_up_to_date() -> None:
                 deps.messagebox.showinfo(
                     "检查更新", f"当前版本 {deps.app_version} 已是最新。"
@@ -95,9 +96,13 @@ def run_update_check(*, deps: UpdateCheckDeps, state: UpdateCheckState) -> None:
             finalize(_info_up_to_date)
             return
 
-        latest_version = result.latest_version or "未知版本"
-        release_notes = result.release_notes or "该版本暂无更新说明。"
-        release_url = result.release_url or ""
+        if not update_result:
+            finalize(lambda: show_error("检查更新失败", "更新结果解析失败"))
+            return
+
+        latest_version = update_result.latest_version or "未知版本"
+        release_notes = update_result.release_notes or "该版本暂无更新说明。"
+        release_url = update_result.release_url or ""
 
         def _show_new_version() -> None:
             deps.update_dialog.show_release_notes_dialog(

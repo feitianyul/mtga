@@ -7,6 +7,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 
+from modules.runtime.operation_result import OperationResult
+
 
 @dataclass(frozen=True)
 class BackupResult:
@@ -160,3 +162,70 @@ def restore_latest_backup(
 ) -> RestoreResult:
     latest = find_latest_backup(user_data_dir)
     return restore_backup(user_data_dir, backup_path=latest.backup_path)
+
+
+def backup_user_data_result(
+    user_data_dir: str,
+    *,
+    error_log_filename: str,
+) -> OperationResult:
+    try:
+        result = backup_user_data(user_data_dir, error_log_filename=error_log_filename)
+        return OperationResult.success(backup_result=result)
+    except Exception as exc:
+        return OperationResult.failure(f"备份用户数据失败: {exc}")
+
+
+def clear_user_data_result(
+    user_data_dir: str,
+    *,
+    error_log_filename: str,
+    copy_template_files_fn: Callable[[], list[str]] | None = None,
+) -> OperationResult:
+    try:
+        result = clear_user_data(
+            user_data_dir,
+            error_log_filename=error_log_filename,
+            copy_template_files_fn=copy_template_files_fn,
+        )
+        return OperationResult.success(clear_result=result)
+    except Exception as exc:
+        return OperationResult.failure(f"清除用户数据失败: {exc}")
+
+
+def find_latest_backup_result(
+    user_data_dir: str,
+) -> OperationResult:
+    try:
+        result = find_latest_backup(user_data_dir)
+        return OperationResult.success(latest_backup=result)
+    except BackupNotFoundError as exc:
+        return OperationResult.failure(str(exc), reason="backup_dir_missing")
+    except NoBackupsError as exc:
+        return OperationResult.failure(str(exc), reason="no_backups")
+    except Exception as exc:
+        return OperationResult.failure(f"读取备份失败: {exc}")
+
+
+def restore_backup_result(
+    user_data_dir: str,
+    *,
+    backup_path: str,
+) -> OperationResult:
+    try:
+        result = restore_backup(user_data_dir, backup_path=backup_path)
+        return OperationResult.success(restore_result=result)
+    except Exception as exc:
+        return OperationResult.failure(f"还原数据失败: {exc}")
+
+
+def restore_latest_backup_result(
+    user_data_dir: str,
+) -> OperationResult:
+    latest_result = find_latest_backup_result(user_data_dir)
+    if not latest_result.ok:
+        return latest_result
+    latest_info = latest_result.details.get("latest_backup")
+    if not isinstance(latest_info, LatestBackupInfo):
+        return OperationResult.failure("未找到可用备份")
+    return restore_backup_result(user_data_dir, backup_path=latest_info.backup_path)

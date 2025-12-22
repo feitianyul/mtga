@@ -5,6 +5,7 @@ from typing import Literal
 
 import requests
 
+from modules.runtime.operation_result import OperationResult
 from modules.update import update_checker
 
 UpdateStatus = Literal[
@@ -80,3 +81,35 @@ def check_for_updates(
         release_notes=release_notes,
         release_url=release_info.release_url,
     )
+
+
+def check_for_updates_result(
+    *,
+    repo: str,
+    app_version: str,
+    timeout: int = 10,
+    user_agent: str | None = None,
+    font: UpdateFontOptions | None = None,
+) -> OperationResult:
+    result = check_for_updates(
+        repo=repo,
+        app_version=app_version,
+        timeout=timeout,
+        user_agent=user_agent,
+        font=font,
+    )
+
+    if result.status == "network_error":
+        message = result.error_message or "检查更新失败：网络异常"
+        return OperationResult.failure(message, status=result.status, update_result=result)
+    if result.status == "remote_error":
+        message = result.error_message or "检查更新失败"
+        return OperationResult.failure(message, status=result.status, update_result=result)
+    if result.status == "no_version":
+        return OperationResult.failure(
+            "未解析到版本号，请稍后再试。",
+            status=result.status,
+            update_result=result,
+        )
+
+    return OperationResult.success(status=result.status, update_result=result)

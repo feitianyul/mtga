@@ -13,12 +13,10 @@ from platformdirs import user_data_dir as platform_user_data_dir
 
 from modules.actions import cert_actions, network_actions
 from modules.services.user_data_service import (
-    BackupNotFoundError,
-    NoBackupsError,
-    backup_user_data,
-    clear_user_data,
-    find_latest_backup,
-    restore_backup,
+    backup_user_data_result,
+    clear_user_data_result,
+    find_latest_backup_result,
+    restore_backup_result,
 )
 
 
@@ -206,10 +204,17 @@ def _open_user_data_directory(deps: DataManagementTabDeps) -> None:
 def _backup_user_data_action(deps: DataManagementTabDeps) -> None:
     try:
         user_data_dir = deps.get_user_data_dir()
-        result = backup_user_data(user_data_dir, error_log_filename=deps.error_log_filename)
-        if result.item_count:
-            deps.log(f"✅ 用户数据备份成功: {result.backup_dir}")
-            deps.log(f"备份了 {result.item_count} 个项目")
+        result = backup_user_data_result(
+            user_data_dir,
+            error_log_filename=deps.error_log_filename,
+        )
+        if not result.ok:
+            deps.log(f"❌ 备份用户数据失败: {result.message}")
+            return
+        backup_result = result.details.get("backup_result") if result.details else None
+        if backup_result and backup_result.item_count:
+            deps.log(f"✅ 用户数据备份成功: {backup_result.backup_dir}")
+            deps.log(f"备份了 {backup_result.item_count} 个项目")
         else:
             deps.log("没有需要备份的用户数据")
     except Exception as exc:
@@ -228,16 +233,20 @@ def _clear_user_data_action(deps: DataManagementTabDeps) -> None:
             return
 
         user_data_dir = deps.get_user_data_dir()
-        result = clear_user_data(
+        result = clear_user_data_result(
             user_data_dir,
             error_log_filename=deps.error_log_filename,
             copy_template_files_fn=deps.copy_template_files,
         )
-        if result.removed_count:
-            deps.log(f"✅ 用户数据清除成功，删除了 {result.removed_count} 个项目")
+        if not result.ok:
+            deps.log(f"❌ 清除用户数据失败: {result.message}")
+            return
+        clear_result = result.details.get("clear_result") if result.details else None
+        if clear_result and clear_result.removed_count:
+            deps.log(f"✅ 用户数据清除成功，删除了 {clear_result.removed_count} 个项目")
             deps.log("备份文件夹已保留")
-            if result.copied_files_count:
-                deps.log(f"✅ 已复制 {result.copied_files_count} 个模板文件")
+            if clear_result.copied_files_count:
+                deps.log(f"✅ 已复制 {clear_result.copied_files_count} 个模板文件")
             else:
                 deps.log("模板文件已存在或复制完成")
         else:
@@ -248,16 +257,32 @@ def _clear_user_data_action(deps: DataManagementTabDeps) -> None:
 
 def _restore_user_data_action(deps: DataManagementTabDeps) -> None:
     try:
+        def warn_no_backup(log_message: str, dialog_message: str) -> None:
+            deps.log(log_message)
+            messagebox.showwarning("无备份", dialog_message)
+
+        def show_restore_error(log_message: str, dialog_message: str) -> None:
+            deps.log(log_message)
+            messagebox.showerror("还原失败", dialog_message)
+
         user_data_dir = deps.get_user_data_dir()
-        try:
-            latest_info = find_latest_backup(user_data_dir)
-        except BackupNotFoundError:
-            deps.log("❌ 没有找到备份文件夹")
-            messagebox.showwarning("无备份", "没有找到备份文件夹，无法执行还原操作。")
+        latest_result = find_latest_backup_result(user_data_dir)
+        if not latest_result.ok:
+            reason = latest_result.details.get("reason") if latest_result.details else None
+            if reason == "backup_dir_missing":
+                warn_no_backup("❌ 没有找到备份文件夹", "没有找到备份文件夹，无法执行还原操作。")
+            elif reason == "no_backups":
+                warn_no_backup("❌ 没有找到任何备份", "没有找到任何备份文件，无法执行还原操作。")
+            else:
+                show_restore_error(
+                    f"❌ 读取备份失败: {latest_result.message}",
+                    f"无法读取备份：\n{latest_result.message}",
+                )
             return
-        except NoBackupsError:
-            deps.log("❌ 没有找到任何备份")
-            messagebox.showwarning("无备份", "没有找到任何备份文件，无法执行还原操作。")
+
+        latest_info = latest_result.details.get("latest_backup") if latest_result.details else None
+        if not latest_info:
+            warn_no_backup("❌ 未找到可用备份", "没有找到任何备份文件，无法执行还原操作。")
             return
 
         result = messagebox.askyesno(
@@ -271,16 +296,32 @@ def _restore_user_data_action(deps: DataManagementTabDeps) -> None:
             deps.log("用户取消了还原操作")
             return
 
-        latest_result = restore_backup(user_data_dir, backup_path=latest_info.backup_path)
+        restore_result = restore_backup_result(
+            user_data_dir,
+            backup_path=latest_info.backup_path,
+        )
+        if not restore_result.ok:
+            show_restore_error(
+                f"❌ 还原用户数据失败: {restore_result.message}",
+                f"还原操作失败：\n{restore_result.message}",
+            )
+            return
+
+        latest_restore = (
+            restore_result.details.get("restore_result") if restore_result.details else None
+        )
+        if not latest_restore:
+            show_restore_error("❌ 还原结果异常", "还原结果异常，请查看日志。")
+            return
         deps.log(
-            f"✅ 数据还原成功，从备份 {latest_result.backup_name} "
-            f"还原了 {latest_result.restored_count} 个项目"
+            f"✅ 数据还原成功，从备份 {latest_restore.backup_name} "
+            f"还原了 {latest_restore.restored_count} 个项目"
         )
         messagebox.showinfo(
             "还原成功",
             "数据还原完成！\n\n"
-            f"从备份：{latest_result.backup_name}\n"
-            f"还原项目：{latest_result.restored_count} 个",
+            f"从备份：{latest_restore.backup_name}\n"
+            f"还原项目：{latest_restore.restored_count} 个",
         )
     except Exception as exc:
         deps.log(f"❌ 还原用户数据失败: {exc}")
