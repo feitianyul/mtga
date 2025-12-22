@@ -100,7 +100,7 @@ def build_cert_tab(deps: CertTabDeps) -> ttk.Frame:
     clear_ca_btn.pack(fill=tk.X, padx=5, pady=5)
     deps.tooltip(
         clear_ca_btn,
-        "macOS: 删除系统钥匙串中匹配的CA证书；"
+        "macOS: 删除系统钥匙串中匹配的CA证书；\n"
         "Windows: 删除本地计算机/Root 中匹配的CA证书\n"
         f"Common Name: {deps.ca_common_name}\n"
         "需要管理员权限，建议仅在需要重置证书时使用",
