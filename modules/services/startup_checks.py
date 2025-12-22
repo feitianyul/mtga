@@ -6,10 +6,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from modules.hosts.file_operability import check_file_operability
-from modules.hosts.hosts_manager import (
+from modules.hosts.hosts_manager import get_hosts_file_path
+from modules.hosts.hosts_state import (
     ALLOW_UNSAFE_HOSTS_FLAG,
     configure_hosts_modify_block,
-    get_hosts_file_path,
     get_hosts_modify_block_report,
     is_hosts_modify_blocked,
 )

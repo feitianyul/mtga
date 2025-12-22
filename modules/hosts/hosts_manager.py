@@ -8,73 +8,25 @@ import os
 import shutil
 import subprocess
 import sys
-from dataclasses import dataclass
 
 from modules.hosts.file_operability import (
     FileOperabilityReport,
     check_file_operability,
     ensure_windows_file_writable,
 )
+from modules.hosts.hosts_state import get_hosts_modify_block_state, guard_hosts_modify
+from modules.hosts.hosts_text import (
+    DEFAULT_HOSTS_IPS,
+    append_hosts_block,
+    build_hosts_block,
+    normalize_ip_list,
+    remove_hosts_block_from_content,
+)
 from modules.platform.macos_privileged_helper import get_mac_privileged_session
 from modules.platform.privileges import is_windows_admin
 from modules.runtime.resource_manager import ResourceManager
 
-HOSTS_ENTRY_MARKER = "# Added by MTGA GUI"
-DEFAULT_HOSTS_IPS = ("127.0.0.1", "::1")
-
-ALLOW_UNSAFE_HOSTS_FLAG = "--allow-unsafe-hosts"
-
-@dataclass
-class _HostsModifyBlockState:
-    blocked: bool = False
-    reason: str | None = None
-    report: FileOperabilityReport | None = None
-
-
-_HOSTS_MODIFY_BLOCK_STATE = _HostsModifyBlockState()
 _HOSTS_PATH_FALLBACK_STATE = {"warned": False}
-
-
-def configure_hosts_modify_block(
-    blocked: bool,
-    *,
-    reason: str | None = None,
-    report: FileOperabilityReport | None = None,
-) -> None:
-    """配置 hosts 自动修改的阻断开关（主要由 GUI 启动预检设置）。"""
-    state = _HOSTS_MODIFY_BLOCK_STATE
-    state.blocked = bool(blocked)
-    state.reason = reason
-    state.report = report
-
-
-def is_hosts_modify_blocked() -> bool:
-    return _HOSTS_MODIFY_BLOCK_STATE.blocked
-
-
-def get_hosts_modify_block_report() -> FileOperabilityReport | None:
-    return _HOSTS_MODIFY_BLOCK_STATE.report
-
-
-def _should_block_hosts_action(action: str) -> bool:
-    return action in {"remove", "restore"}
-
-
-def _guard_hosts_modify(action: str, log_func=print) -> bool:
-    """如需阻断则输出提示并返回 False；允许则返回 True。"""
-    state = _HOSTS_MODIFY_BLOCK_STATE
-    if not state.blocked:
-        return True
-    if not _should_block_hosts_action(action):
-        return True
-    report = state.report
-    reason = state.reason or (report.status.value if report else "unknown")
-    allow_flag = ALLOW_UNSAFE_HOSTS_FLAG
-    log_func(f"⚠️ 当前环境 hosts 写入受限（reason={reason}）。")
-    log_func("⚠️ 自动删除/还原需要原子性覆写，本环境下已禁用，请手动管理 hosts。")
-    log_func("⚠️ 你可以点击「打开hosts文件」手动修改后重试。")
-    log_func(f"⚠️ 如确需继续尝试自动修改，可使用启动参数 {allow_flag} 覆盖此检查（风险自负）。")
-    return False
 
 
 def _append_hosts_block_fallback(
@@ -137,100 +89,6 @@ def _fallback_to_append(  # noqa: PLR0913
         encoding,
         log_func=log_func,
     )
-
-
-def _normalize_ip_list(ip):
-    """将 IP 参数转换为去重后的字符串列表。"""
-    if ip is None:
-        iterable = DEFAULT_HOSTS_IPS
-    elif isinstance(ip, str):
-        iterable = [ip]
-    elif isinstance(ip, list | tuple | set):
-        iterable = list(ip)
-    else:
-        iterable = [ip]
-
-    normalized = []
-    for addr in iterable:
-        if not addr:
-            continue
-        addr_str = str(addr).strip()
-        if addr_str and addr_str not in normalized:
-            normalized.append(addr_str)
-    return normalized
-
-
-def _build_hosts_block(domain, ip_list):
-    """根据域名与 IP 列表构建统一的 hosts 文本块。"""
-    domain = str(domain).strip()
-    valid_ips = [ip for ip in ip_list if ip]
-    if not domain or not valid_ips:
-        return ""
-    entries = "\n".join(f"{ip} {domain}" for ip in valid_ips)
-    return f"{HOSTS_ENTRY_MARKER}\n{entries}\n"
-
-
-def _append_hosts_block(content, hosts_block):
-    """在原有内容后追加 hosts 文本块，并保留一个空行分隔。"""
-    content = content.rstrip("\n")
-    if not content:
-        return hosts_block
-    return f"{content}\n\n{hosts_block}"
-
-
-def _remove_legacy_hosts_entries(content, domain):
-    """
-    移除旧版本逐条写入的 hosts 记录，返回新内容与删除数量。
-    旧格式为一条注释配合单个域名记录。
-    """
-    lines = content.splitlines()
-    new_lines = []
-    skip_block = False
-    removed_entries = 0
-
-    for line in lines:
-        if skip_block:
-            if domain in line:
-                removed_entries += 1
-                continue
-            if not line.strip():
-                skip_block = False
-                continue
-            skip_block = False
-        if HOSTS_ENTRY_MARKER in line:
-            if new_lines and not new_lines[-1].strip():
-                new_lines.pop()
-            skip_block = True
-            continue
-        new_lines.append(line)
-
-    trailing_newline = content.endswith("\n")
-    new_content = "\n".join(new_lines)
-    if trailing_newline:
-        new_content += "\n"
-    return new_content, removed_entries
-
-
-def _remove_hosts_block_from_content(content, domain, ip_list):
-    """移除当前版本写入的文本块，并返回新内容和删除的条目数量。"""
-    normalized_ips = _normalize_ip_list(ip_list)
-    removed_entries = 0
-    block_text = _build_hosts_block(domain, normalized_ips)
-
-    if block_text:
-        variants = [
-            ("\n\n" + block_text, "\n"),
-            ("\n" + block_text, "\n"),
-            (block_text, ""),
-        ]
-        for target, replacement in variants:
-            while target in content:
-                content = content.replace(target, replacement, 1)
-                removed_entries += len(normalized_ips)
-
-    content, legacy_removed = _remove_legacy_hosts_entries(content, domain)
-    removed_entries += legacy_removed
-    return content, removed_entries
 
 
 def check_hosts_file_operability(hosts_file: str, *, log_func=print) -> FileOperabilityReport:
@@ -331,7 +189,7 @@ def restore_hosts_file(log_func=print):  # noqa: PLR0911
     backup_file = get_backup_file_path()
 
     log_func("开始还原 hosts 文件...")
-    if not _guard_hosts_modify("restore", log_func=log_func):
+    if not guard_hosts_modify("restore", log_func=log_func):
         return False
 
     if not os.path.exists(backup_file):
@@ -415,7 +273,7 @@ def add_hosts_entry(domain, ip=DEFAULT_HOSTS_IPS, log_func=print):  # noqa: PLR0
     返回:
         成功返回 True，失败返回 False
     """
-    ip_list = _normalize_ip_list(ip)
+    ip_list = normalize_ip_list(ip)
     if not ip_list:
         log_func("未提供有效 IP，取消 hosts 修改")
         return False
@@ -444,7 +302,7 @@ def add_hosts_entry(domain, ip=DEFAULT_HOSTS_IPS, log_func=print):  # noqa: PLR0
         with open(hosts_file, encoding=encoding, errors="replace") as f:
             content = f.read()
 
-        hosts_block = _build_hosts_block(domain, ip_list)
+        hosts_block = build_hosts_block(domain, ip_list)
         if not hosts_block:
             log_func("未能构造 hosts 写入数据，取消操作")
             return False
@@ -457,7 +315,7 @@ def add_hosts_entry(domain, ip=DEFAULT_HOSTS_IPS, log_func=print):  # noqa: PLR0
             log_func("hosts 文件已包含目标记录，无需修改")
             return True
 
-        state = _HOSTS_MODIFY_BLOCK_STATE
+        state = get_hosts_modify_block_state()
         if state.blocked:
             reason = state.reason or (state.report.status.value if state.report else "unknown")
             return _fallback_to_append(
@@ -469,12 +327,12 @@ def add_hosts_entry(domain, ip=DEFAULT_HOSTS_IPS, log_func=print):  # noqa: PLR0
             )
 
         # 移除旧记录，保证写入是原子块
-        content, removed_entries = _remove_hosts_block_from_content(content, domain, ip_list)
+        content, removed_entries = remove_hosts_block_from_content(content, domain, ip_list)
         if removed_entries:
             log_func(f"检测到重复记录，已移除 {removed_entries} 个 {domain} 条目")
 
         # 添加统一的文本块并保留一个空行
-        content = _append_hosts_block(content, hosts_block)
+        content = append_hosts_block(content, hosts_block)
 
         # 使用权限写入
         write_success = write_hosts_file_with_permission(hosts_file, content, encoding, log_func)
@@ -511,9 +369,9 @@ def remove_hosts_entry(domain, log_func=print, *, ip=None):
     返回:
         成功返回 True，失败返回 False
     """
-    if not _guard_hosts_modify("remove", log_func=log_func):
+    if not guard_hosts_modify("remove", log_func=log_func):
         return False
-    ip_list = _normalize_ip_list(ip)
+    ip_list = normalize_ip_list(ip)
 
     hosts_file = get_hosts_file_path(log_func)
 
@@ -531,7 +389,7 @@ def remove_hosts_entry(domain, log_func=print, *, ip=None):
         with open(hosts_file, encoding=encoding, errors="replace") as f:
             content = f.read()
 
-        new_content, removed_count = _remove_hosts_block_from_content(content, domain, ip_list)
+        new_content, removed_count = remove_hosts_block_from_content(content, domain, ip_list)
 
         if removed_count > 0:
             if write_hosts_file_with_permission(hosts_file, new_content, encoding, log_func):
