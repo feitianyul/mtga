@@ -5,13 +5,9 @@ from tkinter import messagebox
 from typing import Any
 
 from modules import resource_manager as resource_manager_module
-from modules.cert_checker import has_existing_ca_cert
-from modules.cert_generator import generate_certificates
-from modules.cert_installer import install_ca_cert
-from modules.hosts_manager import modify_hosts_file, open_hosts_file
 from modules.network_environment import check_network_environment
 from modules.resource_manager import copy_template_files, get_user_data_dir, is_packaged
-from modules.services import proxy_state, update_service
+from modules.services import cert_service, hosts_service, proxy_state, update_service
 from modules.services.app_metadata import AppMetadata
 from modules.services.bootstrap import AppContext
 from modules.services.startup_context import StartupContext
@@ -40,8 +36,8 @@ def build_main_window_deps(inputs: MainWindowDepsInputs) -> MainWindowDeps:
         check_environment=inputs.check_environment,
         is_packaged=is_packaged,
         check_network_environment=check_network_environment,
-        modify_hosts_file=modify_hosts_file,
-        open_hosts_file=open_hosts_file,
+        modify_hosts_file=hosts_service.modify_hosts_file,
+        open_hosts_file=hosts_service.open_hosts_file,
         get_user_data_dir=get_user_data_dir,
         copy_template_files=copy_template_files,
         app_metadata=inputs.app_metadata,
@@ -51,9 +47,9 @@ def build_main_window_deps(inputs: MainWindowDepsInputs) -> MainWindowDeps:
         create_tkinterweb_html_widget=create_tkinterweb_html_widget,
         program_resource_dir=resource_manager_module.get_program_resource_dir(),
         startup_context=inputs.startup_context,
-        generate_certificates=generate_certificates,
-        install_ca_cert=install_ca_cert,
-        has_existing_ca_cert=has_existing_ca_cert,
+        generate_certificates=cert_service.generate_certificates,
+        install_ca_cert=cert_service.install_ca_cert,
+        has_existing_ca_cert=cert_service.has_existing_ca_cert,
         center_window=center_window,
         get_proxy_instance=proxy_state.get_proxy_instance,
         set_proxy_instance=proxy_state.set_proxy_instance,

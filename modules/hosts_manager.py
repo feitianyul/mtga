@@ -14,9 +14,9 @@ from .file_operability import (
     FileOperabilityReport,
     check_file_operability,
     ensure_windows_file_writable,
-    is_windows_admin,
 )
 from .macos_privileged_helper import get_mac_privileged_session
+from .platform.privileges import is_windows_admin
 from .resource_manager import ResourceManager
 
 HOSTS_ENTRY_MARKER = "# Added by MTGA GUI"

@@ -14,56 +14,7 @@ from ctypes import wintypes
 from dataclasses import dataclass
 from enum import Enum
 
-
-def is_windows_admin() -> bool:
-    """检测当前进程是否属于管理员上下文（仅 Windows 使用）。"""
-    if os.name != "nt":
-        return False
-    try:
-        return bool(ctypes.windll.shell32.IsUserAnAdmin())
-    except Exception:
-        return False
-
-
-def is_windows_elevated() -> bool:
-    """检测当前进程是否已提升（UAC elevated，仅 Windows 使用）。"""
-    if os.name != "nt":
-        return False
-
-    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-    advapi32 = ctypes.WinDLL("advapi32", use_last_error=True)
-
-    TOKEN_QUERY = 0x0008
-    TokenElevation = 20
-
-    token = wintypes.HANDLE()
-    try:
-        if not advapi32.OpenProcessToken(
-            kernel32.GetCurrentProcess(),
-            TOKEN_QUERY,
-            ctypes.byref(token),
-        ):
-            return False
-
-        elevation = wintypes.DWORD()
-        returned_size = wintypes.DWORD()
-        if not advapi32.GetTokenInformation(
-            token,
-            TokenElevation,
-            ctypes.byref(elevation),
-            ctypes.sizeof(elevation),
-            ctypes.byref(returned_size),
-        ):
-            return False
-        return bool(elevation.value)
-    except Exception:
-        return False
-    finally:
-        try:
-            if token:
-                kernel32.CloseHandle(token)
-        except Exception:
-            pass
+from modules.platform.privileges import is_windows_admin, is_windows_elevated
 
 
 class FileOperabilityStatus(Enum):
