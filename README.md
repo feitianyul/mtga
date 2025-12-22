@@ -44,6 +44,7 @@
         - [第 5 步：配置 Trae IDE](#第-5-步配置-trae-ide)
       - [macOS](#macos)
   - [😎 保持更新](#-保持更新)
+  - [架构与依赖约束](#架构与依赖约束)
   - [引用](#引用)
   - [Star History](#star-history)
 
@@ -279,6 +280,15 @@ python trae_proxy.py
 ![star to keep latest](https://github.com/BiFangKNT/mtga/blob/gui/images/star-to-keep-latest.gif?raw=true)
 
 ---
+## 架构与依赖约束
+
+为避免模块耦合失控，项目遵循以下分层与依赖规则：
+
+- UI -> actions -> services -> 领域模块（cert/hosts/network/proxy/update）-> runtime/platform
+- UI 不得直接依赖领域模块，所有操作通过 actions/services 统一编排。
+- 平台相关逻辑放在 `modules/platform`（或显式平台子模块）。
+
+更多细节与错误处理规范见：`docs/ARCHITECTURE.md`。
 
 ## 引用
 
