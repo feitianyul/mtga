@@ -95,6 +95,7 @@ try:
         tab_builders,
         update_dialog,
         window_context,
+        window_lifecycle,
     )
     from modules import resource_manager as resource_manager_module
 except ImportError as e:
@@ -275,6 +276,11 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
     footer_actions.build_footer_actions(
         footer_actions.FooterActionsDeps(
             left_frame=left_frame,
+            start_all=proxy_runner.start_all,
+        )
+    )
+    window_lifecycle.bind_window_close(
+        window_lifecycle.WindowLifecycleDeps(
             window=window,
             log=log,
             thread_manager=thread_manager,
