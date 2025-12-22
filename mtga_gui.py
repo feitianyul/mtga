@@ -73,6 +73,7 @@ try:
         hosts_actions,
         model_tests,
         shutdown_actions,
+        update_bootstrap,
         update_actions,
     )
     from modules.services import (
@@ -228,8 +229,9 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
     proxy_ui = proxy_context_result.proxy_ui
     proxy_runner = proxy_context_result.proxy_runner
 
-    update_state = update_actions.UpdateCheckState()
-    update_controller = update_actions.UpdateCheckController(state=update_state)
+    update_controller = update_actions.UpdateCheckController(
+        state=update_actions.UpdateCheckState()
+    )
 
     _, check_updates_button = tab_builders.build_main_tabs(
         tab_builders.MainTabsDeps(
@@ -252,21 +254,25 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
             on_check_updates=update_controller.trigger,
         )
     )
-    update_controller.configure(update_actions.UpdateCheckDeps(
-        window=window,
-        log=log,
-        thread_manager=thread_manager,
-        check_button=check_updates_button,
-        app_display_name=APP_METADATA.display_name,
-        app_version=APP_VERSION,
-        repo=APP_METADATA.github_repo,
-        default_font=default_font,
-        update_service=update_service,
-        update_dialog=update_dialog,
-        messagebox=messagebox,
-        create_tkinterweb_html_widget=create_tkinterweb_html_widget,
-        program_resource_dir=resource_manager_module.get_program_resource_dir(),
-    ))
+
+    update_bootstrap.configure_update_controller(
+        update_controller,
+        update_bootstrap.UpdateBootstrapDeps(
+            window=window,
+            log=log,
+            thread_manager=thread_manager,
+            check_button=check_updates_button,
+            app_display_name=APP_METADATA.display_name,
+            app_version=APP_VERSION,
+            repo=APP_METADATA.github_repo,
+            default_font=default_font,
+            update_service=update_service,
+            update_dialog=update_dialog,
+            messagebox=messagebox,
+            create_tkinterweb_html_widget=create_tkinterweb_html_widget,
+            program_resource_dir=resource_manager_module.get_program_resource_dir(),
+        )
+    )
 
     # 一键启动按钮
     start_button = ttk.Button(left_frame, text="一键启动全部服务", command=proxy_runner.start_all)
