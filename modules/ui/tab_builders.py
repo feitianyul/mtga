@@ -403,3 +403,78 @@ def build_about_tab(deps: AboutTabDeps) -> tuple[ttk.Frame, ttk.Button]:
     about_footer.pack(side=tk.BOTTOM, fill=tk.X, padx=8, pady=(0, 8))
 
     return about_tab, check_updates_button
+
+
+@dataclass(frozen=True)
+class MainTabsDeps:
+    parent: ttk.Frame
+    window: tk.Tk
+    log: Callable[[str], None]
+    tooltip: Callable[..., None]
+    center_window: Callable[[tk.Toplevel | tk.Tk], None]
+    ca_common_name: str
+    thread_manager: Any
+    hosts_runner: Any
+    proxy_runner: Any
+    is_packaged: Callable[[], bool]
+    get_user_data_dir: Callable[[], str]
+    copy_template_files: Callable[[], list[str]]
+    error_log_filename: str
+    app_display_name: str
+    app_version: str
+    get_preferred_font: Callable[..., tkfont.Font]
+    on_check_updates: Callable[[], None]
+
+
+def build_main_tabs(deps: MainTabsDeps) -> tuple[ttk.Notebook, ttk.Button]:
+    notebook = ttk.Notebook(deps.parent)
+    notebook.pack(fill=tk.BOTH, expand=True, pady=0)
+    build_cert_tab(
+        CertTabDeps(
+            notebook=notebook,
+            window=deps.window,
+            log=deps.log,
+            tooltip=deps.tooltip,
+            center_window=deps.center_window,
+            ca_common_name=deps.ca_common_name,
+            thread_manager=deps.thread_manager,
+        )
+    )
+    build_hosts_tab(
+        HostsTabDeps(
+            notebook=notebook,
+            hosts_runner=deps.hosts_runner,
+        )
+    )
+    build_proxy_tab(
+        ProxyTabDeps(
+            notebook=notebook,
+            proxy_runner=deps.proxy_runner,
+            log=deps.log,
+            thread_manager=deps.thread_manager,
+        )
+    )
+
+    if deps.is_packaged():
+        build_data_management_tab(
+            DataManagementTabDeps(
+                notebook=notebook,
+                log=deps.log,
+                tooltip=deps.tooltip,
+                get_user_data_dir=deps.get_user_data_dir,
+                copy_template_files=deps.copy_template_files,
+                error_log_filename=deps.error_log_filename,
+            )
+        )
+
+    _, check_updates_button = build_about_tab(
+        AboutTabDeps(
+            notebook=notebook,
+            app_display_name=deps.app_display_name,
+            app_version=deps.app_version,
+            get_preferred_font=deps.get_preferred_font,
+            on_check_updates=deps.on_check_updates,
+        )
+    )
+
+    return notebook, check_updates_button

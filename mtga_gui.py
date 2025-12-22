@@ -252,53 +252,24 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
         ),
     )
 
-    # 功能标签页
-    notebook = ttk.Notebook(left_content)
-    notebook.pack(fill=tk.BOTH, expand=True, pady=0)
-    tab_builders.build_cert_tab(
-        tab_builders.CertTabDeps(
-            notebook=notebook,
+    update_state = update_actions.UpdateCheckState()
+    update_controller = update_actions.UpdateCheckController(state=update_state)
+
+    _, check_updates_button = tab_builders.build_main_tabs(
+        tab_builders.MainTabsDeps(
+            parent=left_content,
             window=window,
             log=log,
             tooltip=tooltip,
             center_window=center_window,
             ca_common_name=APP_METADATA.ca_common_name,
             thread_manager=thread_manager,
-        )
-    )
-    tab_builders.build_hosts_tab(
-        tab_builders.HostsTabDeps(
-            notebook=notebook,
             hosts_runner=hosts_runner,
-        )
-    )
-    tab_builders.build_proxy_tab(
-        tab_builders.ProxyTabDeps(
-            notebook=notebook,
             proxy_runner=proxy_runner,
-            log=log,
-            thread_manager=thread_manager,
-        )
-    )
-
-    if is_packaged():
-        tab_builders.build_data_management_tab(
-            tab_builders.DataManagementTabDeps(
-                notebook=notebook,
-                log=log,
-                tooltip=tooltip,
-                get_user_data_dir=get_user_data_dir,
-                copy_template_files=copy_template_files,
-                error_log_filename=APP_METADATA.error_log_filename,
-            )
-        )
-
-    update_state = update_actions.UpdateCheckState()
-    update_controller = update_actions.UpdateCheckController(state=update_state)
-
-    _, check_updates_button = tab_builders.build_about_tab(
-        tab_builders.AboutTabDeps(
-            notebook=notebook,
+            is_packaged=is_packaged,
+            get_user_data_dir=get_user_data_dir,
+            copy_template_files=copy_template_files,
+            error_log_filename=APP_METADATA.error_log_filename,
             app_display_name=APP_METADATA.display_name,
             app_version=APP_VERSION,
             get_preferred_font=get_preferred_font,
