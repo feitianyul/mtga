@@ -7,8 +7,8 @@ import atexit
 import os
 import tempfile
 
-from .process_utils import run_subprocess
-from .resource_manager import ResourceManager
+from modules.runtime.process_utils import run_subprocess
+from modules.runtime.resource_manager import ResourceManager
 
 
 def create_temp_file(content, suffix=".cnf"):

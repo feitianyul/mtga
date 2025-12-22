@@ -86,7 +86,7 @@ def get_program_resource_dir():
         return exe_dir
     else:
         # 开发环境使用项目根目录
-        return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def get_base_path():

@@ -4,17 +4,17 @@ from dataclasses import dataclass
 from tkinter import messagebox
 from typing import Any
 
-from modules import resource_manager as resource_manager_module
-from modules.network_environment import check_network_environment
-from modules.resource_manager import copy_template_files, get_user_data_dir, is_packaged
+from modules.network.network_environment import check_network_environment
+from modules.runtime import resource_manager as resource_manager_module
+from modules.runtime.resource_manager import copy_template_files, get_user_data_dir, is_packaged
 from modules.services import cert_service, hosts_service, proxy_state, update_service
 from modules.services.app_metadata import AppMetadata
 from modules.services.bootstrap import AppContext
 from modules.services.startup_context import StartupContext
-from modules.tkhtml_compat import create_tkinterweb_html_widget
 from modules.ui import update_dialog
 from modules.ui.main_window_builder import MainWindowDeps
-from modules.ui_helpers import center_window
+from modules.ui.tkhtml_compat import create_tkinterweb_html_widget
+from modules.ui.ui_helpers import center_window
 
 
 @dataclass(frozen=True)

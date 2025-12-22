@@ -50,8 +50,8 @@ io_service.ensure_utf8_stdio()
 
 # 导入自定义模块
 try:
-    from modules import macos_privileged_helper
-    from modules.resource_manager import get_user_data_dir
+    from modules.platform import macos_privileged_helper
+    from modules.runtime.resource_manager import get_user_data_dir
     from modules.services import app_bootstrap, privilege_service
     from modules.ui import (
         main_window_builder,

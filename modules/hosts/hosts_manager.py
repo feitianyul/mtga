@@ -10,14 +10,14 @@ import subprocess
 import sys
 from dataclasses import dataclass
 
-from .file_operability import (
+from modules.hosts.file_operability import (
     FileOperabilityReport,
     check_file_operability,
     ensure_windows_file_writable,
 )
-from .macos_privileged_helper import get_mac_privileged_session
-from .platform.privileges import is_windows_admin
-from .resource_manager import ResourceManager
+from modules.platform.macos_privileged_helper import get_mac_privileged_session
+from modules.platform.privileges import is_windows_admin
+from modules.runtime.resource_manager import ResourceManager
 
 HOSTS_ENTRY_MARKER = "# Added by MTGA GUI"
 DEFAULT_HOSTS_IPS = ("127.0.0.1", "::1")

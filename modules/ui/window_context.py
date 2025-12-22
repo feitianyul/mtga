@@ -6,9 +6,9 @@ from dataclasses import dataclass
 from functools import partial
 from typing import Any
 
-from modules.macos_theme import detect_macos_dark_mode
 from modules.ui import layout_builders, window_setup
-from modules.ui_helpers import build_tk_error_handler, create_tooltip
+from modules.ui.macos_theme import detect_macos_dark_mode
+from modules.ui.ui_helpers import build_tk_error_handler, create_tooltip
 
 
 @dataclass(frozen=True)

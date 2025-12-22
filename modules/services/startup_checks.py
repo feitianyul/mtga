@@ -5,15 +5,15 @@ import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from modules.file_operability import check_file_operability
-from modules.hosts_manager import (
+from modules.hosts.file_operability import check_file_operability
+from modules.hosts.hosts_manager import (
     ALLOW_UNSAFE_HOSTS_FLAG,
     configure_hosts_modify_block,
     get_hosts_file_path,
     get_hosts_modify_block_report,
     is_hosts_modify_blocked,
 )
-from modules.network_environment import check_network_environment
+from modules.network.network_environment import check_network_environment
 
 
 @dataclass(frozen=True)

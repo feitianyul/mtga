@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from tkinter import scrolledtext, ttk
 from typing import Any
 
-from modules.ui_helpers import build_text_logger
+from modules.ui.ui_helpers import build_text_logger
 
 
 @dataclass(frozen=True)

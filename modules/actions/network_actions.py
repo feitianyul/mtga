@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from modules.network_environment import check_network_environment
+from modules.network.network_environment import check_network_environment
 
 
 def run_network_environment_check(

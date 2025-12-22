@@ -25,13 +25,13 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from .resource_manager import is_packaged
+    from modules.runtime.resource_manager import is_packaged
 except ImportError:
     # 作为脚本运行时，没有包上下文，补充模块搜索路径
     import sys
 
     sys.path.append(str(Path(__file__).resolve().parent.parent))
-    from modules.resource_manager import is_packaged
+    from modules.runtime.resource_manager import is_packaged
 
 JsonDict = dict[str, Any]
 JsonMapping = Mapping[str, Any]

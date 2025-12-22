@@ -9,9 +9,9 @@ import os
 import shlex
 import sys
 
-from .cert_utils import filter_certs_by_name, log_lines, parse_certutil_store
-from .macos_privileged_helper import get_mac_privileged_session
-from .process_utils import run_command
+from modules.cert.cert_utils import filter_certs_by_name, log_lines, parse_certutil_store
+from modules.platform.macos_privileged_helper import get_mac_privileged_session
+from modules.runtime.process_utils import run_command
 
 
 def _clear_ca_on_windows(ca_common_name: str, log_func=print) -> bool:

@@ -6,9 +6,9 @@
 import os
 import sys
 
-from .macos_privileged_helper import get_mac_privileged_session
-from .process_utils import run_command
-from .resource_manager import ResourceManager
+from modules.platform.macos_privileged_helper import get_mac_privileged_session
+from modules.runtime.process_utils import run_command
+from modules.runtime.resource_manager import ResourceManager
 
 
 def install_ca_cert_windows(ca_cert_file, log_func=print):

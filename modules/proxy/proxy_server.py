@@ -19,8 +19,8 @@ from flask import Flask, Response, jsonify, request
 from requests.adapters import HTTPAdapter
 from werkzeug.serving import BaseWSGIServer, WSGIRequestHandler
 
-from .resource_manager import ResourceManager, is_packaged
-from .thread_manager import ThreadManager
+from modules.runtime.resource_manager import ResourceManager, is_packaged
+from modules.runtime.thread_manager import ThreadManager
 
 
 class StoppableWSGIServer(BaseWSGIServer):

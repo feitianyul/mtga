@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from modules.hosts_manager import (
+from modules.hosts.hosts_manager import (
     backup_hosts_file,
     modify_hosts_file,
     open_hosts_file,

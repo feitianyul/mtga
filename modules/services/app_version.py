@@ -26,7 +26,7 @@ def resolve_app_version(*, project_root: Path) -> str:
 
     baked_version: str | None = None
     try:
-        from modules import _build_version as build_version_module  # type: ignore  # noqa: PLC0415
+        from modules.runtime import _build_version as build_version_module  # type: ignore  # noqa: PLC0415,I001
 
         baked_version = normalize_version(
             getattr(build_version_module, "BUILT_APP_VERSION", None)

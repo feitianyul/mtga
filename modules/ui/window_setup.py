@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from tkinter import font as tkfont
 from typing import Literal
 
-from modules.tk_fonts import FontManager, apply_global_font
+from modules.ui.tk_fonts import FontManager, apply_global_font
 
 
 @dataclass(frozen=True)

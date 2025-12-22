@@ -4,8 +4,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from modules.network_utils import is_port_in_use
-from modules.proxy_server import ProxyServer
+from modules.network.network_utils import is_port_in_use
+from modules.proxy.proxy_server import ProxyServer
 
 
 @dataclass(frozen=True)

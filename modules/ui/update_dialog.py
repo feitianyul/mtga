@@ -8,7 +8,7 @@ from tkinter import font as tkfont
 from tkinter import ttk
 from typing import Any
 
-from modules.ui_helpers import center_window
+from modules.ui.ui_helpers import center_window
 
 
 @dataclass(frozen=True)

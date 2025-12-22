@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from modules.resource_manager import ResourceManager
+from modules.runtime.resource_manager import ResourceManager
+from modules.runtime.thread_manager import ThreadManager
 from modules.services.config_service import ConfigStore
-from modules.thread_manager import ThreadManager
 
 
 @dataclass(frozen=True)

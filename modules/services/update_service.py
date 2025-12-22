@@ -5,7 +5,7 @@ from typing import Literal
 
 import requests
 
-from modules import update_checker
+from modules.update import update_checker
 
 UpdateStatus = Literal[
     "network_error",

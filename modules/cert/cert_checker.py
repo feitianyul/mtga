@@ -7,8 +7,8 @@ from __future__ import annotations
 import os
 import sys
 
-from .cert_utils import filter_certs_by_name, log_lines, parse_certutil_store
-from .process_utils import run_command
+from modules.cert.cert_utils import filter_certs_by_name, log_lines, parse_certutil_store
+from modules.runtime.process_utils import run_command
 
 MAC_KEYCHAIN_ITEM_NOT_FOUND = 44
 
