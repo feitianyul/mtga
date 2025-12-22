@@ -11,9 +11,6 @@ from functools import partial
 from pathlib import Path
 from tkinter import messagebox
 
-
-from modules.ui_helpers import center_window
-
 os.environ.setdefault("LANG", "zh_CN.UTF-8")
 os.environ.setdefault("LC_ALL", "zh_CN.UTF-8")
 os.environ.setdefault("PYTHONIOENCODING", "utf-8")
@@ -54,36 +51,20 @@ io_service.ensure_utf8_stdio()
 
 # 导入自定义模块
 try:
-    from modules.cert_generator import generate_certificates
-    from modules.cert_checker import has_existing_ca_cert
-    from modules.cert_installer import install_ca_cert
-    from modules.hosts_manager import (
-        modify_hosts_file,
-        open_hosts_file,
-    )
-    from modules.network_environment import check_network_environment
-    from modules.resource_manager import (
-        copy_template_files,
-        get_user_data_dir,
-        is_packaged,
-    )
-    from modules.tkhtml_compat import create_tkinterweb_html_widget
     from modules import macos_privileged_helper
+    from modules.resource_manager import get_user_data_dir
     from modules.services import (
         bootstrap,
         app_metadata,
         app_version,
         logging_service,
         privilege_service,
-        proxy_state,
         startup_context,
-        update_service,
     )
     from modules.ui import (
         main_window_builder,
-        update_dialog,
+        main_window_deps,
     )
-    from modules import resource_manager as resource_manager_module
 except ImportError as e:
     print(f"导入模块失败: {e}")
     print("请确保 modules 目录及其模块文件存在")
@@ -115,10 +96,6 @@ APP_VERSION = app_version.resolve_app_version(project_root=Path(__file__).resolv
 
 
 
-get_proxy_instance = proxy_state.get_proxy_instance
-set_proxy_instance = proxy_state.set_proxy_instance
-
-
 check_is_admin = privilege_service.check_is_admin
 run_as_admin = privilege_service.run_as_admin
 
@@ -135,32 +112,15 @@ config_store = APP_CONTEXT.config_store
 def create_main_window() -> tk.Tk | None:
     """创建主窗口"""
     return main_window_builder.build_main_window(
-        main_window_builder.MainWindowDeps(
-            get_icon_file=resource_manager.get_icon_file,
-            thread_manager=thread_manager,
-            config_store=config_store,
-            log_error=log_error,
-            check_environment=check_environment,
-            is_packaged=is_packaged,
-            check_network_environment=check_network_environment,
-            modify_hosts_file=modify_hosts_file,
-            open_hosts_file=open_hosts_file,
-            get_user_data_dir=get_user_data_dir,
-            copy_template_files=copy_template_files,
-            app_metadata=APP_METADATA,
-            app_version=APP_VERSION,
-            update_service=update_service,
-            update_dialog=update_dialog,
-            create_tkinterweb_html_widget=create_tkinterweb_html_widget,
-            program_resource_dir=resource_manager_module.get_program_resource_dir(),
-            startup_context=STARTUP_CONTEXT,
-            generate_certificates=generate_certificates,
-            install_ca_cert=install_ca_cert,
-            has_existing_ca_cert=has_existing_ca_cert,
-            center_window=center_window,
-            get_proxy_instance=get_proxy_instance,
-            set_proxy_instance=set_proxy_instance,
-            messagebox=messagebox,
+        main_window_deps.build_main_window_deps(
+            main_window_deps.MainWindowDepsInputs(
+                app_context=APP_CONTEXT,
+                app_metadata=APP_METADATA,
+                app_version=APP_VERSION,
+                log_error=log_error,
+                check_environment=check_environment,
+                startup_context=STARTUP_CONTEXT,
+            )
         )
     )
 
