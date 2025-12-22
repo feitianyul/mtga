@@ -4,6 +4,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from modules.runtime.operation_result import OperationResult
+
 
 @dataclass
 class ShutdownState:
@@ -15,7 +17,7 @@ class ShutdownDeps:
     window: Any
     log: Callable[[str], None]
     thread_manager: Any
-    stop_proxy_and_restore: Callable[..., bool]
+    stop_proxy_and_restore: Callable[..., OperationResult]
     proxy_runner: Any
 
 
@@ -34,8 +36,8 @@ def handle_window_close(
         try:
             deps.thread_manager.wait(deps.proxy_runner.proxy_start_task_id, timeout=5)
             deps.thread_manager.wait(deps.proxy_runner.proxy_stop_task_id, timeout=5)
-            stopped = deps.stop_proxy_and_restore(block_hosts_cleanup=True)
-            if stopped:
+            result = deps.stop_proxy_and_restore(block_hosts_cleanup=True)
+            if result.ok:
                 deps.log("代理服务器已停止，程序即将退出")
         finally:
             state.shutdown_task_id = None

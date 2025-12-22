@@ -4,18 +4,20 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from modules.runtime.operation_result import OperationResult
+
 
 @dataclass(frozen=True)
 class ProxyTaskDependencies:
     ensure_global_config_ready: Callable[[], bool]
     build_proxy_config: Callable[[], dict[str, Any] | None]
     get_current_config: Callable[[], dict[str, Any]]
-    restart_proxy: Callable[..., bool]
-    stop_proxy_and_restore: Callable[..., bool]
+    restart_proxy: Callable[..., OperationResult]
+    stop_proxy_and_restore: Callable[..., OperationResult]
     has_existing_ca_cert: Callable[..., bool]
     generate_certificates: Callable[..., bool]
     install_ca_cert: Callable[..., bool]
-    modify_hosts_file: Callable[..., bool]
+    modify_hosts_file: Callable[..., OperationResult]
     ca_common_name: str
 
 
@@ -103,20 +105,22 @@ class ProxyTaskRunner:
                     return
 
             self._log("步骤 3/4: 修改hosts文件")
-            hosts_modified = self._deps.modify_hosts_file(log_func=self._log)
-            if not hosts_modified:
-                self._log("❌ 修改hosts文件失败，无法继续")
+            modify_result = self._deps.modify_hosts_file(log_func=self._log)
+            if not modify_result.ok:
+                message = modify_result.message or "修改hosts文件失败，无法继续"
+                self._log(f"❌ {message}")
                 return
 
             self._log("步骤 4/4: 启动代理服务器")
             config = self._deps.build_proxy_config()
             if not config:
                 return
-            if self._deps.restart_proxy(
+            restart_result = self._deps.restart_proxy(
                 config,
                 success_message="✅ 全部服务启动成功",
-                hosts_modified=hosts_modified,
-            ):
+                hosts_modified=modify_result.ok,
+            )
+            if restart_result.ok:
                 return
             self._log("❌ 全部服务启动失败：代理服务器未能启动")
 

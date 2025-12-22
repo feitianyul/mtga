@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from modules.actions import proxy_actions, proxy_ui_coordinator, runtime_options_actions
+from modules.runtime.operation_result import OperationResult
 from modules.services.config_service import ConfigStore
 from modules.ui import runtime_options_panel
 
@@ -17,7 +18,7 @@ class ProxyContextDeps:
     config_store: ConfigStore
     thread_manager: Any
     check_network_environment: Callable[..., Any]
-    modify_hosts_file: Callable[..., bool]
+    modify_hosts_file: Callable[..., OperationResult]
     get_proxy_instance: Callable[[], Any | None]
     set_proxy_instance: Callable[[Any | None], None]
     hosts_runner: Any

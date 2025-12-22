@@ -24,10 +24,12 @@ class HostsTaskRunner:
             action_name = action_names.get(action, action)
             self._log(f"开始{action_name} hosts文件...")
             ip_tuple = ("127.0.0.1", "::1")
-            if self._modify_hosts_file(action=action, ip=ip_tuple, log_func=self._log):
+            result = self._modify_hosts_file(action=action, ip=ip_tuple, log_func=self._log)
+            if getattr(result, "ok", False):
                 self._log(f"✅ hosts文件{action_name}完成")
             else:
-                self._log(f"❌ hosts文件{action_name}失败")
+                message = getattr(result, "message", None) or f"hosts文件{action_name}失败"
+                self._log(f"❌ {message}")
 
         if block:
             self._thread_manager.wait(self._hosts_task_id)
@@ -46,9 +48,11 @@ class HostsTaskRunner:
     def open_hosts(self) -> None:
         def task():
             self._log("正在打开hosts文件...")
-            if self._open_hosts_file(log_func=self._log):
+            result = self._open_hosts_file(log_func=self._log)
+            if getattr(result, "ok", False):
                 self._log("✅ hosts文件已打开")
             else:
-                self._log("❌ 打开hosts文件失败")
+                message = getattr(result, "message", None) or "打开hosts文件失败"
+                self._log(f"❌ {message}")
 
         self._thread_manager.run("hosts_open", task)

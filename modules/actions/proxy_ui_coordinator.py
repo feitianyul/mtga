@@ -4,6 +4,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from modules.runtime.operation_result import OperationResult
 from modules.services import proxy_orchestration
 from modules.services.config_service import ConfigStore
 
@@ -15,7 +16,7 @@ class ProxyUiDeps:
     runtime_options: Any
     thread_manager: Any
     check_network_environment: Callable[..., Any]
-    modify_hosts_file: Callable[..., bool]
+    modify_hosts_file: Callable[..., OperationResult]
     get_proxy_instance: Callable[[], Any | None]
     set_proxy_instance: Callable[[Any | None], None]
     hosts_runner: Any
@@ -66,8 +67,8 @@ class ProxyUiCoordinator:
         *,
         success_message: str = "✅ 代理服务器启动成功",
         hosts_modified: bool = False,
-    ) -> bool:
-        return proxy_orchestration.restart_proxy(
+    ) -> OperationResult:
+        return proxy_orchestration.restart_proxy_result(
             config=config,
             deps=proxy_orchestration.RestartProxyDeps(
                 log=self._deps.log,
@@ -78,8 +79,10 @@ class ProxyUiCoordinator:
             hosts_modified=hosts_modified,
         )
 
-    def stop_proxy_instance(self, reason: str = "stop", show_idle_message: bool = False) -> bool:
-        return proxy_orchestration.stop_proxy_instance(
+    def stop_proxy_instance(
+        self, reason: str = "stop", show_idle_message: bool = False
+    ) -> OperationResult:
+        return proxy_orchestration.stop_proxy_instance_result(
             get_proxy_instance=self._deps.get_proxy_instance,
             set_proxy_instance=self._deps.set_proxy_instance,
             log=self._deps.log,
@@ -93,8 +96,8 @@ class ProxyUiCoordinator:
         success_message: str = "✅ 代理服务器启动成功",
         *,
         hosts_modified: bool = False,
-    ) -> bool:
-        return proxy_orchestration.start_proxy_instance(
+    ) -> OperationResult:
+        return proxy_orchestration.start_proxy_instance_result(
             config=config,
             deps=proxy_orchestration.StartProxyDeps(
                 log=self._deps.log,
@@ -113,7 +116,7 @@ class ProxyUiCoordinator:
         show_idle_message: bool = False,
         *,
         block_hosts_cleanup: bool = False,
-    ) -> bool:
+    ) -> OperationResult:
         stopped = self.stop_proxy_instance(show_idle_message=show_idle_message)
         self._deps.hosts_runner.modify_hosts("remove", block=block_hosts_cleanup)
         return stopped
