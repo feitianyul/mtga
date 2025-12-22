@@ -2,7 +2,6 @@
 # ruff: noqa: E402,I001
 
 # 在最早阶段设置 UTF-8 编码环境变量 - 必须在任何导入之前
-import io
 import locale
 import os
 import sys
@@ -82,34 +81,14 @@ def setup_environment():
 # Call setup_environment before importing other modules
 setup_environment()
 
+try:
+    from modules.services import io_service
+except ImportError as e:
+    print(f"导入模块失败: {e}")
+    print("请确保 modules 目录及其模块文件存在")
+    sys.exit(1)
 
-def ensure_utf8_stdio():
-    """Ensure stdout/stderr can emit UTF-8 even when Finder starts the app."""
-    for name in ("stdout", "stderr"):
-        stream = getattr(sys, name, None)
-        if not stream:
-            continue
-        encoding = getattr(stream, "encoding", None)
-        if encoding and encoding.lower().startswith("utf-8"):
-            continue
-        try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
-        except AttributeError:
-            buffer = getattr(stream, "buffer", None)
-            if buffer is None:
-                continue
-            try:
-                new_stream = io.TextIOWrapper(
-                    buffer, encoding="utf-8", errors="replace", line_buffering=True
-                )
-            except Exception:
-                continue
-            setattr(sys, name, new_stream)
-        except Exception:
-            pass
-
-
-ensure_utf8_stdio()
+io_service.ensure_utf8_stdio()
 
 # 导入自定义模块
 try:
