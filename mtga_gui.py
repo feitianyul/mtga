@@ -36,7 +36,6 @@ MTGA GUI - 重构版本
 
 try:
     from modules.services import (
-        app_metadata,
         env_setup,
         environment_service,
         io_service,
@@ -53,14 +52,7 @@ io_service.ensure_utf8_stdio()
 try:
     from modules import macos_privileged_helper
     from modules.resource_manager import get_user_data_dir
-    from modules.services import (
-        bootstrap,
-        app_metadata,
-        app_version,
-        logging_service,
-        privilege_service,
-        startup_context,
-    )
+    from modules.services import app_bootstrap, privilege_service
     from modules.ui import (
         main_window_builder,
         main_window_deps,
@@ -75,24 +67,18 @@ if macos_privileged_helper.HELPER_FLAG in sys.argv:
     macos_privileged_helper.main()
     sys.exit(0)
 
-# 全局变量
-APP_CONTEXT = bootstrap.build_app_context()
+BOOTSTRAP = app_bootstrap.build_app_bootstrap(
+    project_root=Path(__file__).resolve().parent,
+    get_user_data_dir=get_user_data_dir,
+)
+APP_CONTEXT = BOOTSTRAP.app_context
 resource_manager = APP_CONTEXT.resource_manager
 thread_manager = APP_CONTEXT.thread_manager
-
-APP_METADATA = app_metadata.DEFAULT_METADATA
-
-
-ERROR_LOG_PATH = logging_service.setup_error_logging(
-    get_user_data_dir=get_user_data_dir,
-    error_log_filename=APP_METADATA.error_log_filename,
-)
-log_error = logging_service.log_error
-logging_service.install_global_exception_hook(log_error=log_error)
-
-STARTUP_CONTEXT = startup_context.build_startup_context()
-
-APP_VERSION = app_version.resolve_app_version(project_root=Path(__file__).resolve().parent)
+APP_METADATA = BOOTSTRAP.app_metadata
+APP_VERSION = BOOTSTRAP.app_version
+STARTUP_CONTEXT = BOOTSTRAP.startup_context
+ERROR_LOG_PATH = BOOTSTRAP.error_log_path
+log_error = BOOTSTRAP.log_error
 
 
 
