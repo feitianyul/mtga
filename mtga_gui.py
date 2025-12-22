@@ -68,13 +68,11 @@ try:
     )
     from modules.network_environment import check_network_environment
     from modules.resource_manager import (
-        ResourceManager,
         copy_template_files,
         get_user_data_dir,
         is_packaged,
     )
     from modules.tkhtml_compat import create_tkinterweb_html_widget
-    from modules.thread_manager import ThreadManager
     from modules import macos_privileged_helper
     from modules.actions import (
         hosts_actions,
@@ -85,8 +83,8 @@ try:
         shutdown_actions,
         update_actions,
     )
-    from modules.services.config_service import ConfigStore
     from modules.services import (
+        bootstrap,
         app_metadata,
         app_version,
         logging_service,
@@ -116,8 +114,9 @@ if macos_privileged_helper.HELPER_FLAG in sys.argv:
     sys.exit(0)
 
 # 全局变量
-resource_manager = ResourceManager()
-thread_manager = ThreadManager()
+APP_CONTEXT = bootstrap.build_app_context()
+resource_manager = APP_CONTEXT.resource_manager
+thread_manager = APP_CONTEXT.thread_manager
 
 APP_METADATA = app_metadata.DEFAULT_METADATA
 
@@ -150,9 +149,7 @@ check_environment = partial(
 )
 
 
-# 配置文件路径（持久化到用户数据目录）
-CONFIG_FILE = resource_manager.get_user_config_file()
-config_store = ConfigStore(CONFIG_FILE)
+config_store = APP_CONTEXT.config_store
 
 
 def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
