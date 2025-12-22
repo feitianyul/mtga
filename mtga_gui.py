@@ -43,7 +43,12 @@ MTGA GUI - 重构版本
 
 
 try:
-    from modules.services import env_setup, io_service, environment_service
+    from modules.services import (
+        app_metadata,
+        env_setup,
+        environment_service,
+        io_service,
+    )
 except ImportError as e:
     print(f"导入模块失败: {e}")
     print("请确保 modules 目录及其模块文件存在")
@@ -82,6 +87,7 @@ try:
     )
     from modules.services.config_service import ConfigStore
     from modules.services import (
+        app_metadata,
         app_version,
         logging_service,
         privilege_service,
@@ -113,16 +119,12 @@ if macos_privileged_helper.HELPER_FLAG in sys.argv:
 resource_manager = ResourceManager()
 thread_manager = ThreadManager()
 
-API_KEY_VISIBLE_CHARS = 4
-APP_DISPLAY_NAME = "MTGA GUI"
-GITHUB_REPO = "BiFangKNT/mtga"
-ERROR_LOG_FILENAME = "mtga_gui_error.log"
-CA_COMMON_NAME = "MTGA_CA"
+APP_METADATA = app_metadata.DEFAULT_METADATA
 
 
 ERROR_LOG_PATH = logging_service.setup_error_logging(
     get_user_data_dir=get_user_data_dir,
-    error_log_filename=ERROR_LOG_FILENAME,
+    error_log_filename=APP_METADATA.error_log_filename,
 )
 log_error = logging_service.log_error
 logging_service.install_global_exception_hook(log_error=log_error)
@@ -217,7 +219,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
             get_preferred_font=get_preferred_font,
             config_store=config_store,
             thread_manager=thread_manager,
-            api_key_visible_chars=API_KEY_VISIBLE_CHARS,
+            api_key_visible_chars=APP_METADATA.api_key_visible_chars,
             test_chat_completion=model_tests.test_chat_completion,
             test_model_in_list=model_tests.test_model_in_list,
         )
@@ -267,7 +269,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
             generate_certificates=generate_certificates,
             install_ca_cert=install_ca_cert,
             modify_hosts_file=modify_hosts_file,
-            ca_common_name=CA_COMMON_NAME,
+            ca_common_name=APP_METADATA.ca_common_name,
         ),
     )
 
@@ -281,7 +283,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
             log=log,
             tooltip=tooltip,
             center_window=center_window,
-            ca_common_name=CA_COMMON_NAME,
+            ca_common_name=APP_METADATA.ca_common_name,
             thread_manager=thread_manager,
         )
     )
@@ -308,7 +310,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
                 tooltip=tooltip,
                 get_user_data_dir=get_user_data_dir,
                 copy_template_files=copy_template_files,
-                error_log_filename=ERROR_LOG_FILENAME,
+                error_log_filename=APP_METADATA.error_log_filename,
             )
         )
 
@@ -318,7 +320,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
     _, check_updates_button = tab_builders.build_about_tab(
         tab_builders.AboutTabDeps(
             notebook=notebook,
-            app_display_name=APP_DISPLAY_NAME,
+            app_display_name=APP_METADATA.display_name,
             app_version=APP_VERSION,
             get_preferred_font=get_preferred_font,
             on_check_updates=update_controller.trigger,
@@ -329,9 +331,9 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
         log=log,
         thread_manager=thread_manager,
         check_button=check_updates_button,
-        app_display_name=APP_DISPLAY_NAME,
+        app_display_name=APP_METADATA.display_name,
         app_version=APP_VERSION,
-        repo=GITHUB_REPO,
+        repo=APP_METADATA.github_repo,
         default_font=default_font,
         update_service=update_service,
         update_dialog=update_dialog,
