@@ -6,6 +6,7 @@ from typing import Any
 
 from modules.network.network_utils import is_port_in_use
 from modules.proxy.proxy_server import ProxyServer
+from modules.runtime.error_codes import ErrorCode
 from modules.runtime.operation_result import OperationResult
 
 
@@ -84,7 +85,10 @@ def restart_proxy_result(
     )
     if start_result.ok:
         return OperationResult.success()
-    return OperationResult.failure(start_result.message or "代理服务器启动失败")
+    return OperationResult.failure(
+        start_result.message or "代理服务器启动失败",
+        code=start_result.code,
+    )
 
 
 def restart_proxy(
@@ -158,14 +162,17 @@ def start_proxy_instance_result(
 
     if is_port_in_use(443):
         deps.log("⚠️ 端口 443 已被其他进程占用，代理服务器未启动。请释放该端口后重试。")
-        return OperationResult.failure("端口已被占用")
+        return OperationResult.failure("端口已被占用", code=ErrorCode.PORT_IN_USE)
 
     if not hosts_modified:
         deps.log("正在修改hosts文件...")
         modify_result = deps.modify_hosts_file(log_func=deps.log)
         if not modify_result.ok:
             deps.log("❌ 修改hosts文件失败，代理服务器未启动")
-            return OperationResult.failure(modify_result.message or "修改hosts文件失败")
+            return OperationResult.failure(
+                modify_result.message or "修改hosts文件失败",
+                code=modify_result.code,
+            )
     deps.log("开始启动代理服务器...")
     instance = ProxyServer(config, log_func=deps.log, thread_manager=deps.thread_manager)
     deps.set_proxy_instance(instance)
@@ -174,7 +181,7 @@ def start_proxy_instance_result(
         return OperationResult.success()
     deps.log("❌ 代理服务器启动失败")
     deps.set_proxy_instance(None)
-    return OperationResult.failure("代理服务器启动失败")
+    return OperationResult.failure("代理服务器启动失败", code=ErrorCode.UNKNOWN)
 
 
 def start_proxy_instance(

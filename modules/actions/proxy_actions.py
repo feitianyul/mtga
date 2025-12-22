@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from modules.runtime.operation_result import OperationResult
+from modules.runtime.result_messages import describe_result
 
 
 @dataclass(frozen=True)
@@ -107,7 +108,7 @@ class ProxyTaskRunner:
             self._log("步骤 3/4: 修改hosts文件")
             modify_result = self._deps.modify_hosts_file(log_func=self._log)
             if not modify_result.ok:
-                message = modify_result.message or "修改hosts文件失败，无法继续"
+                message = describe_result(modify_result, "修改hosts文件失败，无法继续")
                 self._log(f"❌ {message}")
                 return
 

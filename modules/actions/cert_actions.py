@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from modules.runtime.result_messages import describe_result
 from modules.services import cert_service
 
 
@@ -20,7 +21,7 @@ def run_generate_certificates(
         if result.ok:
             log_func("✅ 证书生成完成")
         else:
-            message = result.message or "证书生成失败"
+            message = describe_result(result, "证书生成失败")
             log_func(f"❌ {message}")
 
     thread_manager.run("cert_generate", task)
@@ -37,7 +38,7 @@ def run_install_ca_cert(
         if result.ok:
             log_func("✅ CA证书安装完成")
         else:
-            message = result.message or "CA证书安装失败"
+            message = describe_result(result, "CA证书安装失败")
             log_func(f"❌ {message}")
 
     thread_manager.run("cert_install", task)
@@ -58,7 +59,7 @@ def run_clear_ca_cert(
         if result.ok:
             log_func("✅ CA证书清除完成")
         else:
-            message = result.message or "CA证书清除失败"
+            message = describe_result(result, "CA证书清除失败")
             log_func(f"❌ {message}")
 
     thread_manager.run("cert_clear", task)

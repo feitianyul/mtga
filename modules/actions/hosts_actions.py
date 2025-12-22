@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from modules.runtime.result_messages import describe_result
+
 
 class HostsTaskRunner:
     def __init__(
@@ -28,7 +30,7 @@ class HostsTaskRunner:
             if getattr(result, "ok", False):
                 self._log(f"✅ hosts文件{action_name}完成")
             else:
-                message = getattr(result, "message", None) or f"hosts文件{action_name}失败"
+                message = describe_result(result, f"hosts文件{action_name}失败")
                 self._log(f"❌ {message}")
 
         if block:
@@ -52,7 +54,7 @@ class HostsTaskRunner:
             if getattr(result, "ok", False):
                 self._log("✅ hosts文件已打开")
             else:
-                message = getattr(result, "message", None) or "打开hosts文件失败"
+                message = describe_result(result, "打开hosts文件失败")
                 self._log(f"❌ {message}")
 
         self._thread_manager.run("hosts_open", task)

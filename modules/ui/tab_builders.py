@@ -13,6 +13,7 @@ from platformdirs import user_data_dir as platform_user_data_dir
 
 from modules.actions import cert_actions, network_actions
 from modules.runtime.error_codes import ErrorCode
+from modules.runtime.result_messages import describe_result
 from modules.services.user_data_service import (
     backup_user_data_result,
     clear_user_data_result,
@@ -210,7 +211,8 @@ def _backup_user_data_action(deps: DataManagementTabDeps) -> None:
             error_log_filename=deps.error_log_filename,
         )
         if not result.ok:
-            deps.log(f"❌ 备份用户数据失败: {result.message}")
+            message = describe_result(result, "备份用户数据失败")
+            deps.log(f"❌ {message}")
             return
         backup_result = result.details.get("backup_result") if result.details else None
         if backup_result and backup_result.item_count:
@@ -240,7 +242,8 @@ def _clear_user_data_action(deps: DataManagementTabDeps) -> None:
             copy_template_files_fn=deps.copy_template_files,
         )
         if not result.ok:
-            deps.log(f"❌ 清除用户数据失败: {result.message}")
+            message = describe_result(result, "清除用户数据失败")
+            deps.log(f"❌ {message}")
             return
         clear_result = result.details.get("clear_result") if result.details else None
         if clear_result and clear_result.removed_count:
@@ -275,8 +278,8 @@ def _restore_user_data_action(deps: DataManagementTabDeps) -> None:
                 warn_no_backup("❌ 没有找到任何备份", "没有找到任何备份文件，无法执行还原操作。")
             else:
                 show_restore_error(
-                    f"❌ 读取备份失败: {latest_result.message}",
-                    f"无法读取备份：\n{latest_result.message}",
+                    f"❌ {describe_result(latest_result, '读取备份失败')}",
+                    f"无法读取备份：\n{describe_result(latest_result, '读取备份失败')}",
                 )
             return
 
@@ -301,9 +304,10 @@ def _restore_user_data_action(deps: DataManagementTabDeps) -> None:
             backup_path=latest_info.backup_path,
         )
         if not restore_result.ok:
+            message = describe_result(restore_result, "还原用户数据失败")
             show_restore_error(
-                f"❌ 还原用户数据失败: {restore_result.message}",
-                f"还原操作失败：\n{restore_result.message}",
+                f"❌ {message}",
+                f"还原操作失败：\n{message}",
             )
             return
 

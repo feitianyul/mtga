@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from modules.runtime.error_codes import ErrorCode
+from modules.runtime.result_messages import describe_result
 
 
 @dataclass
@@ -84,7 +85,7 @@ def run_update_check(*, deps: UpdateCheckDeps, state: UpdateCheckState) -> None:
                 finalize(_warn_no_version)
                 return
 
-            error_msg = result.message or "检查更新失败"
+            error_msg = describe_result(result, "检查更新失败")
             finalize(lambda: show_error("检查更新失败", error_msg))
             return
 
