@@ -3,34 +3,16 @@ from __future__ import annotations
 import contextlib
 import json
 import logging
-import os
-import ssl
 import time
 import uuid
-from collections.abc import Generator
 
 import requests
-import yaml
 from flask import Flask, Response, jsonify, request
-from requests.adapters import HTTPAdapter
 
-from modules.runtime.resource_manager import ResourceManager, is_packaged
-
-
-class SSLContextAdapter(HTTPAdapter):
-    """支持自定义 SSLContext 的适配器，用于调整验证策略。"""
-
-    def __init__(self, ssl_context, *args, **kwargs):
-        self.ssl_context = ssl_context
-        super().__init__(*args, **kwargs)
-
-    def init_poolmanager(self, connections, maxsize, block=False, **pool_kwargs):
-        pool_kwargs.setdefault("ssl_context", self.ssl_context)
-        return super().init_poolmanager(connections, maxsize, block=block, **pool_kwargs)
-
-    def proxy_manager_for(self, proxy, **proxy_kwargs):
-        proxy_kwargs.setdefault("ssl_context", self.ssl_context)
-        return super().proxy_manager_for(proxy, **proxy_kwargs)
+from modules.proxy.proxy_auth import ProxyAuth
+from modules.proxy.proxy_config import ProxyConfig, build_proxy_config
+from modules.proxy.proxy_transport import ProxyTransport
+from modules.runtime.resource_manager import ResourceManager
 
 
 class ProxyApp:
@@ -42,58 +24,46 @@ class ProxyApp:
         self.resource_manager = resource_manager
         self.app: Flask | None = None
         self.valid = True
+        self.proxy_config: ProxyConfig | None = None
+        self.auth: ProxyAuth | None = None
+        self.transport: ProxyTransport | None = None
+        self.http_client: requests.Session | None = None
+        self.target_api_base_url = ""
+        self.custom_model_id = ""
+        self.target_model_id = ""
+        self.stream_mode = None
+        self.debug_mode = False
+        self.disable_ssl_strict_mode = False
 
-        self.global_config = self._load_global_config()
-        self.target_api_base_url = self.config.get(
-            "api_url", "YOUR_REVERSE_ENGINEERED_API_ENDPOINT_BASE_URL"
+        proxy_config = build_proxy_config(
+            self.config,
+            resource_manager=self.resource_manager,
+            log_func=self.log_func,
         )
-        global_mapped_model_id = (self.global_config.get("mapped_model_id") or "").strip()
-        legacy_group_mapped_model_id = (self.config.get("mapped_model_id") or "").strip()
-        self.custom_model_id = (
-            global_mapped_model_id or legacy_group_mapped_model_id or "CUSTOM_MODEL_ID"
-        )
-
-        target_model_id = self.config.get("model_id", "").strip()
-        self.target_model_id = target_model_id if target_model_id else self.custom_model_id
-        self.stream_mode = self.config.get("stream_mode")  # None, 'true', 'false'
-        self.debug_mode = self.config.get("debug_mode", False)
-        self.disable_ssl_strict_mode = self.config.get("disable_ssl_strict_mode", False)
-        self.http_client = self._create_http_client()
-
-        if self.target_api_base_url == "YOUR_REVERSE_ENGINEERED_API_ENDPOINT_BASE_URL":
-            self.log_func("错误: 请在配置中设置正确的 API URL")
+        if not proxy_config:
             self.valid = False
             return
+
+        self.proxy_config = proxy_config
+        self.target_api_base_url = proxy_config.target_api_base_url
+        self.custom_model_id = proxy_config.custom_model_id
+        self.target_model_id = proxy_config.target_model_id
+        self.stream_mode = proxy_config.stream_mode  # None, 'true', 'false'
+        self.debug_mode = proxy_config.debug_mode
+        self.disable_ssl_strict_mode = proxy_config.disable_ssl_strict_mode
+        self.auth = ProxyAuth(proxy_config.mtga_auth_key)
+        self.transport = ProxyTransport(
+            resource_manager=self.resource_manager,
+            disable_ssl_strict_mode=self.disable_ssl_strict_mode,
+            log_func=self.log_func,
+        )
+        self.http_client = self.transport.session
 
         self._create_app()
 
     def close(self) -> None:
-        if self.http_client:
-            with contextlib.suppress(Exception):
-                self.http_client.close()
-
-    def _load_global_config(self):
-        try:
-            config_file = self.resource_manager.get_user_config_file()
-            if os.path.exists(config_file):
-                with open(config_file, encoding="utf-8") as f:
-                    return yaml.safe_load(f) or {}
-        except Exception as exc:
-            self.log_func(f"加载全局配置失败: {exc}")
-        return {}
-
-    def _create_http_client(self):
-        session = requests.Session()
-        if self.disable_ssl_strict_mode:
-            try:
-                ctx = ssl.create_default_context()
-                ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT
-                adapter = SSLContextAdapter(ctx)
-                session.mount("https://", adapter)
-                self.log_func("关闭 SSL 严格模式: 使用自定义 HTTPS 上下文")
-            except Exception as exc:  # noqa: BLE001
-                self.log_func(f"配置非严格 SSL 上下文失败，继续使用默认设置: {exc}")
-        return session
+        if self.transport:
+            self.transport.close()
 
     @staticmethod
     def _new_request_id() -> str:
@@ -109,107 +79,8 @@ class ProxyApp:
     def _log_request(self, request_id: str, message: str):
         self.log_func(f"{self._timestamp_ms()} [{request_id}] {message}")
 
-    def _prepare_sse_log_path(self) -> str:
-        base_dir = (
-            self.resource_manager.user_data_dir
-            if is_packaged()
-            else self.resource_manager.program_resource_dir
-        )
-        log_dir = os.path.join(base_dir, "logs")
-        os.makedirs(log_dir, exist_ok=True)
-        timestamp = time.strftime("%Y%m%d_%H%M%S")
-        filename = f"sse_{timestamp}_{int(time.time() * 1000)}.log"
-        return os.path.join(log_dir, filename)
-
-    def _extract_sse_events(
-        self, response, *, log_file=None, log
-    ) -> Generator[tuple[int, bytes]]:
-        buffer = b""
-        chunk_index = 0
-        for chunk in response.iter_content(chunk_size=None):
-            chunk_index += 1
-            if log_file:
-                try:
-                    log_file.write(chunk)
-                    log_file.flush()
-                except Exception as write_exc:  # noqa: BLE001
-                    log(f"SSE 日志写入失败，停止记录: {write_exc}")
-                    with contextlib.suppress(Exception):
-                        log_file.close()
-                    log_file = None
-            buffer += chunk
-            while True:
-                sep = buffer.find(b"\n\n")
-                if sep == -1:
-                    break
-                event = buffer[:sep]
-                buffer = buffer[sep + 2 :]
-                yield chunk_index, event
-        if buffer.strip():
-            log("警告: 上游 SSE 结束时存在未完整分隔的残留数据")
-            yield chunk_index, buffer
-
-    def _normalize_openai_event(
-        self, data_str: str, event_index: int, *, model_name: str, log
-    ) -> tuple[bytes, str | None]:
-        try:
-            payload = json.loads(data_str)
-        except Exception as exc:  # noqa: BLE001
-            log(f"chunk#{event_index} JSON 解析失败，原样透传: {exc}")
-            return f"data: {data_str}\n\n".encode(), None
-
-        choices = payload.get("choices") or []
-        choice0 = choices[0] if choices else {}
-        raw_delta = choice0.get("delta") or {}
-        message = choice0.get("message") or {}
-
-        delta: dict[str, object] = {}
-        role = raw_delta.get("role") or message.get("role")
-        if role or event_index == 1:
-            delta["role"] = role or "assistant"
-
-        content = raw_delta.get("content") or message.get("content")
-        if content:
-            delta["content"] = content
-
-        for key in ("tool_calls", "function_calls", "reasoning_content"):
-            value = raw_delta.get(key)
-            if value not in (None, []):
-                delta[key] = value
-
-        finish_reason = choice0.get("finish_reason")
-        normalized_finish = finish_reason if finish_reason not in (None, "") else None
-
-        chunk_obj = {
-            "id": payload.get("id") or self._new_request_id(),
-            "object": "chat.completion.chunk",
-            "created": int(payload.get("created") or time.time()),
-            "model": payload.get("model") or model_name,
-            "choices": [
-                {
-                    "index": choice0.get("index", 0),
-                    "delta": delta,
-                    "logprobs": None,
-                    "finish_reason": normalized_finish,
-                }
-            ],
-        }
-        chunk_json = json.dumps(chunk_obj, ensure_ascii=False)
-        return f"data: {chunk_json}\n\n".encode(), normalized_finish
-
     def _get_mapped_model_id(self):
         return self.custom_model_id
-
-    def _verify_auth(self, auth_header):
-        if not auth_header:
-            return False
-
-        mtga_auth_key = self.global_config.get("mtga_auth_key", "")
-        if not mtga_auth_key:
-            return True
-
-        provided_key = auth_header[7:] if auth_header.startswith("Bearer ") else auth_header
-        return provided_key == mtga_auth_key
 
     def _create_app(self):
         self.app = Flask(__name__)
@@ -226,8 +97,15 @@ class ProxyApp:
     def _get_models(self):
         self.log_func("收到模型列表请求 /v1/models")
 
+        auth = self.auth
+        if not auth:
+            self.log_func("代理鉴权未就绪")
+            return jsonify(
+                {"error": {"message": "Proxy not ready", "type": "server_error"}}
+            ), 500
+
         auth_header = request.headers.get("Authorization")
-        if not self._verify_auth(auth_header):
+        if not auth.verify(auth_header):
             self.log_func("模型列表请求鉴权失败")
             return jsonify(
                 {"error": {"message": "Invalid authentication", "type": "authentication_error"}}
@@ -273,6 +151,13 @@ class ProxyApp:
             self._log_request(request_id, message)
 
         log("收到聊天补全请求 /v1/chat/completions")
+
+        auth = self.auth
+        transport = self.transport
+        http_client = self.http_client
+        if not (auth and transport and http_client):
+            log("代理服务未就绪")
+            return jsonify({"error": "Proxy not ready"}), 500
 
         if self.debug_mode:
             headers_str = "\\n".join(f"{k}: {v}" for k, v in request.headers.items())
@@ -329,20 +214,20 @@ class ProxyApp:
                 request_data["stream"] = stream_value
 
         auth_header = request.headers.get("Authorization")
-        if not self._verify_auth(auth_header):
+        if not auth.verify(auth_header):
             log("聊天补全请求MTGA鉴权失败")
             return jsonify(
                 {"error": {"message": "Invalid authentication", "type": "authentication_error"}}
             ), 401
 
-        target_api_key = self.config.get("api_key", "")
-        forward_headers = {"Content-Type": "application/json"}
-        if target_api_key:
-            forward_headers["Authorization"] = f"Bearer {target_api_key}"
-            log("使用配置组中的API key")
-        elif auth_header:
-            forward_headers["Authorization"] = auth_header
-            log("透传原始Authorization header")
+        target_api_key = ""
+        if self.proxy_config:
+            target_api_key = self.proxy_config.api_key
+        forward_headers = auth.build_forward_headers(
+            auth_header,
+            target_api_key,
+            log_func=log,
+        )
 
         try:
             target_url = f"{self.target_api_base_url.rstrip('/')}/v1/chat/completions"
@@ -351,7 +236,7 @@ class ProxyApp:
             is_stream = request_data.get("stream", False)
             log(f"流模式: {is_stream}")
 
-            response_from_target = self.http_client.post(
+            response_from_target = http_client.post(
                 target_url,
                 json=request_data,
                 headers=forward_headers,
@@ -371,7 +256,7 @@ class ProxyApp:
                 log_path = None
                 if self.debug_mode:
                     try:
-                        log_path = self._prepare_sse_log_path()
+                        log_path = transport.prepare_sse_log_path()
                         log_file_stack = contextlib.ExitStack()
                         log_file = log_file_stack.enter_context(open(log_path, "wb"))  # noqa: SIM115
                         log(f"SSE 原始数据将记录到: {log_path}")
@@ -384,7 +269,7 @@ class ProxyApp:
                     done_sent = False
                     finish_reason_seen = None
                     try:
-                        for upstream_chunk_index, raw_event in self._extract_sse_events(
+                        for upstream_chunk_index, raw_event in transport.extract_sse_events(
                             response_from_target, log_file=log_file, log=log
                         ):
                             event_index += 1
@@ -421,7 +306,7 @@ class ProxyApp:
                                 log("已转发 [DONE]")
                                 break
 
-                            normalized_bytes, finish_reason = self._normalize_openai_event(
+                            normalized_bytes, finish_reason = transport.normalize_openai_event(
                                 data_str,
                                 event_index,
                                 model_name=self.target_model_id,
