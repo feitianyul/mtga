@@ -12,12 +12,7 @@ from pathlib import Path
 from tkinter import messagebox, ttk
 
 
-from modules.ui_helpers import (
-    build_tk_error_handler,
-    center_window,
-    create_tooltip,
-)
-from modules.macos_theme import detect_macos_dark_mode
+from modules.ui_helpers import center_window
 
 os.environ.setdefault("LANG", "zh_CN.UTF-8")
 os.environ.setdefault("LC_ALL", "zh_CN.UTF-8")
@@ -100,7 +95,7 @@ try:
         runtime_options_panel,
         tab_builders,
         update_dialog,
-        window_setup,
+        window_context,
     )
     from modules import resource_manager as resource_manager_module
 except ImportError as e:
@@ -159,26 +154,18 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
         with suppress(OSError):
             os.chdir(os.path.expanduser("~"))
 
-    window = tk.Tk()
-
-    window.report_callback_exception = build_tk_error_handler(log_error, "Tkinter 回调异常")
-
-    window_setup_result = window_setup.setup_main_window(
-        window,
+    window_context_result = window_context.build_window_context(
+        log_error=log_error,
         get_icon_file=resource_manager.get_icon_file,
     )
-    get_preferred_font = window_setup_result.get_preferred_font
-    default_font = get_preferred_font()
-
-    layout = layout_builders.build_main_layout(
-        window,
-        get_preferred_font=get_preferred_font,
-    )
-    main_frame = layout.main_frame
-    main_paned = layout.main_paned
-    left_frame = layout.left_frame
-    left_content = layout.left_content
-    log = layout.log
+    window = window_context_result.window
+    get_preferred_font = window_context_result.get_preferred_font
+    default_font = window_context_result.default_font
+    main_frame = window_context_result.main_frame
+    main_paned = window_context_result.main_paned
+    left_frame = window_context_result.left_frame
+    left_content = window_context_result.left_content
+    log = window_context_result.log
     hosts_runner = hosts_actions.HostsTaskRunner(
         log_func=log,
         thread_manager=thread_manager,
@@ -186,12 +173,7 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
         open_hosts_file=open_hosts_file,
     )
 
-    macos_dark_mode = detect_macos_dark_mode()
-    tooltip = partial(
-        create_tooltip,
-        font_getter=get_preferred_font,
-        is_dark_mode=macos_dark_mode,
-    )
+    tooltip = window_context_result.tooltip
 
     shutdown_state = shutdown_actions.ShutdownState()
     proxy_ui = None
