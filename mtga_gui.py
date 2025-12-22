@@ -9,7 +9,7 @@ import tkinter as tk
 from contextlib import suppress
 from functools import partial
 from pathlib import Path
-from tkinter import messagebox, ttk
+from tkinter import messagebox
 
 
 from modules.ui_helpers import center_window
@@ -88,6 +88,7 @@ try:
     )
     from modules.ui import (
         config_group_panel,
+        footer_actions,
         global_config_panel,
         layout_builders,
         proxy_context,
@@ -271,26 +272,19 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
         )
     )
 
-    # 一键启动按钮
-    start_button = ttk.Button(left_frame, text="一键启动全部服务", command=proxy_runner.start_all)
-    start_button.grid(row=1, column=0, sticky="ew", padx=5, pady=0)
+    footer_actions.build_footer_actions(
+        footer_actions.FooterActionsDeps(
+            left_frame=left_frame,
+            window=window,
+            log=log,
+            thread_manager=thread_manager,
+            stop_proxy_and_restore=proxy_ui.stop_proxy_and_restore,
+            proxy_runner=proxy_runner,
+            shutdown_state=shutdown_state,
+        )
+    )
 
     layout_builders.init_paned_layout(main_paned, main_frame, window)
-
-    # 窗口关闭处理
-    window.protocol(
-        "WM_DELETE_WINDOW",
-        lambda: shutdown_actions.handle_window_close(
-            deps=shutdown_actions.ShutdownDeps(
-                window=window,
-                log=log,
-                thread_manager=thread_manager,
-                stop_proxy_and_restore=proxy_ui.stop_proxy_and_restore,
-                proxy_runner=proxy_runner,
-            ),
-            state=shutdown_state,
-        ),
-    )
 
     log("MTGA GUI 已启动")
     log("请选择操作或直接使用一键启动...")
