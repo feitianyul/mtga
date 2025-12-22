@@ -72,9 +72,6 @@ try:
     from modules.actions import (
         hosts_actions,
         model_tests,
-        proxy_actions,
-        proxy_ui_coordinator,
-        runtime_options_actions,
         shutdown_actions,
         update_actions,
     )
@@ -92,7 +89,7 @@ try:
         config_group_panel,
         global_config_panel,
         layout_builders,
-        runtime_options_panel,
+        proxy_context,
         tab_builders,
         update_dialog,
         window_context,
@@ -176,9 +173,6 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
     tooltip = window_context_result.tooltip
 
     shutdown_state = shutdown_actions.ShutdownState()
-    proxy_ui = None
-    runtime_options = None
-    debug_toggle_handler = runtime_options_actions.DebugModeToggleHandler()
 
     startup_checks.emit_startup_logs(
         log=log,
@@ -213,44 +207,26 @@ def create_main_window() -> tk.Tk | None:  # noqa: PLR0912, PLR0915
         )
     )
 
-    runtime_options = runtime_options_panel.build_runtime_options_panel(
-        runtime_options_panel.RuntimeOptionsPanelDeps(
+    proxy_context_result = proxy_context.build_proxy_context(
+        proxy_context.ProxyContextDeps(
             parent=left_content,
             tooltip=tooltip,
-            on_debug_mode_toggle=debug_toggle_handler,
-        )
-    )
-    proxy_ui = proxy_ui_coordinator.ProxyUiCoordinator(
-        proxy_ui_coordinator.ProxyUiDeps(
             log=log,
             config_store=config_store,
-            runtime_options=runtime_options,
             thread_manager=thread_manager,
             check_network_environment=check_network_environment,
             modify_hosts_file=modify_hosts_file,
             get_proxy_instance=get_proxy_instance,
             set_proxy_instance=set_proxy_instance,
             hosts_runner=hosts_runner,
-        )
-    )
-    debug_toggle_handler.bind(proxy_ui=proxy_ui, runtime_options=runtime_options)
-    proxy_ui.set_network_env_precheck_enabled(bool(runtime_options.debug_mode_var.get()))
-    proxy_runner = proxy_actions.ProxyTaskRunner(
-        log_func=log,
-        thread_manager=thread_manager,
-        deps=proxy_actions.ProxyTaskDependencies(
-            ensure_global_config_ready=proxy_ui.ensure_global_config_ready,
-            build_proxy_config=proxy_ui.build_proxy_config,
-            get_current_config=proxy_ui.get_current_config,
-            restart_proxy=proxy_ui.restart_proxy,
-            stop_proxy_and_restore=proxy_ui.stop_proxy_and_restore,
             has_existing_ca_cert=has_existing_ca_cert,
             generate_certificates=generate_certificates,
             install_ca_cert=install_ca_cert,
-            modify_hosts_file=modify_hosts_file,
             ca_common_name=APP_METADATA.ca_common_name,
-        ),
+        )
     )
+    proxy_ui = proxy_context_result.proxy_ui
+    proxy_runner = proxy_context_result.proxy_runner
 
     update_state = update_actions.UpdateCheckState()
     update_controller = update_actions.UpdateCheckController(state=update_state)
