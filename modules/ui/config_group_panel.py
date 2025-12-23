@@ -203,8 +203,14 @@ class ConfigGroupPanel:
                 self._current_config_index,
             )
 
-    def _add_config_group(self) -> None:  # noqa: PLR0915
-        def save_new_config():
+    def _open_config_group_window(
+        self,
+        title: str,
+        initial_group: dict[str, Any] | None,
+        on_save: Callable[[dict[str, str]], bool],
+        on_saved: Callable[[dict[str, str]], None] | None = None,
+    ) -> None:
+        def handle_save() -> None:
             name = name_var.get().strip()
             api_url = api_url_var.get().strip()
             model_id = model_id_var.get().strip()
@@ -214,56 +220,49 @@ class ConfigGroupPanel:
                 self._deps.log("错误: API URL、实际模型ID和API Key都是必填项")
                 return
 
-            new_group = {
+            payload = {
                 "name": name,
                 "api_url": api_url,
                 "model_id": model_id,
                 "api_key": api_key,
             }
 
-            self._config_groups.append(new_group)
-            if self._deps.config_store.save_config_groups(
-                self._config_groups, self._current_config_index
-            ):
-                display_name = name if name else f"配置组 {len(self._config_groups)}"
-                self._deps.log(f"已添加配置组: {display_name}")
-                self.refresh_config_list()
-                add_window.destroy()
+            if on_save(payload):
+                window.destroy()
+                if on_saved:
+                    on_saved(payload)
 
-                self._deps.test_model_in_list(
-                    new_group,
-                    log_func=self._deps.log,
-                    thread_manager=self._deps.thread_manager,
-                )
-            else:
-                self._deps.log("保存配置组失败")
+        window = tk.Toplevel(self._deps.window)
+        window.title(title)
+        window.geometry("450x300")
+        window.resizable(False, False)
+        window.transient(self._deps.window)
 
-        add_window = tk.Toplevel(self._deps.window)
-        add_window.title("新增配置组")
-        add_window.geometry("450x300")
-        add_window.resizable(False, False)
-        add_window.transient(self._deps.window)
-
-        main_frame = ttk.Frame(add_window, padding=10)
+        main_frame = ttk.Frame(window, padding=10)
         main_frame.pack(fill=tk.BOTH, expand=True)
 
+        name_value = initial_group.get("name", "") if initial_group else ""
+        api_url_value = initial_group.get("api_url", "") if initial_group else ""
+        model_id_value = initial_group.get("model_id", "") if initial_group else ""
+        api_key_value = initial_group.get("api_key", "") if initial_group else ""
+
         ttk.Label(main_frame, text="配置组名称 (可选):").grid(row=0, column=0, sticky=tk.W, pady=5)
-        name_var = tk.StringVar()
+        name_var = tk.StringVar(value=name_value)
         name_entry = ttk.Entry(main_frame, textvariable=name_var, width=35)
         name_entry.grid(row=0, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
 
         ttk.Label(main_frame, text="* API URL:").grid(row=1, column=0, sticky=tk.W, pady=5)
-        api_url_var = tk.StringVar()
+        api_url_var = tk.StringVar(value=api_url_value)
         api_url_entry = ttk.Entry(main_frame, textvariable=api_url_var, width=35)
         api_url_entry.grid(row=1, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
 
         ttk.Label(main_frame, text="* 实际模型ID:").grid(row=2, column=0, sticky=tk.W, pady=5)
-        model_id_var = tk.StringVar()
+        model_id_var = tk.StringVar(value=model_id_value)
         model_id_entry = ttk.Entry(main_frame, textvariable=model_id_var, width=35)
         model_id_entry.grid(row=2, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
 
         ttk.Label(main_frame, text="* API Key:").grid(row=3, column=0, sticky=tk.W, pady=5)
-        api_key_var = tk.StringVar()
+        api_key_var = tk.StringVar(value=api_key_value)
         api_key_entry = ttk.Entry(main_frame, textvariable=api_key_var, width=35, show="*")
         api_key_entry.grid(row=3, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
 
@@ -278,17 +277,45 @@ class ConfigGroupPanel:
         button_frame = ttk.Frame(main_frame)
         button_frame.grid(row=5, column=0, columnspan=2, pady=20)
 
-        ttk.Button(button_frame, text="保存", command=save_new_config).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="取消", command=add_window.destroy).pack(
+        ttk.Button(button_frame, text="保存", command=handle_save).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="取消", command=window.destroy).pack(
             side=tk.LEFT, padx=5
         )
 
         main_frame.columnconfigure(1, weight=1)
-        self._deps.center_window(add_window)
-        add_window.grab_set()
+        self._deps.center_window(window)
+        window.grab_set()
         name_entry.focus()
 
-    def _edit_config_group(self) -> None:  # noqa: PLR0915
+    def _add_config_group(self) -> None:
+        def save_new_config(payload: dict[str, str]) -> bool:
+            self._config_groups.append(payload)
+            if self._deps.config_store.save_config_groups(
+                self._config_groups, self._current_config_index
+            ):
+                display_name = payload["name"] or f"配置组 {len(self._config_groups)}"
+                self._deps.log(f"已添加配置组: {display_name}")
+                self.refresh_config_list()
+                return True
+
+            self._deps.log("保存配置组失败")
+            return False
+
+        def after_save(payload: dict[str, str]) -> None:
+            self._deps.test_model_in_list(
+                payload,
+                log_func=self._deps.log,
+                thread_manager=self._deps.thread_manager,
+            )
+
+        self._open_config_group_window(
+            title="新增配置组",
+            initial_group=None,
+            on_save=save_new_config,
+            on_saved=after_save,
+        )
+
+    def _edit_config_group(self) -> None:
         selected_index = self._get_selected_index()
         if selected_index < 0:
             self._deps.log("请先选择要修改的配置组")
@@ -296,88 +323,32 @@ class ConfigGroupPanel:
 
         current_group = self._config_groups[selected_index]
 
-        def save_edited_config():
-            name = name_var.get().strip()
-            api_url = api_url_var.get().strip()
-            model_id = model_id_var.get().strip()
-            api_key = api_key_var.get().strip()
-
-            if not api_url or not model_id or not api_key:
-                self._deps.log("错误: API URL、实际模型ID和API Key都是必填项")
-                return
-
-            self._config_groups[selected_index] = {
-                "name": name,
-                "api_url": api_url,
-                "model_id": model_id,
-                "api_key": api_key,
-            }
-
+        def save_edited_config(payload: dict[str, str]) -> bool:
+            self._config_groups[selected_index] = payload
             if self._deps.config_store.save_config_groups(
                 self._config_groups, self._current_config_index
             ):
-                display_name = name if name else f"配置组 {selected_index + 1}"
+                display_name = payload["name"] or f"配置组 {selected_index + 1}"
                 self._deps.log(f"已修改配置组: {display_name}")
                 self.refresh_config_list()
-                edit_window.destroy()
+                return True
 
-                self._deps.test_model_in_list(
-                    self._config_groups[selected_index],
-                    log_func=self._deps.log,
-                    thread_manager=self._deps.thread_manager,
-                )
-            else:
-                self._deps.log("保存配置组失败")
+            self._deps.log("保存配置组失败")
+            return False
 
-        edit_window = tk.Toplevel(self._deps.window)
-        edit_window.title("修改配置组")
-        edit_window.geometry("450x300")
-        edit_window.resizable(False, False)
-        edit_window.transient(self._deps.window)
+        def after_save(payload: dict[str, str]) -> None:
+            self._deps.test_model_in_list(
+                payload,
+                log_func=self._deps.log,
+                thread_manager=self._deps.thread_manager,
+            )
 
-        main_frame = ttk.Frame(edit_window, padding=10)
-        main_frame.pack(fill=tk.BOTH, expand=True)
-
-        ttk.Label(main_frame, text="配置组名称 (可选):").grid(row=0, column=0, sticky=tk.W, pady=5)
-        name_var = tk.StringVar(value=current_group.get("name", ""))
-        name_entry = ttk.Entry(main_frame, textvariable=name_var, width=35)
-        name_entry.grid(row=0, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
-
-        ttk.Label(main_frame, text="* API URL:").grid(row=1, column=0, sticky=tk.W, pady=5)
-        api_url_var = tk.StringVar(value=current_group.get("api_url", ""))
-        api_url_entry = ttk.Entry(main_frame, textvariable=api_url_var, width=35)
-        api_url_entry.grid(row=1, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
-
-        ttk.Label(main_frame, text="* 实际模型ID:").grid(row=2, column=0, sticky=tk.W, pady=5)
-        model_id_var = tk.StringVar(value=current_group.get("model_id", ""))
-        model_id_entry = ttk.Entry(main_frame, textvariable=model_id_var, width=35)
-        model_id_entry.grid(row=2, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
-
-        ttk.Label(main_frame, text="* API Key:").grid(row=3, column=0, sticky=tk.W, pady=5)
-        api_key_var = tk.StringVar(value=current_group.get("api_key", ""))
-        api_key_entry = ttk.Entry(main_frame, textvariable=api_key_var, width=35, show="*")
-        api_key_entry.grid(row=3, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
-
-        info_label = ttk.Label(
-            main_frame,
-            text="* 为必填项",
-            font=self._deps.get_preferred_font(size=8),
-            foreground="gray",
+        self._open_config_group_window(
+            title="修改配置组",
+            initial_group=current_group,
+            on_save=save_edited_config,
+            on_saved=after_save,
         )
-        info_label.grid(row=4, column=0, columnspan=2, sticky=tk.W, pady=5)
-
-        button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=5, column=0, columnspan=2, pady=20)
-
-        ttk.Button(button_frame, text="保存", command=save_edited_config).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="取消", command=edit_window.destroy).pack(
-            side=tk.LEFT, padx=5
-        )
-
-        main_frame.columnconfigure(1, weight=1)
-        self._deps.center_window(edit_window)
-        edit_window.grab_set()
-        name_entry.focus()
 
     def _delete_config_group(self) -> None:
         selected_index = self._get_selected_index()
