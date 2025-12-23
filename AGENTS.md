@@ -1,8 +1,8 @@
 # 仓库指南
 
 ## 项目结构与模块组织
-- `mtga_gui.py` 承担 Tkinter UI、证书流程与代理线程，是整个流程的协调层。
-- `modules/` 提供与证书、hosts 记录、资源查找、基于 Flask 的代理服务器相关的导入安全辅助函数。
+- `mtga_gui.py` 负责环境初始化、启动装配与 GUI 入口协调，调用 `modules/ui` 构建界面。
+- `modules/` 采用分层结构：`ui/` 负责界面与布局，`actions/` 编排用户操作，`services/` 作为副作用边界，领域模块落在 `cert/hosts/network/proxy/update`，基础设施在 `runtime/` 与 `platform/`。
 - 文档位于 `docs/`；打包资源在 `mac/`、`helper-tool/`、`icons/`，诊断脚本（`test_*.py`、`debug_test.py`）放在仓库根目录。
 
 ## 构建、测试与开发命令
