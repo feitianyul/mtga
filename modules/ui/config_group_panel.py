@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from tkinter import messagebox, ttk
 from typing import Any
 
+from modules.proxy.proxy_config import DEFAULT_MIDDLE_ROUTE, normalize_middle_route
 from modules.services.config_service import ConfigStore
 
 
@@ -203,7 +204,7 @@ class ConfigGroupPanel:
                 self._current_config_index,
             )
 
-    def _open_config_group_window(
+    def _open_config_group_window(  # noqa: PLR0915
         self,
         title: str,
         initial_group: dict[str, Any] | None,
@@ -215,6 +216,9 @@ class ConfigGroupPanel:
             api_url = api_url_var.get().strip()
             model_id = model_id_var.get().strip()
             api_key = api_key_var.get().strip()
+            middle_route_value = ""
+            if middle_route_enabled_var.get() and not placeholder_active:
+                middle_route_value = middle_route_var.get().strip()
 
             if not api_url or not model_id or not api_key:
                 self._deps.log("错误: API URL、实际模型ID和API Key都是必填项")
@@ -226,6 +230,8 @@ class ConfigGroupPanel:
                 "model_id": model_id,
                 "api_key": api_key,
             }
+            if middle_route_value:
+                payload["middle_route"] = normalize_middle_route(middle_route_value)
 
             if on_save(payload):
                 window.destroy()
@@ -234,7 +240,7 @@ class ConfigGroupPanel:
 
         window = tk.Toplevel(self._deps.window)
         window.title(title)
-        window.geometry("450x300")
+        window.geometry("450x330")
         window.resizable(False, False)
         window.transient(self._deps.window)
 
@@ -256,15 +262,85 @@ class ConfigGroupPanel:
         api_url_entry = ttk.Entry(main_frame, textvariable=api_url_var, width=35)
         api_url_entry.grid(row=1, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
 
-        ttk.Label(main_frame, text="* 实际模型ID:").grid(row=2, column=0, sticky=tk.W, pady=5)
+        middle_route_value = initial_group.get("middle_route", "").strip() if initial_group else ""
+        middle_route_enabled_var = tk.BooleanVar(value=bool(middle_route_value))
+        middle_route_var = tk.StringVar(value=middle_route_value)
+        middle_route_custom_value = middle_route_value
+        placeholder_active = False
+
+        placeholder_style = "ConfigGroupPlaceholder.TEntry"
+        ttk.Style().configure(placeholder_style, foreground="gray")
+
+        middle_route_toggle = ttk.Checkbutton(
+            main_frame,
+            text="修改中间路由",
+            variable=middle_route_enabled_var,
+        )
+        middle_route_toggle.grid(row=2, column=0, sticky=tk.W, pady=5)
+
+        middle_route_entry = ttk.Entry(main_frame, textvariable=middle_route_var, width=35)
+        middle_route_entry.grid(row=2, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
+
+        ttk.Label(main_frame, text="* 实际模型ID:").grid(row=3, column=0, sticky=tk.W, pady=5)
         model_id_var = tk.StringVar(value=model_id_value)
         model_id_entry = ttk.Entry(main_frame, textvariable=model_id_var, width=35)
-        model_id_entry.grid(row=2, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
+        model_id_entry.grid(row=3, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
 
-        ttk.Label(main_frame, text="* API Key:").grid(row=3, column=0, sticky=tk.W, pady=5)
+        ttk.Label(main_frame, text="* API Key:").grid(row=4, column=0, sticky=tk.W, pady=5)
         api_key_var = tk.StringVar(value=api_key_value)
         api_key_entry = ttk.Entry(main_frame, textvariable=api_key_var, width=35, show="*")
-        api_key_entry.grid(row=3, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
+        api_key_entry.grid(row=4, column=1, sticky=tk.EW, padx=(10, 0), pady=5)
+
+        def set_middle_route_placeholder() -> None:
+            nonlocal placeholder_active
+            middle_route_var.set(DEFAULT_MIDDLE_ROUTE)
+            middle_route_entry.configure(style=placeholder_style)
+            placeholder_active = True
+
+        def clear_middle_route_placeholder() -> None:
+            nonlocal placeholder_active
+            if placeholder_active:
+                middle_route_var.set("")
+                middle_route_entry.configure(style="TEntry")
+                placeholder_active = False
+
+        def apply_middle_route_state() -> None:
+            nonlocal middle_route_custom_value, placeholder_active
+            if middle_route_enabled_var.get():
+                middle_route_entry.configure(state="normal")
+                if middle_route_custom_value:
+                    middle_route_var.set(middle_route_custom_value)
+                    middle_route_entry.configure(style="TEntry")
+                    placeholder_active = False
+                else:
+                    set_middle_route_placeholder()
+            else:
+                if not placeholder_active:
+                    middle_route_custom_value = middle_route_var.get().strip()
+                middle_route_entry.configure(state="disabled")
+                set_middle_route_placeholder()
+
+        def on_middle_route_focus_in(_event: tk.Event) -> None:
+            if middle_route_enabled_var.get() and placeholder_active:
+                clear_middle_route_placeholder()
+
+        def on_middle_route_focus_out(_event: tk.Event) -> None:
+            if not middle_route_enabled_var.get():
+                return
+            if not middle_route_var.get().strip():
+                set_middle_route_placeholder()
+
+        def on_middle_route_key_release(_event: tk.Event) -> None:
+            nonlocal middle_route_custom_value
+            if not middle_route_enabled_var.get() or placeholder_active:
+                return
+            middle_route_custom_value = middle_route_var.get().strip()
+
+        middle_route_toggle.configure(command=apply_middle_route_state)
+        middle_route_entry.bind("<FocusIn>", on_middle_route_focus_in)
+        middle_route_entry.bind("<FocusOut>", on_middle_route_focus_out)
+        middle_route_entry.bind("<KeyRelease>", on_middle_route_key_release)
+        apply_middle_route_state()
 
         info_label = ttk.Label(
             main_frame,
@@ -272,10 +348,10 @@ class ConfigGroupPanel:
             font=self._deps.get_preferred_font(size=8),
             foreground="gray",
         )
-        info_label.grid(row=4, column=0, columnspan=2, sticky=tk.W, pady=5)
+        info_label.grid(row=6, column=0, columnspan=2, sticky=tk.W, pady=5)
 
         button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=5, column=0, columnspan=2, pady=20)
+        button_frame.grid(row=7, column=0, columnspan=2, pady=20)
 
         ttk.Button(button_frame, text="保存", command=handle_save).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="取消", command=window.destroy).pack(

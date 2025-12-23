@@ -5,6 +5,8 @@ from typing import Any
 
 import requests
 
+from modules.proxy.proxy_config import normalize_middle_route
+
 HTTP_OK = 200
 CONTENT_PREVIEW_LEN = 50
 
@@ -37,6 +39,13 @@ def _collect_model_ids(model_items: list[dict[str, Any]]) -> set[str]:
         if isinstance(model_id, str):
             model_ids.add(model_id)
     return model_ids
+
+
+def _build_middle_route_path(middle_route: str, suffix: str) -> str:
+    normalized = normalize_middle_route(middle_route)
+    if normalized == "/":
+        return f"/{suffix.lstrip('/')}"
+    return f"{normalized.rstrip('/')}/{suffix.lstrip('/')}"
 
 
 def _log_model_list(
@@ -97,7 +106,11 @@ def _run_model_connection_test(
             log_func("检查失败: API URL或模型ID为空")
             return
 
-        test_url = f"{api_url}/v1/models"
+        route_path = _build_middle_route_path(
+            config_group.get("middle_route", ""),
+            "models",
+        )
+        test_url = f"{api_url}{route_path}"
         headers: dict[str, str] = {}
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
@@ -156,7 +169,11 @@ def test_chat_completion(
                 log_func("测活失败: API URL或模型ID为空")
                 return
 
-            test_url = f"{api_url}/v1/chat/completions"
+            route_path = _build_middle_route_path(
+                config_group.get("middle_route", ""),
+                "chat/completions",
+            )
+            test_url = f"{api_url}{route_path}"
 
             headers = {"Content-Type": "application/json"}
             if api_key:

@@ -8,11 +8,13 @@ import yaml
 from modules.runtime.resource_manager import ResourceManager
 
 PLACEHOLDER_API_URL = "YOUR_REVERSE_ENGINEERED_API_ENDPOINT_BASE_URL"
+DEFAULT_MIDDLE_ROUTE = "/v1"
 
 
 @dataclass(frozen=True)
 class ProxyConfig:
     target_api_base_url: str
+    middle_route: str
     custom_model_id: str
     target_model_id: str
     stream_mode: str | None
@@ -44,6 +46,19 @@ def _resolve_target_model_id(*, raw_config: dict, custom_model_id: str) -> str:
     return target_model_id if target_model_id else custom_model_id
 
 
+def normalize_middle_route(value: str | None) -> str:
+    raw_value = (value or "").strip()
+    if not raw_value:
+        raw_value = DEFAULT_MIDDLE_ROUTE
+    if not raw_value.startswith("/"):
+        raw_value = f"/{raw_value}"
+    if len(raw_value) > 1:
+        raw_value = raw_value.rstrip("/")
+        if not raw_value:
+            raw_value = "/"
+    return raw_value
+
+
 def build_proxy_config(
     raw_config: dict | None,
     *,
@@ -66,9 +81,11 @@ def build_proxy_config(
         raw_config=raw_config,
         custom_model_id=custom_model_id,
     )
+    middle_route = normalize_middle_route(raw_config.get("middle_route"))
 
     return ProxyConfig(
         target_api_base_url=target_api_base_url,
+        middle_route=middle_route,
         custom_model_id=custom_model_id,
         target_model_id=target_model_id,
         stream_mode=raw_config.get("stream_mode"),
@@ -79,4 +96,11 @@ def build_proxy_config(
     )
 
 
-__all__ = ["ProxyConfig", "PLACEHOLDER_API_URL", "build_proxy_config", "load_global_config"]
+__all__ = [
+    "DEFAULT_MIDDLE_ROUTE",
+    "ProxyConfig",
+    "PLACEHOLDER_API_URL",
+    "build_proxy_config",
+    "load_global_config",
+    "normalize_middle_route",
+]

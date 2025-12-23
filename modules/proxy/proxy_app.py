@@ -10,7 +10,7 @@ import requests
 from flask import Flask, Response, jsonify, request
 
 from modules.proxy.proxy_auth import ProxyAuth
-from modules.proxy.proxy_config import ProxyConfig, build_proxy_config
+from modules.proxy.proxy_config import DEFAULT_MIDDLE_ROUTE, ProxyConfig, build_proxy_config
 from modules.proxy.proxy_transport import ProxyTransport
 from modules.runtime.resource_manager import ResourceManager
 
@@ -29,6 +29,8 @@ class ProxyApp:
         self.transport: ProxyTransport | None = None
         self.http_client: requests.Session | None = None
         self.target_api_base_url = ""
+        self.middle_route = ""
+        self.inbound_route = DEFAULT_MIDDLE_ROUTE
         self.custom_model_id = ""
         self.target_model_id = ""
         self.stream_mode = None
@@ -46,6 +48,7 @@ class ProxyApp:
 
         self.proxy_config = proxy_config
         self.target_api_base_url = proxy_config.target_api_base_url
+        self.middle_route = proxy_config.middle_route
         self.custom_model_id = proxy_config.custom_model_id
         self.target_model_id = proxy_config.target_model_id
         self.stream_mode = proxy_config.stream_mode  # None, 'true', 'false'
@@ -82,6 +85,14 @@ class ProxyApp:
     def _get_mapped_model_id(self):
         return self.custom_model_id
 
+    def _build_route(self, base_route: str, suffix: str) -> str:
+        middle_route = base_route or ""
+        if not middle_route.startswith("/"):
+            middle_route = f"/{middle_route}"
+        if middle_route == "/":
+            return f"/{suffix.lstrip('/')}"
+        return f"{middle_route.rstrip('/')}/{suffix.lstrip('/')}"
+
     def _create_app(self):
         self.app = Flask(__name__)
 
@@ -89,13 +100,19 @@ class ProxyApp:
             logging.getLogger().setLevel(logging.INFO)
             self.app.logger.setLevel(logging.INFO)
 
-        self.app.add_url_rule("/v1/models", "get_models", self._get_models, methods=["GET"])
+        models_route = self._build_route(self.inbound_route, "models")
+        chat_route = self._build_route(self.inbound_route, "chat/completions")
+
+        self.app.add_url_rule(models_route, "get_models", self._get_models, methods=["GET"])
         self.app.add_url_rule(
-            "/v1/chat/completions", "chat_completions", self._chat_completions, methods=["POST"]
+            chat_route,
+            "chat_completions",
+            self._chat_completions,
+            methods=["POST"],
         )
 
     def _get_models(self):
-        self.log_func("收到模型列表请求 /v1/models")
+        self.log_func(f"收到模型列表请求 {self._build_route(self.inbound_route, 'models')}")
 
         auth = self.auth
         if not auth:
@@ -150,7 +167,7 @@ class ProxyApp:
         def log(message: str):
             self._log_request(request_id, message)
 
-        log("收到聊天补全请求 /v1/chat/completions")
+        log(f"收到聊天补全请求 {self._build_route(self.inbound_route, 'chat/completions')}")
 
         auth = self.auth
         transport = self.transport
@@ -230,7 +247,10 @@ class ProxyApp:
         )
 
         try:
-            target_url = f"{self.target_api_base_url.rstrip('/')}/v1/chat/completions"
+            target_url = (
+                f"{self.target_api_base_url.rstrip('/')}"
+                f"{self._build_route(self.middle_route, 'chat/completions')}"
+            )
             log(f"转发请求到: {target_url}")
 
             is_stream = request_data.get("stream", False)
