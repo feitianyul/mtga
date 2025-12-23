@@ -86,155 +86,117 @@ graph LR
 
 ```mermaid
 classDiagram
-  class MainWindowBuilder {
-    +build_main_window()
-  }
-  class MainWindowDeps {
-    +build_main_window_deps()
-  }
-  class TabBuilders {
-    +build_main_tabs()
-  }
-  class UpdateDialog {
-    +show_release_notes_dialog()
-  }
-
-  class CertActions {
-    +run_generate_certificates()
-    +run_install_ca_cert()
-  }
-  class HostsActions {
-    +modify_hosts()
-    +open_hosts()
-  }
-  class ProxyActions {
-    +start_proxy()
-    +stop_proxy()
-    +start_all()
-  }
-  class UpdateActions {
-    +run_update_check()
-  }
-  class NetworkActions {
-    +run_network_environment_check()
-  }
-  class ProxyUiCoordinator {
-    +restart_proxy()
-    +stop_proxy_and_restore()
-  }
-
-  class CertService {
-    +generate_certificates_result()
-    +install_ca_cert_result()
-  }
-  class HostsService {
-    +modify_hosts_file_result()
-  }
-  class UpdateService {
-    +check_for_updates_result()
-  }
-  class ProxyOrchestration {
-    +start_proxy_instance_result()
-    +restart_proxy_result()
-  }
+  class AppBootstrapResult
+  class AppContext
+  class AppMetadata
+  class StartupContext
+  class StartupReport
+  class MainWindowDepsInputs
+  class MainWindowDeps
+  class WindowContext
+  class WindowSetupResult
+  class WindowLayout
+  class FontManager
+  class RuntimeOptions
+  class RuntimeOptionsPanelDeps
   class ConfigStore {
     +get_current_config()
     +load_global_config()
   }
+  class ProxyContext
+  class ProxyUiDeps
+  class ProxyUiCoordinator {
+    +restart_proxy()
+    +stop_proxy_and_restore()
+  }
+  class ProxyTaskDependencies
+  class ProxyTaskRunner {
+    +start_proxy()
+    +stop_proxy()
+    +start_all()
+  }
+  class HostsTaskRunner {
+    +modify_hosts()
+    +open_hosts()
+  }
+  class UpdateCheckController {
+    +configure()
+    +trigger()
+  }
+  class UpdateCheckState
+  class UpdateCheckDeps
 
-  class CaStore {
-    +install_ca_cert_file()
-    +clear_ca_cert_store()
-  }
-  class CertGenerator {
-    +generate_ca_cert()
-  }
-  class HostsManager {
-    +modify_hosts_file()
-  }
-  class HostsState {
-    +guard_hosts_modify()
-  }
-  class HostsText {
-    +normalize_ip_list()
-  }
   class ProxyServer {
     +start()
     +stop()
+    +is_running()
   }
   class ProxyApp {
-    +app
+    +close()
   }
   class ProxyRuntime {
     +start()
     +stop()
+    +is_running()
   }
+  class RuntimeState
+  class StoppableWSGIServer
   class ProxyTransport {
     +session
+    +close()
   }
-  class UpdateChecker {
-    +fetch_latest_release()
+  class SSLContextAdapter
+  class ProxyAuth {
+    +verify()
+    +build_forward_headers()
   }
-  class NetworkEnvironment {
-    +check_network_environment()
-  }
+  class ProxyConfig
 
-  class ResourceManager {
-  }
-  class ThreadManager {
-  }
+  class ResourceManager
+  class ThreadManager
   class OperationResult {
     +ok
     +message
     +code
   }
-  class ErrorCode {
-  }
-  class Privileges {
-    +check_is_admin()
-  }
-  class MacOSPrivilegedHelper {
-  }
+  class ErrorCode
 
-  MainWindowBuilder --> MainWindowDeps
-  MainWindowBuilder --> TabBuilders
-  TabBuilders --> CertActions
-  TabBuilders --> HostsActions
-  TabBuilders --> ProxyActions
-  TabBuilders --> UpdateActions
-  TabBuilders --> NetworkActions
-  UpdateActions --> UpdateDialog
-  ProxyActions --> ProxyUiCoordinator
+  AppBootstrapResult --> AppContext
+  AppBootstrapResult --> AppMetadata
+  AppBootstrapResult --> StartupContext
+  AppContext --> ResourceManager
+  AppContext --> ThreadManager
+  AppContext --> ConfigStore
+  StartupContext ..> StartupReport
+  MainWindowDepsInputs --> MainWindowDeps
+  MainWindowDeps --> ConfigStore
+  MainWindowDeps --> StartupContext
+  WindowContext --> WindowLayout
+  WindowSetupResult --> FontManager
+  RuntimeOptionsPanelDeps --> RuntimeOptions
+  ProxyContext --> RuntimeOptions
+  ProxyContext --> ProxyUiCoordinator
+  ProxyContext --> ProxyTaskRunner
+  ProxyContext --> HostsTaskRunner
+  ProxyUiCoordinator --> ProxyUiDeps
   ProxyUiCoordinator --> ConfigStore
-  ProxyUiCoordinator --> ProxyOrchestration
+  ProxyTaskRunner --> ProxyTaskDependencies
+  ProxyTaskRunner --> ProxyUiCoordinator
+  UpdateCheckController --> UpdateCheckState
+  UpdateCheckController --> UpdateCheckDeps
 
-  CertActions --> CertService
-  HostsActions --> HostsService
-  UpdateActions --> UpdateService
-  NetworkActions --> NetworkEnvironment
-
-  CertService --> CaStore
-  CertService --> CertGenerator
-  HostsService --> HostsManager
-  HostsService --> HostsState
-  HostsService --> HostsText
-  UpdateService --> UpdateChecker
-  ProxyOrchestration --> ProxyServer
   ProxyServer --> ProxyApp
   ProxyServer --> ProxyRuntime
-  ProxyApp --> ProxyTransport
-
-  CertService --> OperationResult
-  HostsService --> OperationResult
-  UpdateService --> OperationResult
-  ProxyOrchestration --> OperationResult
-  ProxyRuntime --> OperationResult
-  OperationResult --> ErrorCode
-
+  ProxyRuntime --> RuntimeState
+  ProxyRuntime --> StoppableWSGIServer
   ProxyRuntime --> ResourceManager
   ProxyRuntime --> ThreadManager
-  CaStore --> Privileges
-  MacOSPrivilegedHelper --> Privileges
+  ProxyRuntime --> OperationResult
+  ProxyApp --> ProxyTransport
+  ProxyApp --> ProxyAuth
+  ProxyApp --> ProxyConfig
+  ProxyTransport --> SSLContextAdapter
+  OperationResult --> ErrorCode
 ```
 
 ## 错误处理
