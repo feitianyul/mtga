@@ -65,10 +65,10 @@ BUILD_VERSION="${MTGA_VERSION:-$VERSION}"
 if [[ "$BUILD_VERSION" != v* ]]; then
     BUILD_VERSION="v${BUILD_VERSION}"
 fi
-cat > modules/_build_version.py <<EOF
+cat > modules/runtime/_build_version.py <<EOF
 BUILT_APP_VERSION = "${BUILD_VERSION}"
 EOF
-print_success "已写入版本号到 modules/_build_version.py: ${BUILD_VERSION}"
+print_success "已写入版本号到 modules/runtime/_build_version.py: ${BUILD_VERSION}"
 
 # 创建输出目录
 if [[ ! -d "dist-onefile" ]]; then
@@ -104,7 +104,7 @@ uv run --python .venv/bin/python nuitka \
     --include-data-files=ca/v3_req.cnf=ca/v3_req.cnf \
     --include-data-files=ca/youtube.cnf=ca/youtube.cnf \
     --include-data-files=ca/youtube.subj=ca/youtube.subj \
-    --include-data-files=modules/_build_version.py=modules/_build_version.py \
+    --include-data-files=modules/runtime/_build_version.py=modules/runtime/_build_version.py \
     --include-data-files=.venv/lib/python3.13/site-packages/tkinterweb_tkhtml/tkhtml/libTkhtml3.0.dylib=tkinterweb_tkhtml/tkhtml/libTkhtml3.0.dylib \
     --macos-app-icon=mac/icon.icns \
     --enable-plugin=tk-inter \

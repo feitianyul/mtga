@@ -9,7 +9,7 @@ ca/ca.srl
 *.bak
 MTGA.Gui
 __pycache__
-modules/_build_version.py
+_build_version.py
 build
 dist*
 *copy*

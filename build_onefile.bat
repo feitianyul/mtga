@@ -81,10 +81,10 @@ if defined MTGA_VERSION (
 if not "%APP_VERSION:~0,1%"=="v" (
     set "APP_VERSION=v%APP_VERSION%"
 )
-> "modules\_build_version.py" (
+> "modules\runtime\_build_version.py" (
     echo BUILT_APP_VERSION = "%APP_VERSION%"
 )
-echo 已写入版本号到 modules\_build_version.py: %APP_VERSION%
+echo 已写入版本号到 modules\runtime\_build_version.py: %APP_VERSION%
 
 REM 创建输出目录
 if not exist "dist-onefile" mkdir dist-onefile
@@ -113,7 +113,7 @@ uv run --python .venv\Scripts\python.exe nuitka ^
     --include-data-files=ca/v3_req.cnf=ca/v3_req.cnf ^
     --include-data-files=ca/youtube.cnf=ca/youtube.cnf ^
     --include-data-files=ca/youtube.subj=ca/youtube.subj ^
-    --include-data-files=modules/_build_version.py=modules/_build_version.py ^
+    --include-data-files=modules/runtime/_build_version.py=modules/runtime/_build_version.py ^
     --include-package-data=tkinterweb_tkhtml:* ^
     --include-data-files=openssl/openssl.exe=openssl/openssl.exe ^
     --include-data-files=openssl/libcrypto-3-x64.dll=openssl/libcrypto-3-x64.dll ^
