@@ -11,31 +11,230 @@
 - actions 负责编排 services；services 定义副作用边界。
 - 平台相关逻辑放在 `modules/platform`（或显式的平台子模块）。
 
-## 重构前后组件图
+## 重构前后对比
 
 ```mermaid
-graph TD
-  subgraph Before[重构前]
+graph LR
+
+  %% 定义样式
+  classDef old fill:#f9f9f9,stroke:#333,stroke-dasharray: 5 5
+  classDef ui fill:#e1f5fe,stroke:#01579b
+  classDef action fill:#fff3e0,stroke:#e65100
+  classDef service fill:#e8f5e9,stroke:#1b5e20
+  classDef domain fill:#f3e5f5,stroke:#4a148c
+  classDef infrastructure fill:#eceff1,stroke:#263238
+
+  subgraph Before [重构前：高度耦合单体结构]
+    direction TB
     GUI[mtga_gui.py]
-    GUI --> Cert[cert_checker/installer/cleaner]
-    GUI --> Hosts[hosts_manager]
-    GUI --> Proxy[proxy_server]
-    GUI --> Update[update_checker]
-    GUI --> Platform[macos_privileged_helper]
-    Proxy --> Cert
-    Proxy --> Hosts
+    Modules[多个散乱的 modules]
+    GUI --- Modules
+    style Before fill:#fff,stroke:#999,stroke-width:2px
   end
 
-  subgraph After[重构后]
-    UI[modules/ui/*]
-    Actions[modules/actions/*]
-    Services[modules/services/*]
-    Domain[modules/{cert,hosts,network,proxy,update}/*]
-    Runtime[modules/runtime/*]
-    PlatformLayer[modules/platform/*]
-    UI --> Actions --> Services --> Domain --> Runtime
-    Domain --> PlatformLayer
+  %% 重构演进连接
+  Before == 重构为 ==> After
+
+  subgraph After [重构后：分层领域驱动架构]
+    direction TB
+    
+    subgraph UI_Layer [交互层]
+      UI[modules/ui/*]
+    end
+
+    subgraph Logic_Layer [逻辑编排层]
+      Actions[modules/actions/*]
+      Services[modules/services/*]
+    end
+
+    subgraph Domain_Layer [领域逻辑层]
+      DomainCert["cert/<br/>ca_store、generator"]
+      DomainHosts["hosts/<br/>manager、state"]
+      DomainProxy["proxy/<br/>app、runtime、transport"]
+      DomainUpdate["update/<br/>checker"]
+      DomainNetwork["network/<br/>environment"]
+    end
+
+    subgraph Base_Layer [基础设施与运行时]
+      Runtime[modules/runtime/*]
+      PlatformLayer[modules/platform/*]
+    end
+
+    %% 定义流转关系
+    UI --> Actions
+    Actions --> Services
+    
+    Services --> DomainCert
+    Services --> DomainHosts
+    Services --> DomainProxy
+    Services --> DomainUpdate
+    Services --> DomainNetwork
+
+    DomainCert & DomainHosts & DomainProxy & DomainUpdate & DomainNetwork --> Runtime
+    DomainCert & DomainProxy --> PlatformLayer
+
+    %% 应用样式
+    class UI ui
+    class Actions action
+    class Services service
+    class DomainCert,DomainHosts,DomainProxy,DomainUpdate,DomainNetwork domain
+    class Runtime,PlatformLayer infrastructure
   end
+```
+
+## 类图
+
+```mermaid
+classDiagram
+  class MainWindowBuilder {
+    +build_main_window()
+  }
+  class MainWindowDeps {
+    +build_main_window_deps()
+  }
+  class TabBuilders {
+    +build_main_tabs()
+  }
+  class UpdateDialog {
+    +show_release_notes_dialog()
+  }
+
+  class CertActions {
+    +run_generate_certificates()
+    +run_install_ca_cert()
+  }
+  class HostsActions {
+    +modify_hosts()
+    +open_hosts()
+  }
+  class ProxyActions {
+    +start_proxy()
+    +stop_proxy()
+    +start_all()
+  }
+  class UpdateActions {
+    +run_update_check()
+  }
+  class NetworkActions {
+    +run_network_environment_check()
+  }
+  class ProxyUiCoordinator {
+    +restart_proxy()
+    +stop_proxy_and_restore()
+  }
+
+  class CertService {
+    +generate_certificates_result()
+    +install_ca_cert_result()
+  }
+  class HostsService {
+    +modify_hosts_file_result()
+  }
+  class UpdateService {
+    +check_for_updates_result()
+  }
+  class ProxyOrchestration {
+    +start_proxy_instance_result()
+    +restart_proxy_result()
+  }
+  class ConfigStore {
+    +get_current_config()
+    +load_global_config()
+  }
+
+  class CaStore {
+    +install_ca_cert_file()
+    +clear_ca_cert_store()
+  }
+  class CertGenerator {
+    +generate_ca_cert()
+  }
+  class HostsManager {
+    +modify_hosts_file()
+  }
+  class HostsState {
+    +guard_hosts_modify()
+  }
+  class HostsText {
+    +normalize_ip_list()
+  }
+  class ProxyServer {
+    +start()
+    +stop()
+  }
+  class ProxyApp {
+    +app
+  }
+  class ProxyRuntime {
+    +start()
+    +stop()
+  }
+  class ProxyTransport {
+    +session
+  }
+  class UpdateChecker {
+    +fetch_latest_release()
+  }
+  class NetworkEnvironment {
+    +check_network_environment()
+  }
+
+  class ResourceManager {
+  }
+  class ThreadManager {
+  }
+  class OperationResult {
+    +ok
+    +message
+    +code
+  }
+  class ErrorCode {
+  }
+  class Privileges {
+    +check_is_admin()
+  }
+  class MacOSPrivilegedHelper {
+  }
+
+  MainWindowBuilder --> MainWindowDeps
+  MainWindowBuilder --> TabBuilders
+  TabBuilders --> CertActions
+  TabBuilders --> HostsActions
+  TabBuilders --> ProxyActions
+  TabBuilders --> UpdateActions
+  TabBuilders --> NetworkActions
+  UpdateActions --> UpdateDialog
+  ProxyActions --> ProxyUiCoordinator
+  ProxyUiCoordinator --> ConfigStore
+  ProxyUiCoordinator --> ProxyOrchestration
+
+  CertActions --> CertService
+  HostsActions --> HostsService
+  UpdateActions --> UpdateService
+  NetworkActions --> NetworkEnvironment
+
+  CertService --> CaStore
+  CertService --> CertGenerator
+  HostsService --> HostsManager
+  HostsService --> HostsState
+  HostsService --> HostsText
+  UpdateService --> UpdateChecker
+  ProxyOrchestration --> ProxyServer
+  ProxyServer --> ProxyApp
+  ProxyServer --> ProxyRuntime
+  ProxyApp --> ProxyTransport
+
+  CertService --> OperationResult
+  HostsService --> OperationResult
+  UpdateService --> OperationResult
+  ProxyOrchestration --> OperationResult
+  ProxyRuntime --> OperationResult
+  OperationResult --> ErrorCode
+
+  ProxyRuntime --> ResourceManager
+  ProxyRuntime --> ThreadManager
+  CaStore --> Privileges
+  MacOSPrivilegedHelper --> Privileges
 ```
 
 ## 错误处理
