@@ -13,8 +13,12 @@ import tempfile
 from ctypes import wintypes
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any, cast
 
 from modules.platform.privileges import is_windows_admin, is_windows_elevated
+from modules.platform.system import is_windows
+
+_CTYPES = cast(Any, ctypes)
 
 
 class FileOperabilityStatus(Enum):
@@ -50,13 +54,13 @@ def _get_windows_file_attributes(file_path: str, log_func):
     attrs = None
     attr_names: list[str] = []
     try:
-        attrs = os.stat(file_path).st_file_attributes
+        attrs = getattr(os.stat(file_path), "st_file_attributes", 0)
         flag_map = {
-            stat.FILE_ATTRIBUTE_READONLY: "READONLY",
-            stat.FILE_ATTRIBUTE_HIDDEN: "HIDDEN",
-            stat.FILE_ATTRIBUTE_SYSTEM: "SYSTEM",
-            stat.FILE_ATTRIBUTE_ARCHIVE: "ARCHIVE",
-            stat.FILE_ATTRIBUTE_NOT_CONTENT_INDEXED: "NOT_CONTENT_INDEXED",
+            getattr(stat, "FILE_ATTRIBUTE_READONLY", 0): "READONLY",
+            getattr(stat, "FILE_ATTRIBUTE_HIDDEN", 0): "HIDDEN",
+            getattr(stat, "FILE_ATTRIBUTE_SYSTEM", 0): "SYSTEM",
+            getattr(stat, "FILE_ATTRIBUTE_ARCHIVE", 0): "ARCHIVE",
+            getattr(stat, "FILE_ATTRIBUTE_NOT_CONTENT_INDEXED", 0): "NOT_CONTENT_INDEXED",
         }
         for flag, name in flag_map.items():
             if attrs & flag:
@@ -68,7 +72,11 @@ def _get_windows_file_attributes(file_path: str, log_func):
 
 def _windows_probe_open(file_path: str, desired_access: int):
     """用 CreateFileW 探测句柄是否能打开（不写入、不截断）。"""
-    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    try:
+        kernel32 = _CTYPES.WinDLL("kernel32", use_last_error=True)
+    except Exception:
+        return False, None
+    last_error = getattr(_CTYPES, "get_last_error", None)
 
     FILE_SHARE_READ = 0x00000001
     FILE_SHARE_WRITE = 0x00000002
@@ -101,7 +109,7 @@ def _windows_probe_open(file_path: str, desired_access: int):
         None,
     )
     if handle == INVALID_HANDLE_VALUE:
-        return False, ctypes.get_last_error()
+        return False, last_error() if last_error else None
     kernel32.CloseHandle(handle)
     return True, None
 
@@ -119,7 +127,7 @@ def check_file_operability(file_path: str, *, log_func=print) -> FileOperability
         log_func(f"⚠️ 文件不存在: {file_path}")
         return FileOperabilityReport(status=FileOperabilityStatus.FILE_NOT_FOUND)
 
-    if os.name != "nt":
+    if not is_windows():
         try:
             with open(file_path, "r+b"):
                 pass

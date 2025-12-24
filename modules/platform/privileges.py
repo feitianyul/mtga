@@ -3,15 +3,18 @@ from __future__ import annotations
 import ctypes
 import os
 import sys
+from typing import Any, cast
 
 from .system import is_posix, is_windows
+
+_CTYPES = cast(Any, ctypes)
 
 
 def is_windows_admin() -> bool:
     if not is_windows():
         return False
     try:
-        return bool(ctypes.windll.shell32.IsUserAnAdmin())
+        return bool(_CTYPES.windll.shell32.IsUserAnAdmin())
     except Exception:
         return False
 
@@ -20,8 +23,11 @@ def is_windows_elevated() -> bool:
     if not is_windows():
         return False
 
-    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-    advapi32 = ctypes.WinDLL("advapi32", use_last_error=True)
+    try:
+        kernel32 = _CTYPES.WinDLL("kernel32", use_last_error=True)
+        advapi32 = _CTYPES.WinDLL("advapi32", use_last_error=True)
+    except Exception:
+        return False
 
     TOKEN_QUERY = 0x0008
     TokenElevation = 20
@@ -80,9 +86,13 @@ def run_as_admin() -> None:
     if check_is_admin():
         return
     if is_windows():
-        ctypes.windll.shell32.ShellExecuteW(
-            None, "runas", sys.executable, " ".join(sys.argv), None, 1
-        )
+        try:
+            _CTYPES.windll.shell32.ShellExecuteW(
+                None, "runas", sys.executable, " ".join(sys.argv), None, 1
+            )
+        except Exception:
+            print("无法获取 Windows 提权接口。")
+            sys.exit(1)
         sys.exit(0)
     if is_posix():
         print("此程序需要管理员权限才能运行。")
