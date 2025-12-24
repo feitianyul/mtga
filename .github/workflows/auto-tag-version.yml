@@ -28,7 +28,7 @@ jobs:
           script: |
             const commits = context.payload.commits || [];
             const pattern =
-              /^chore: 更新项目版本号至(\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?)$/;
+              /^(?:chore|build): 更新(?:项目)?版本号至(\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?)$/;
             const owner = context.repo.owner;
             const repo = context.repo.repo;
 
