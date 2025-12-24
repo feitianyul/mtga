@@ -4,6 +4,7 @@ import os
 import sys
 import tkinter as tk
 from collections.abc import Callable
+from contextlib import suppress
 from dataclasses import dataclass
 from tkinter import font as tkfont
 from tkinter import messagebox, ttk
@@ -474,6 +475,41 @@ class MainTabsDeps:
 def build_main_tabs(deps: MainTabsDeps) -> tuple[ttk.Notebook, ttk.Button]:
     notebook = ttk.Notebook(deps.parent)
     notebook.pack(fill=tk.BOTH, expand=True, pady=0)
+    if sys.platform == "darwin":
+        # macOS 下 Notebook 点击同一标签会让焦点停留在标签栏，导致重绘延迟
+        def _sync_tab_focus() -> None:
+            try:
+                tab_id = notebook.select()
+                if not tab_id:
+                    return
+                tab_widget = notebook.nametowidget(tab_id)
+            except tk.TclError:
+                return
+
+            focus_target: tk.Widget = tab_widget
+            for child in tab_widget.winfo_children():
+                if not child.winfo_viewable():
+                    continue
+                try:
+                    takefocus = child.cget("takefocus")
+                except tk.TclError:
+                    takefocus = None
+                if takefocus in (True, "1", 1, "true"):
+                    focus_target = child
+                    break
+                if isinstance(child, (ttk.Button, tk.Button)):
+                    focus_target = child
+                    break
+
+            with suppress(tk.TclError):
+                focus_target.focus_set()
+            focus_target.update_idletasks()
+
+        def _schedule_refresh(_event=None) -> None:
+            notebook.after_idle(_sync_tab_focus)
+
+        notebook.bind("<<NotebookTabChanged>>", _schedule_refresh, add=True)
+        notebook.bind("<ButtonRelease-1>", _schedule_refresh, add=True)
     build_cert_tab(
         CertTabDeps(
             notebook=notebook,
