@@ -1,0 +1,14 @@
+[project]
+name = "mtga-app"
+version = "0.1.0"
+description = "MTGA Tauri Python backend"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "pytauri==0.8.*",
+    "pytauri-wheel==0.8.*",
+]
+
+[build-system]
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"

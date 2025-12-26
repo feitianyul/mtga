@@ -1,0 +1,8 @@
+Metadata-Version: 2.4
+Name: mtga-app
+Version: 0.1.0
+Summary: MTGA Tauri Python backend
+Requires-Python: >=3.13
+Description-Content-Type: text/markdown
+Requires-Dist: pytauri==0.8.*
+Requires-Dist: pytauri-wheel==0.8.*

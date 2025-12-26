@@ -18,4 +18,5 @@ export default defineNuxtConfig({
       strictPort: true,
     },
   },
+  ignore: ['**/src-tauri/**']
 })
