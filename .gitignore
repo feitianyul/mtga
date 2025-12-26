@@ -1,5 +1,3 @@
-.vscode/*
-!.vscode/settings.json
 ca/api.*.com.crt
 ca/api.*.com.csr
 ca/api.*.com.key

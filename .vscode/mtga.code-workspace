@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"path": "../mtga-tauri"
+		}
+	],
+	"settings": {
+		"yaml.format.enable": true,
+		"yaml.format.printWidth": 150,
+		"yaml.format.singleQuote": false,
+		"yaml.format.bracketSpacing": true,
+		"yaml.format.proseWrap": "preserve"
+	}
+}
