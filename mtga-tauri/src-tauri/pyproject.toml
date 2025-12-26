@@ -12,3 +12,29 @@ dependencies = [
 [build-system]
 requires = ["setuptools>=80"]
 build-backend = "setuptools.build_meta"
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.407",
+    "ruff>=0.14.4",
+    "yamllint>=1.37.1",
+]
+
+[tool.pyright]
+pythonVersion = "3.13"
+exclude = [".uv_cache", ".venv"]
+venvPath = "."
+venv = ".venv"
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+# 开启常用规则集：E/F 是基础错误；I=imports；B=bugbear；UP=pyupgrade；SIM=简化；
+# PL= Pylint 规则子集（减少你对 Pylint 的依赖）
+[tool.ruff.lint]
+select  = ["E", "F", "I", "B", "UP", "SIM", "PL"]
+fixable = ["ALL"]  # 尽可能自动修复
+
+[tool.ruff.format]
+line-ending = "auto"

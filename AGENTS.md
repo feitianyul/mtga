@@ -6,13 +6,12 @@
 - 文档位于 `docs/`；打包资源在 `mac/`、`helper-tool/`、`icons/`，诊断脚本（`test_*.py`、`debug_test.py`）放在仓库根目录。
 
 ## 构建、测试与开发命令
-- Windows pwsh 中运行python命令时，不要使用 here-string，而是使用 python -c。
-- linux 中使用 `uv run` 调用依赖，macOS/Windows 中使用 `./.venv/bin/python -m` 或 `.\.venv\Scripts\python -m`。
+- linux 中使用 `uv run` 调用依赖；macOS/Windows 中不要使用uv，而是 `./.venv/bin/python -m` 或 `.\.venv\Scripts\python -m`。
   - 在任何 `uv` 命令前先设置 `UV_CACHE_DIR="$PWD/.uv_cache"`，然后执行原命令，确保缓存路径可控。
   - 在交付任何代码修改前必须运行 `pyright/ruff check .`；交付 yaml 文件前必须运行 `yamllint <filename>`；并确认无报错后才能交付。
-- `uv sync` 安装运行时依赖；在调用 Nuitka 打包脚本前附加 `--group win-build` 或 `--group mac-build`。
+- `uv sync --project .` 安装运行时依赖；在调用 Nuitka 打包脚本前附加 `--group win-build` 或 `--group mac-build`。
 - `python mtga_gui.py --debug` 以详细日志启动 GUI；`./run_mtga_gui.sh`（macOS）与 `run_mtga_gui.bat`（Windows）封装了依赖同步与提权步骤。
-- `./build_mac_app.sh` 生成位于 `dist-onefile/` 的 `.app` 包；`build_onefile.bat` 与 `build_standalone.bat` 生成 Windows 可分发包。
+- `./build_mac_app.sh` 生成位于 `dist-onefile/` 的 `.app` 包；`build_onefile.bat` 生成 Windows 可分发包。
 
 ## 编码风格与命名约定
 - 目标 Python 3.13，使用四空格缩进，并遵循 PEP 8 命名（函数 `snake_case`、类 `CamelCase`、常量全大写）。
