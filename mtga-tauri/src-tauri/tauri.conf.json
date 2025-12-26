@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "mtga-tauri",
   "version": "0.1.0",
-  "identifier": "com.tauri.dev",
+  "identifier": "com.mtga.app",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:3000",
@@ -10,9 +10,11 @@
     "beforeBuildCommand": "pnpm generate"
   },
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
-        "title": "mtga",
+        "label": "main",
+        "title": "MTGA",
         "width": 800,
         "height": 600,
         "resizable": true,
