@@ -10,7 +10,9 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "@tauri-apps/plugin-dialog": "~2.4.2",
     "nuxt": "^4.2.2",
+    "tauri-plugin-pytauri-api": "^0.8.0",
     "vue": "^3.5.26",
     "vue-router": "^4.6.4"
   },

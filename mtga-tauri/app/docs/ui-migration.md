@@ -2,6 +2,21 @@
 
 本文件合并原有分析/计划/配置说明，用于指导从 Tkinter UI 迁移到 `app/`。
 
+## 当前进度摘要（便于恢复上下文）
+- 已确定 UI 技术选型：Tailwind + daisyUI（基于 daisyUI 5 / Tailwind v4 的 CSS-first 配置方式）。
+- 已搭建组件骨架：`AppShell`、`LogPanel`、`FooterActions`、`panels/*`、`tabs/*`、`dialogs/*`。
+- 已在 `app/app.vue` 挂载骨架布局：左侧面板 + Tabs，右侧日志面板，底部按钮。
+- 交互方式确认：前端通过 `pyInvoke` 调用 Python 后端命令（pytauri-wheel）。
+
+## TODO（下一步执行清单）
+- [ ] 安装并启用 Tailwind + daisyUI（创建 `app/assets/css/tailwind.css`，在 `nuxt.config.ts` 引入）。
+- [ ] `MainTabs` 支持切换并挂载各 Tab 内容（证书/hosts/代理/数据/关于）。
+- [ ] `ConfigGroupPanel` 改为可交互：列表数据、选中状态、增删改弹窗。
+- [ ] `GlobalConfigPanel` 与 `RuntimeOptionsPanel` 接入真实数据与保存逻辑。
+- [ ] `LogPanel` 支持追加日志流（从后端或前端事件）。
+- [ ] `UpdateDialog`、确认弹窗完善交互与 HTML 内容渲染。
+- [ ] 用 `pyInvoke` 串起最小功能链路（例如 `greet` -> 日志输出）。
+
 ## 现有 UI 功能梳理
 - **整体布局**：标题 + 左右分栏，左侧操作区，右侧日志滚动面板。
 - **配置区**：配置组列表（含新增/修改/删除/上移/下移/测活/刷新）、全局配置（映射模型 ID / MTGA 鉴权 Key）。

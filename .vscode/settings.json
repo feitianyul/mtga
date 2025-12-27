@@ -4,6 +4,10 @@
     "yaml.format.singleQuote": false,
     "yaml.format.bracketSpacing": true,
     "yaml.format.proseWrap": "preserve",
+    "css.customData": [".vscode/tailwind-data.json"],
+    "files.associations": {
+        "*.css": "tailwindcss"
+    },
     "[yaml]": {
         "editor.tabSize": 2,
         "editor.insertSpaces": true,

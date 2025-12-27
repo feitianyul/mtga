@@ -3,6 +3,7 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
+  components: [{ path: './app/components', pathPrefix: false }],
   // 启用 SSG
   ssr: false,
   // 使开发服务器能够被其他设备发现，以便在 iOS 物理机运行。
