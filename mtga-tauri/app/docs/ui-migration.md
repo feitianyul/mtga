@@ -9,7 +9,7 @@
 - 交互方式确认：前端通过 `pyInvoke` 调用 Python 后端命令（pytauri-wheel）。
 
 ## TODO（下一步执行清单）
-- [ ] 安装并启用 Tailwind + daisyUI（创建 `app/assets/css/tailwind.css`，在 `nuxt.config.ts` 引入）。
+- [x] 安装并启用 Tailwind + daisyUI（创建 `app/assets/css/tailwind.css`，在 `nuxt.config.ts` 引入）。
 - [ ] `MainTabs` 支持切换并挂载各 Tab 内容（证书/hosts/代理/数据/关于）。
 - [ ] `ConfigGroupPanel` 改为可交互：列表数据、选中状态、增删改弹窗。
 - [ ] `GlobalConfigPanel` 与 `RuntimeOptionsPanel` 接入真实数据与保存逻辑。
@@ -89,7 +89,7 @@ pnpm add -D tailwindcss daisyui
 `nuxt.config.ts` 引入样式：
 ```ts
 export default defineNuxtConfig({
-  css: ['~/assets/css/tailwind.css'],
+  css: ['./app/assets/css/tailwind.css'],
 })
 ```
 

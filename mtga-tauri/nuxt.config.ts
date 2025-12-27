@@ -21,6 +21,6 @@ export default defineNuxtConfig({
     },
     plugins: [tailwindcss()],
   },
-  css: ["./app/tailwind.css"],
+  css: ["./app/assets/css/tailwind.css"],
   ignore: ['**/src-tauri/**']
 })
