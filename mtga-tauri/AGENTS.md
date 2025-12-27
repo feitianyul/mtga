@@ -23,6 +23,7 @@
 - `package.json` 为 ESM（`"type": "module"`），使用 `import` 语法。
 - Python 目标版本为 3.13（见 `src-tauri/pyproject.toml`），使用 4 空格缩进与 PEP 8 命名。
 - Rust 代码位于 `src-tauri/src/`，沿用 `rustfmt` 默认风格与 `snake_case` 命名。
+- daisyUI 针对LLMs优化的prompt：https://daisyui.com/llms.txt
 
 ## 测试指引
 - `package.json` 未配置 `test` 脚本，当前无固定前端测试框架。

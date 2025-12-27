@@ -1,3 +1,4 @@
+import tailwindcss from "@tailwindcss/vite";
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
@@ -17,6 +18,8 @@ export default defineNuxtConfig({
       // Tauri需要一个确定的端口
       strictPort: true,
     },
+    plugins: [tailwindcss()],
   },
+  css: ["./app/tailwind.css"],
   ignore: ['**/src-tauri/**']
 })
