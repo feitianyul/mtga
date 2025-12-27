@@ -4,9 +4,7 @@
       <ConfigGroupPanel />
       <GlobalConfigPanel />
       <RuntimeOptionsPanel />
-      <MainTabs>
-        <CertTab />
-      </MainTabs>
+      <MainTabs />
     </template>
 
     <template #right>

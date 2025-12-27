@@ -1,9 +1,12 @@
 import tailwindcss from "@tailwindcss/vite";
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
+  appDir: 'app',
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
-  components: [{ path: './app/components', pathPrefix: false }],
+  components: {
+    dirs: [{ path: '~/components', pathPrefix: false }],
+  },
   // 启用 SSG
   ssr: false,
   // 使开发服务器能够被其他设备发现，以便在 iOS 物理机运行。
@@ -21,6 +24,6 @@ export default defineNuxtConfig({
     },
     plugins: [tailwindcss()],
   },
-  css: ["./app/assets/css/tailwind.css"],
+  css: ["~/assets/css/tailwind.css"],
   ignore: ['**/src-tauri/**']
 })

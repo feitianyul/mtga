@@ -1,16 +1,69 @@
+<script setup lang="ts">
+
+type TabKey = "cert" | "hosts" | "proxy" | "data" | "about";
+
+const props = withDefaults(
+  defineProps<{
+    showDataTab?: boolean;
+  }>(),
+  {
+    showDataTab: true,
+  }
+);
+
+const allTabs: { key: TabKey; label: string }[] = [
+  { key: "cert", label: "证书管理" },
+  { key: "hosts", label: "hosts文件管理" },
+  { key: "proxy", label: "代理服务器操作" },
+  { key: "data", label: "用户数据管理" },
+  { key: "about", label: "关于" },
+];
+
+const tabs = computed(() =>
+  props.showDataTab ? allTabs : allTabs.filter((tab) => tab.key !== "data")
+);
+
+const activeTab = ref<TabKey>("cert");
+
+const selectTab = (key: TabKey) => {
+  activeTab.value = key;
+};
+</script>
+
 <template>
   <div class="card bg-base-200 shadow-sm">
     <div class="card-body p-4">
       <div role="tablist" class="tabs tabs-bordered">
-        <a role="tab" class="tab tab-active">证书管理</a>
-        <a role="tab" class="tab">hosts文件管理</a>
-        <a role="tab" class="tab">代理服务器操作</a>
-        <a role="tab" class="tab">用户数据管理</a>
-        <a role="tab" class="tab">关于</a>
+        <button
+          v-for="tab in tabs"
+          :key="tab.key"
+          role="tab"
+          type="button"
+          class="tab"
+          :class="{ 'tab-active': activeTab === tab.key }"
+          :aria-selected="activeTab === tab.key"
+          @click="selectTab(tab.key)"
+        >
+          {{ tab.label }}
+        </button>
       </div>
 
-      <div class="mt-4">
-        <slot />
+      <div class="mt-4 space-y-4">
+        <section v-show="activeTab === 'cert'">
+          <CertTab />
+        </section>
+        <section v-show="activeTab === 'hosts'">
+          <HostsTab />
+        </section>
+        <section v-show="activeTab === 'proxy'">
+          <ProxyTab />
+        </section>
+        <section v-if="showDataTab" v-show="activeTab === 'data'">
+          <DataManagementTab />
+        </section>
+        <section v-show="activeTab === 'about'">
+          <AboutTab />
+        </section>
       </div>
     </div>
   </div>
