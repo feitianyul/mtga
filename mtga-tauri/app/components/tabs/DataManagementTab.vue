@@ -2,19 +2,19 @@
 const store = useMtgaStore()
 
 const handleOpen = () => {
-  store.runPlaceholder("打开用户数据目录")
+  store.runUserDataOpenDir()
 }
 
 const handleBackup = () => {
-  store.runPlaceholder("备份用户数据")
+  store.runUserDataBackup()
 }
 
 const handleRestore = () => {
-  store.runPlaceholder("还原用户数据")
+  store.runUserDataRestoreLatest()
 }
 
 const handleClear = () => {
-  store.runPlaceholder("清除用户数据")
+  store.runUserDataClear()
 }
 </script>
 

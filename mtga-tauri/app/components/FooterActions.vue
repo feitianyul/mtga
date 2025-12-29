@@ -2,7 +2,7 @@
 const store = useMtgaStore()
 
 const handleStartAll = () => {
-  store.runPlaceholder("一键启动全部服务")
+  store.runProxyStartAll()
 }
 </script>
 

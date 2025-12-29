@@ -2,15 +2,15 @@
 const store = useMtgaStore()
 
 const handleGenerate = () => {
-  store.runPlaceholder("生成CA和服务器证书")
+  store.runGenerateCertificates()
 }
 
 const handleInstall = () => {
-  store.runPlaceholder("安装CA证书")
+  store.runInstallCaCert()
 }
 
 const handleClear = () => {
-  store.runPlaceholder("清除系统CA证书")
+  store.runClearCaCert()
 }
 </script>
 

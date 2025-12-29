@@ -36,10 +36,22 @@ from pydantic import BaseModel
 from pytauri import Commands
 from pytauri_wheel.lib import builder_factory, context_factory
 
-from .commands.hosts import register_hosts_commands
+from .commands import (
+    register_cert_commands,
+    register_hosts_commands,
+    register_model_test_commands,
+    register_proxy_commands,
+    register_update_commands,
+    register_user_data_commands,
+)
 
-commands = Commands()
-register_hosts_commands(commands)
+command_registry = Commands()
+register_cert_commands(command_registry)
+register_hosts_commands(command_registry)
+register_model_test_commands(command_registry)
+register_proxy_commands(command_registry)
+register_update_commands(command_registry)
+register_user_data_commands(command_registry)
 
 
 class GreetPayload(BaseModel):
@@ -64,12 +76,12 @@ def _get_config_store() -> ConfigStore:
     return ConfigStore(resource_manager.get_user_config_file())
 
 
-@commands.command()
+@command_registry.command()
 async def greet(body: GreetPayload) -> str:
     return f"Hello, {body.name}! from Python {sys.version.split()[0]}"
 
 
-@commands.command()
+@command_registry.command()
 async def load_config() -> dict[str, Any]:
     config_store = _get_config_store()
     config_groups, current_index = config_store.load_config_groups()
@@ -82,7 +94,7 @@ async def load_config() -> dict[str, Any]:
     }
 
 
-@commands.command()
+@command_registry.command()
 async def save_config(body: SaveConfigPayload) -> bool:
     config_store = _get_config_store()
     return config_store.save_config_groups(
@@ -93,7 +105,7 @@ async def save_config(body: SaveConfigPayload) -> bool:
     )
 
 
-@commands.command()
+@command_registry.command()
 async def get_app_info() -> dict[str, Any]:
     metadata = DEFAULT_METADATA
     version = resolve_app_version(project_root=REPO_ROOT)
@@ -106,7 +118,7 @@ async def get_app_info() -> dict[str, Any]:
     }
 
 
-@commands.command()
+@command_registry.command()
 async def is_packaged() -> bool:
     return resource_is_packaged()
 
@@ -132,6 +144,6 @@ def main() -> int:
         )
         app = builder_factory().build(
             context=context,
-            invoke_handler=commands.generate_handler(portal),
+            invoke_handler=command_registry.generate_handler(portal),
         )
         return app.run_return()

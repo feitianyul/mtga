@@ -1,0 +1,39 @@
+from __future__ import annotations
+
+from typing import Any
+
+from modules.services.app_metadata import DEFAULT_METADATA
+from modules.services.cert_service import (
+    clear_ca_cert_result,
+    generate_certificates_result,
+    install_ca_cert_result,
+)
+from pytauri import Commands
+
+from .common import build_result_payload, collect_logs
+
+
+def register_cert_commands(commands: Commands) -> None:
+    @commands.command()
+    async def generate_certificates() -> dict[str, Any]:
+        logs, log_func = collect_logs()
+        result = generate_certificates_result(
+            log_func=log_func,
+            ca_common_name=DEFAULT_METADATA.ca_common_name,
+        )
+        return build_result_payload(result, logs, "证书生成完成")
+
+    @commands.command()
+    async def install_ca_cert() -> dict[str, Any]:
+        logs, log_func = collect_logs()
+        result = install_ca_cert_result(log_func=log_func)
+        return build_result_payload(result, logs, "CA 证书安装完成")
+
+    @commands.command()
+    async def clear_ca_cert() -> dict[str, Any]:
+        logs, log_func = collect_logs()
+        result = clear_ca_cert_result(
+            DEFAULT_METADATA.ca_common_name,
+            log_func=log_func,
+        )
+        return build_result_payload(result, logs, "CA 证书清除完成")

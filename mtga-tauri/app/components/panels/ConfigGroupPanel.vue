@@ -89,12 +89,12 @@ const refreshList = async () => {
   }
 }
 
-const requestTest = () => {
+const requestTest = async () => {
   if (!hasSelection.value) {
     store.appendLog("请先选择要测活的配置组")
     return
   }
-  store.runPlaceholder("配置组测活")
+  await store.runConfigGroupTest(selectedIndex.value)
 }
 
 const resetForm = () => {

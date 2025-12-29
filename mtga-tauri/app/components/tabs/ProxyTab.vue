@@ -2,15 +2,15 @@
 const store = useMtgaStore()
 
 const handleStart = () => {
-  store.runPlaceholder("启动代理服务器")
+  store.runProxyStart()
 }
 
 const handleStop = () => {
-  store.runPlaceholder("停止代理服务器")
+  store.runProxyStop()
 }
 
 const handleCheck = () => {
-  store.runPlaceholder("检查网络环境")
+  store.runProxyCheckNetwork()
 }
 </script>
 

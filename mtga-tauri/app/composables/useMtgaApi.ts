@@ -35,6 +35,35 @@ export const useMtgaApi = () => {
     ip?: string[] | string
   }) => safeInvoke<InvokeResult>("hosts_modify", payload)
   const hostsOpen = () => safeInvoke<InvokeResult>("hosts_open")
+  const generateCertificates = () =>
+    safeInvoke<InvokeResult>("generate_certificates")
+  const installCaCert = () => safeInvoke<InvokeResult>("install_ca_cert")
+  const clearCaCert = () => safeInvoke<InvokeResult>("clear_ca_cert")
+  const proxyStart = (payload: {
+    debug_mode: boolean
+    disable_ssl_strict_mode: boolean
+    force_stream: boolean
+    stream_mode?: string | null
+  }) => safeInvoke<InvokeResult>("proxy_start", payload)
+  const proxyStop = () => safeInvoke<InvokeResult>("proxy_stop")
+  const proxyCheckNetwork = () =>
+    safeInvoke<InvokeResult>("proxy_check_network")
+  const proxyStartAll = (payload: {
+    debug_mode: boolean
+    disable_ssl_strict_mode: boolean
+    force_stream: boolean
+    stream_mode?: string | null
+  }) => safeInvoke<InvokeResult>("proxy_start_all", payload)
+  const configGroupTest = (payload: {
+    index: number
+    mode?: "chat" | "models"
+  }) => safeInvoke<InvokeResult>("config_group_test", payload)
+  const userDataOpenDir = () => safeInvoke<InvokeResult>("user_data_open_dir")
+  const userDataBackup = () => safeInvoke<InvokeResult>("user_data_backup")
+  const userDataRestoreLatest = () =>
+    safeInvoke<InvokeResult>("user_data_restore_latest")
+  const userDataClear = () => safeInvoke<InvokeResult>("user_data_clear")
+  const checkUpdates = () => safeInvoke<InvokeResult>("check_updates")
 
   return {
     loadConfig,
@@ -44,5 +73,18 @@ export const useMtgaApi = () => {
     greet,
     hostsModify,
     hostsOpen,
+    generateCertificates,
+    installCaCert,
+    clearCaCert,
+    proxyStart,
+    proxyStop,
+    proxyCheckNetwork,
+    proxyStartAll,
+    configGroupTest,
+    userDataOpenDir,
+    userDataBackup,
+    userDataRestoreLatest,
+    userDataClear,
+    checkUpdates,
   }
 }

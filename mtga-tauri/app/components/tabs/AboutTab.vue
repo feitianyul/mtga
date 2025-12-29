@@ -1,8 +1,8 @@
 <script setup lang="ts">
-const { appInfo, runPlaceholder } = useMtgaStore()
+const { appInfo, runCheckUpdates } = useMtgaStore()
 
 const handleCheckUpdates = () => {
-  runPlaceholder("检查更新")
+  runCheckUpdates()
 }
 </script>
 

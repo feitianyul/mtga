@@ -1,6 +1,18 @@
 <script setup lang="ts">
 const store = useMtgaStore()
 const saving = ref(false)
+const mappedModelId = computed({
+  get: () => store.mappedModelId.value,
+  set: (value) => {
+    store.mappedModelId.value = value
+  },
+})
+const mtgaAuthKey = computed({
+  get: () => store.mtgaAuthKey.value,
+  set: (value) => {
+    store.mtgaAuthKey.value = value
+  },
+})
 
 const handleSave = async () => {
   if (!store.mappedModelId.value || !store.mtgaAuthKey.value) {
@@ -28,7 +40,7 @@ const handleSave = async () => {
             <span class="label-text">映射模型ID</span>
           </div>
           <input
-            v-model="store.mappedModelId"
+            v-model="mappedModelId"
             class="input input-bordered w-full"
             placeholder="例如：gpt-5"
           />
@@ -39,7 +51,7 @@ const handleSave = async () => {
             <span class="label-text">MTGA鉴权Key</span>
           </div>
           <input
-            v-model="store.mtgaAuthKey"
+            v-model="mtgaAuthKey"
             class="input input-bordered w-full"
             placeholder="例如：111"
             type="password"

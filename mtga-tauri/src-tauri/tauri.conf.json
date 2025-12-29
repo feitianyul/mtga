@@ -15,8 +15,8 @@
       {
         "label": "main",
         "title": "MTGA",
-        "width": 800,
-        "height": 600,
+        "width": 1300,
+        "height": 800,
         "resizable": true,
         "fullscreen": false
       }
