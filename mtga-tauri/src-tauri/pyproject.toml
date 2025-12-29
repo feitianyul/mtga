@@ -25,6 +25,7 @@ pythonVersion = "3.13"
 exclude = [".uv_cache", ".venv"]
 venvPath = "."
 venv = ".venv"
+extraPaths = ["..", "../.."]
 
 [tool.ruff]
 line-length = 100
