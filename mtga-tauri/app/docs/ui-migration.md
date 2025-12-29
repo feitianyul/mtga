@@ -10,12 +10,12 @@
 
 ## TODO（下一步执行清单）
 - [x] 安装并启用 Tailwind + daisyUI（创建 `app/assets/css/tailwind.css`，在 `nuxt.config.ts` 引入）。
-- [ ] `MainTabs` 支持切换并挂载各 Tab 内容（证书/hosts/代理/数据/关于）。
-- [ ] `ConfigGroupPanel` 改为可交互：列表数据、选中状态、增删改弹窗。
-- [ ] `GlobalConfigPanel` 与 `RuntimeOptionsPanel` 接入真实数据与保存逻辑。
-- [ ] `LogPanel` 支持追加日志流（从后端或前端事件）。
-- [ ] `UpdateDialog`、确认弹窗完善交互与 HTML 内容渲染。
-- [ ] 用 `pyInvoke` 串起最小功能链路（例如 `greet` -> 日志输出）。
+- [x] `MainTabs` 支持切换并挂载各 Tab 内容（证书/hosts/代理/数据/关于）。
+- [x] `ConfigGroupPanel` 改为可交互：列表数据、选中状态、增删改弹窗。
+- [x] `GlobalConfigPanel` 与 `RuntimeOptionsPanel` 接入真实数据与保存逻辑。
+- [x] `LogPanel` 支持追加日志流（从后端或前端事件）。
+- [x] `UpdateDialog`、确认弹窗完善交互与 HTML 内容渲染。
+- [x] 用 `pyInvoke` 串起最小功能链路（例如 `greet` -> 日志输出）。
 
 ## 现有 UI 功能梳理
 - **整体布局**：标题 + 左右分栏，左侧操作区，右侧日志滚动面板。
@@ -68,6 +68,136 @@ import { pyInvoke } from "tauri-plugin-pytauri-api";
 const msg = await pyInvoke("greet", { name: "bifang" });
 ```
 需要对接的能力包括：配置读写、证书/hosts/代理操作、用户数据管理、更新检查、运行环境标志。
+
+## 前后端契约（pyInvoke 命令）
+### 已实现
+```
+greet({ name: string }) -> string
+
+load_config() -> {
+  config_groups: ConfigGroup[]
+  current_config_index: number
+  mapped_model_id: string
+  mtga_auth_key: string
+}
+
+save_config({
+  config_groups: ConfigGroup[]
+  current_config_index: number
+  mapped_model_id?: string
+  mtga_auth_key?: string
+}) -> boolean
+
+get_app_info() -> {
+  display_name: string
+  version: string
+  github_repo: string
+  ca_common_name: string
+  api_key_visible_chars: number
+}
+
+is_packaged() -> boolean
+```
+
+### 待实现（优先按 UI 按钮接入）
+```
+generate_certificates()
+install_ca_cert()
+clear_ca_cert({ ca_common_name?: string })
+
+hosts_modify({ mode: "add" | "backup" | "restore" | "remove" })
+hosts_open()
+
+proxy_start()
+proxy_stop()
+proxy_check_network()
+proxy_start_all()
+
+user_data_open_dir()
+user_data_backup()
+user_data_restore_latest()
+user_data_clear()
+
+check_updates()
+```
+
+## 状态字段定义（前端 store）
+```
+config_groups: ConfigGroup[]
+current_config_index: number
+mapped_model_id: string
+mtga_auth_key: string
+runtime_options: {
+  debugMode: boolean
+  disableSslStrict: boolean
+  forceStream: boolean
+  streamMode: "true" | "false"
+}
+logs: string[]
+app_info: {
+  display_name: string
+  version: string
+  github_repo: string
+  ca_common_name: string
+  api_key_visible_chars: number
+}
+show_data_tab: boolean
+```
+
+## 旧 Tkinter 功能 → 新 UI 按钮映射
+```
+ConfigGroupPanel:
+  测活 -> test_chat_completion
+  刷新 -> load_config
+  新增/修改/删除/上移/下移 -> save_config
+
+GlobalConfigPanel:
+  保存全局配置 -> save_config
+
+RuntimeOptionsPanel:
+  调试/SSL/流模式 -> 仅前端状态，启动代理时传给后端
+
+CertTab:
+  生成CA和服务器证书 -> generate_certificates
+  安装CA证书 -> install_ca_cert
+  清除系统CA证书 -> clear_ca_cert
+
+HostsTab:
+  修改hosts文件 -> hosts_modify(add)
+  备份hosts -> hosts_modify(backup)
+  还原hosts -> hosts_modify(restore)
+  打开hosts文件 -> hosts_open
+
+ProxyTab:
+  启动代理服务器 -> proxy_start
+  停止代理服务器 -> proxy_stop
+  检查网络环境 -> proxy_check_network
+
+FooterActions:
+  一键启动全部服务 -> proxy_start_all
+
+DataManagementTab（仅打包态）:
+  打开目录 -> user_data_open_dir
+  备份数据 -> user_data_backup
+  还原数据 -> user_data_restore_latest
+  清除数据 -> user_data_clear
+
+AboutTab:
+  检查更新 -> check_updates
+```
+
+## ConfigGroup 结构
+```
+type ConfigGroup = {
+  name?: string
+  api_url: string
+  model_id: string
+  api_key: string
+  middle_route?: string
+  target_model_id?: string
+  mapped_model_id?: string
+}
+```
 
 ## Tailwind + daisyUI 最小集成（按 daisyUI 5 / Tailwind v4）
 依赖（示例 pnpm）：
