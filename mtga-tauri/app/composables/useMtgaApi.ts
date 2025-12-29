@@ -1,6 +1,6 @@
 import { pyInvoke } from "tauri-plugin-pytauri-api"
 
-import type { AppInfo, ConfigPayload } from "./mtgaTypes"
+import type { AppInfo, ConfigPayload, InvokeResult } from "./mtgaTypes"
 
 type InvokePayload = Record<string, unknown>
 
@@ -29,6 +29,12 @@ export const useMtgaApi = () => {
   const getAppInfo = () => safeInvoke<AppInfo>("get_app_info")
   const getIsPackaged = () => safeInvoke<boolean>("is_packaged", undefined, false)
   const greet = (name: string) => safeInvoke<string>("greet", { name }, "")
+  const hostsModify = (payload: {
+    mode: "add" | "backup" | "restore" | "remove"
+    domain?: string
+    ip?: string[] | string
+  }) => safeInvoke<InvokeResult>("hosts_modify", payload)
+  const hostsOpen = () => safeInvoke<InvokeResult>("hosts_open")
 
   return {
     loadConfig,
@@ -36,5 +42,7 @@ export const useMtgaApi = () => {
     getAppInfo,
     getIsPackaged,
     greet,
+    hostsModify,
+    hostsOpen,
   }
 }

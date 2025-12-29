@@ -2,19 +2,19 @@
 const store = useMtgaStore()
 
 const handleModify = () => {
-  store.runPlaceholder("修改hosts文件")
+  store.runHostsModify("add")
 }
 
 const handleBackup = () => {
-  store.runPlaceholder("备份hosts")
+  store.runHostsModify("backup")
 }
 
 const handleRestore = () => {
-  store.runPlaceholder("还原hosts")
+  store.runHostsModify("restore")
 }
 
 const handleOpen = () => {
-  store.runPlaceholder("打开hosts文件")
+  store.runHostsOpen()
 }
 </script>
 

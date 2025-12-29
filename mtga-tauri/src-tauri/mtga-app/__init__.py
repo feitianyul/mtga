@@ -7,13 +7,19 @@ from pathlib import Path
 from typing import Any, cast
 
 from anyio.from_thread import start_blocking_portal
-from modules.runtime.resource_manager import ResourceManager
-from modules.runtime.resource_manager import is_packaged as resource_is_packaged
+from modules.runtime.resource_manager import (
+    ResourceManager,
+)
+from modules.runtime.resource_manager import (
+    is_packaged as resource_is_packaged,
+)
 from modules.services.app_metadata import DEFAULT_METADATA
 from modules.services.app_version import resolve_app_version
 from modules.services.config_service import ConfigStore
 from pytauri import Commands
 from pytauri_wheel.lib import builder_factory, context_factory
+
+from .commands.hosts import register_hosts_commands
 
 
 def find_repo_root(start: Path) -> Path:
@@ -31,6 +37,8 @@ REPO_ROOT = find_repo_root(Path(__file__).resolve())
 sys.path.insert(0, str(REPO_ROOT))
 
 commands = Commands()
+register_hosts_commands(commands)
+
 
 @lru_cache(maxsize=1)
 def _get_resource_manager() -> ResourceManager:

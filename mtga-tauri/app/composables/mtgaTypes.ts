@@ -22,3 +22,11 @@ export type AppInfo = {
   ca_common_name: string
   api_key_visible_chars: number
 }
+
+export type InvokeResult = {
+  ok: boolean
+  message?: string | null
+  code?: string | null
+  details?: Record<string, unknown>
+  logs?: string[]
+}

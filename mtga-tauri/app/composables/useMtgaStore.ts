@@ -1,5 +1,5 @@
 import { useMtgaApi } from "./useMtgaApi"
-import type { AppInfo, ConfigGroup, ConfigPayload } from "./mtgaTypes"
+import type { AppInfo, ConfigGroup, ConfigPayload, InvokeResult } from "./mtgaTypes"
 
 type RuntimeOptions = {
   debugMode: boolean
@@ -49,6 +49,28 @@ export const useMtgaStore = () => {
   const appendLog = (message: string) => {
     const stamp = new Date().toLocaleTimeString()
     logs.value.push(`[${stamp}] ${message}`)
+  }
+
+  const appendLogs = (entries?: string[]) => {
+    if (!entries || !entries.length) {
+      return
+    }
+    entries.forEach((entry) => appendLog(entry))
+  }
+
+  const applyInvokeResult = (
+    result: InvokeResult | null,
+    fallbackMessage: string
+  ) => {
+    if (!result) {
+      appendLog(`${fallbackMessage}失败：无法连接后端`)
+      return false
+    }
+    appendLogs(result.logs)
+    if (result.message) {
+      appendLog(result.message)
+    }
+    return result.ok
   }
 
   const loadConfig = async () => {
@@ -117,6 +139,18 @@ export const useMtgaStore = () => {
     }
   }
 
+  const runHostsModify = async (
+    mode: "add" | "backup" | "restore" | "remove"
+  ) => {
+    const result = await api.hostsModify({ mode })
+    return applyInvokeResult(result, "hosts 操作")
+  }
+
+  const runHostsOpen = async () => {
+    const result = await api.hostsOpen()
+    return applyInvokeResult(result, "打开 hosts 文件")
+  }
+
   const runPlaceholder = (label: string) => {
     appendLog(`${label}（待接入后端）`)
   }
@@ -135,6 +169,8 @@ export const useMtgaStore = () => {
     saveConfig,
     init,
     runGreet,
+    runHostsModify,
+    runHostsOpen,
     runPlaceholder,
   }
 }
