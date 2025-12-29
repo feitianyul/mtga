@@ -2,33 +2,6 @@
 
 本文件合并原有分析/计划/配置说明，用于指导从 Tkinter UI 迁移到 `app/`。
 
-## 当前进度摘要（便于恢复上下文）
-- 已确定 UI 技术选型：Tailwind + daisyUI（基于 daisyUI 5 / Tailwind v4 的 CSS-first 配置方式）。
-- 已搭建组件骨架：`AppShell`、`LogPanel`、`FooterActions`、`panels/*`、`tabs/*`、`dialogs/*`。
-- 已在 `app/app.vue` 挂载骨架布局：左侧面板 + Tabs，右侧日志面板，底部按钮。
-- 交互方式确认：前端通过 `pyInvoke` 调用 Python 后端命令（pytauri-wheel）。
-
-## TODO（下一步执行清单）
-- [x] 安装并启用 Tailwind + daisyUI（创建 `app/assets/css/tailwind.css`，在 `nuxt.config.ts` 引入）。
-- [x] `MainTabs` 支持切换并挂载各 Tab 内容（证书/hosts/代理/数据/关于）。
-- [x] `ConfigGroupPanel` 改为可交互：列表数据、选中状态、增删改弹窗。
-- [x] `GlobalConfigPanel` 与 `RuntimeOptionsPanel` 接入真实数据与保存逻辑。
-- [x] `LogPanel` 支持追加日志流（从后端或前端事件）。
-- [x] `UpdateDialog`、确认弹窗完善交互与 HTML 内容渲染。
-- [x] 用 `pyInvoke` 串起最小功能链路（例如 `greet` -> 日志输出）。
-
-## 现有 UI 功能梳理
-- **整体布局**：标题 + 左右分栏，左侧操作区，右侧日志滚动面板。
-- **配置区**：配置组列表（含新增/修改/删除/上移/下移/测活/刷新）、全局配置（映射模型 ID / MTGA 鉴权 Key）。
-- **运行时选项**：调试模式、关闭 SSL 严格模式、强制流模式。
-- **功能标签页**：
-  - 证书管理：生成 / 安装 / 清除（确认弹窗）
-  - hosts 文件：修改 / 备份 / 还原 / 打开
-  - 代理操作：启动 / 停止 / 检查网络环境
-  - 用户数据管理（仅打包态）：打开目录 / 备份 / 还原 / 清除
-  - 关于：版本信息 + 检查更新
-- **更新弹窗**：展示 HTML release notes + 跳转发布页
-
 ## 迁移目标与组件拆分
 - 页面级布局：`AppShell`（标题 + 分栏）
 - 主要组件：
@@ -60,6 +33,39 @@ app/
       UpdateDialog.vue
       ConfirmDialog.vue
 ```
+
+## 迁移顺序建议
+1) 布局 + 日志面板
+2) 配置组 / 全局配置 / 运行时选项
+3) Tabs 功能区
+4) 更新弹窗与确认弹窗
+
+## 当前进度摘要（便于恢复上下文）
+- 已确定 UI 技术选型：Tailwind + daisyUI（基于 daisyUI 5 / Tailwind v4 的 CSS-first 配置方式）。
+- 已搭建组件骨架：`AppShell`、`LogPanel`、`FooterActions`、`panels/*`、`tabs/*`、`dialogs/*`。
+- 已在 `app/app.vue` 挂载骨架布局：左侧面板 + Tabs，右侧日志面板，底部按钮。
+- 交互方式确认：前端通过 `pyInvoke` 调用 Python 后端命令（pytauri-wheel）。
+
+## TODO（下一步执行清单）
+- [x] 安装并启用 Tailwind + daisyUI（创建 `app/assets/css/tailwind.css`，在 `nuxt.config.ts` 引入）。
+- [x] `MainTabs` 支持切换并挂载各 Tab 内容（证书/hosts/代理/数据/关于）。
+- [x] `ConfigGroupPanel` 改为可交互：列表数据、选中状态、增删改弹窗。
+- [x] `GlobalConfigPanel` 与 `RuntimeOptionsPanel` 接入真实数据与保存逻辑。
+- [x] `LogPanel` 支持追加日志流（从后端或前端事件）。
+- [x] `UpdateDialog`、确认弹窗完善交互与 HTML 内容渲染。
+- [x] 用 `pyInvoke` 串起最小功能链路（例如 `greet` -> 日志输出）。
+
+## 现有 UI 功能梳理
+- **整体布局**：标题 + 左右分栏，左侧操作区，右侧日志滚动面板。
+- **配置区**：配置组列表（含新增/修改/删除/上移/下移/测活/刷新）、全局配置（映射模型 ID / MTGA 鉴权 Key）。
+- **运行时选项**：调试模式、关闭 SSL 严格模式、强制流模式。
+- **功能标签页**：
+  - 证书管理：生成 / 安装 / 清除（确认弹窗）
+  - hosts 文件：修改 / 备份 / 还原 / 打开
+  - 代理操作：启动 / 停止 / 检查网络环境
+  - 用户数据管理（仅打包态）：打开目录 / 备份 / 还原 / 清除
+  - 关于：版本信息 + 检查更新
+- **更新弹窗**：展示 HTML release notes + 跳转发布页
 
 ## 交互方式（pytauri-wheel）
 前端通过 `tauri-plugin-pytauri-api` 调用 Python 后端：
@@ -144,6 +150,19 @@ app_info: {
 show_data_tab: boolean
 ```
 
+## ConfigGroup 结构
+```
+type ConfigGroup = {
+  name?: string
+  api_url: string
+  model_id: string
+  api_key: string
+  middle_route?: string
+  target_model_id?: string
+  mapped_model_id?: string
+}
+```
+
 ## 旧 Tkinter 功能 → 新 UI 按钮映射
 ```
 ConfigGroupPanel:
@@ -186,19 +205,6 @@ AboutTab:
   检查更新 -> check_updates
 ```
 
-## ConfigGroup 结构
-```
-type ConfigGroup = {
-  name?: string
-  api_url: string
-  model_id: string
-  api_key: string
-  middle_route?: string
-  target_model_id?: string
-  mapped_model_id?: string
-}
-```
-
 ## Tailwind + daisyUI 最小集成（按 daisyUI 5 / Tailwind v4）
 依赖（示例 pnpm）：
 ```
@@ -231,8 +237,23 @@ export default defineNuxtConfig({
 - 表单：`input` / `select` / `checkbox`
 - 按钮：`btn` + `btn-primary/secondary`
 
-## 迁移顺序建议
-1) 布局 + 日志面板
-2) 配置组 / 全局配置 / 运行时选项
-3) Tabs 功能区
-4) 更新弹窗与确认弹窗
+## 迁移期开发环境下的开发方法
+### 后端工程化
+在 `mtga-tauri/src-tauri` 下：
+```
+uv venv
+uv pip install -e .
+```
+
+### 启动前端
+在 `mtga-tauri/app` 下：
+```
+pnpm dev
+```
+
+### 启动后端
+在 `mtga-tauri/src-tauri` 下：
+```
+$env:DEV_SERVER="http://localhost:3000"; uv run python -m mtga_app
+```
+
