@@ -1,3 +1,4 @@
+# ruff: noqa: E402
 from __future__ import annotations
 
 import os
@@ -5,21 +6,6 @@ import sys
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, cast
-
-from anyio.from_thread import start_blocking_portal
-from modules.runtime.resource_manager import (
-    ResourceManager,
-)
-from modules.runtime.resource_manager import (
-    is_packaged as resource_is_packaged,
-)
-from modules.services.app_metadata import DEFAULT_METADATA
-from modules.services.app_version import resolve_app_version
-from modules.services.config_service import ConfigStore
-from pytauri import Commands
-from pytauri_wheel.lib import builder_factory, context_factory
-
-from .commands.hosts import register_hosts_commands
 
 
 def find_repo_root(start: Path) -> Path:
@@ -36,8 +22,35 @@ def find_repo_root(start: Path) -> Path:
 REPO_ROOT = find_repo_root(Path(__file__).resolve())
 sys.path.insert(0, str(REPO_ROOT))
 
+from anyio.from_thread import start_blocking_portal
+from modules.runtime.resource_manager import (
+    ResourceManager,
+)
+from modules.runtime.resource_manager import (
+    is_packaged as resource_is_packaged,
+)
+from modules.services.app_metadata import DEFAULT_METADATA
+from modules.services.app_version import resolve_app_version
+from modules.services.config_service import ConfigStore
+from pydantic import BaseModel
+from pytauri import Commands
+from pytauri_wheel.lib import builder_factory, context_factory
+
+from .commands.hosts import register_hosts_commands
+
 commands = Commands()
 register_hosts_commands(commands)
+
+
+class GreetPayload(BaseModel):
+    name: str
+
+
+class SaveConfigPayload(BaseModel):
+    config_groups: list[dict[str, Any]]
+    current_config_index: int
+    mapped_model_id: str | None = None
+    mtga_auth_key: str | None = None
 
 
 @lru_cache(maxsize=1)
@@ -52,8 +65,8 @@ def _get_config_store() -> ConfigStore:
 
 
 @commands.command()
-async def greet(name: str) -> str:
-    return f"Hello, {name}! from Python {sys.version.split()[0]}"
+async def greet(body: GreetPayload) -> str:
+    return f"Hello, {body.name}! from Python {sys.version.split()[0]}"
 
 
 @commands.command()
@@ -70,18 +83,13 @@ async def load_config() -> dict[str, Any]:
 
 
 @commands.command()
-async def save_config(
-    config_groups: list[dict[str, Any]],
-    current_config_index: int,
-    mapped_model_id: str | None = None,
-    mtga_auth_key: str | None = None,
-) -> bool:
+async def save_config(body: SaveConfigPayload) -> bool:
     config_store = _get_config_store()
     return config_store.save_config_groups(
-        config_groups,
-        current_config_index,
-        mapped_model_id,
-        mtga_auth_key,
+        body.config_groups,
+        body.current_config_index,
+        body.mapped_model_id,
+        body.mtga_auth_key,
     )
 
 
@@ -106,13 +114,21 @@ async def is_packaged() -> bool:
 def main() -> int:
     # 开发期：让 Tauri 加载 Nuxt dev server
     dev_server = os.environ.get("DEV_SERVER")
+    tauri_config: dict[str, Any] | None = None
+    if dev_server:
+        tauri_config = {
+            "build": {
+                "devUrl": dev_server,
+                "frontendDist": dev_server,
+            }
+        }
 
     with start_blocking_portal("asyncio") as portal:
         context_factory_any = cast(Any, context_factory)
         context = context_factory_any(
             # ✅ v2：context 根通常用 src-tauri 目录
-            src_tauri_dir=Path(__file__).resolve().parent.parent,
-            tauri_config=dev_server,
+            Path(__file__).resolve().parent.parent,
+            tauri_config=tauri_config,
         )
         app = builder_factory().build(
             context=context,

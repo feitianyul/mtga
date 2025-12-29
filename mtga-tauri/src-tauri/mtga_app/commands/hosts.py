@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from modules.services.hosts_service import (
     backup_hosts_file_result,
@@ -9,20 +9,25 @@ from modules.services.hosts_service import (
     remove_hosts_entry_result,
     restore_hosts_file_result,
 )
+from pydantic import BaseModel
 from pytauri import Commands
 
 from .common import build_result_payload, collect_logs
 
 
+class HostsModifyPayload(BaseModel):
+    mode: Literal["add", "backup", "restore", "remove"]
+    domain: str | None = None
+    ip: list[str] | str | None = None
+
+
 def register_hosts_commands(commands: Commands) -> None:
     @commands.command()
-    async def hosts_modify(
-        mode: str,
-        domain: str | None = None,
-        ip: list[str] | str | None = None,
-    ) -> dict[str, Any]:
+    async def hosts_modify(body: HostsModifyPayload) -> dict[str, Any]:
         logs, log_func = collect_logs()
-        domain_value = domain or "api.openai.com"
+        domain_value = body.domain or "api.openai.com"
+        mode = body.mode
+        ip = body.ip
 
         if mode == "add":
             result = modify_hosts_file_result(

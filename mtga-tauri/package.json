@@ -7,9 +7,11 @@
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
     "lint": "eslint .",
     "typecheck": "vue-tsc --noEmit",
-    "postinstall": "nuxt prepare"
+    "dev:py": "cd src-tauri && cross-env DEV_SERVER=http://localhost:3000 uv run python -m mtga_app",
+    "dev:all": "concurrently -k \"pnpm dev\" \"pnpm dev:py\""
   },
   "dependencies": {
     "@tauri-apps/plugin-dialog": "~2.4.2",
@@ -24,6 +26,8 @@
     "@tailwindcss/vite": "^4.1.18",
     "@tauri-apps/cli": "^2.9.6",
     "@types/node": "^25.0.3",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
     "daisyui": "^5.5.14",
     "eslint": "^9.21.0",
     "eslint-plugin-better-tailwindcss": "^3.8.0",
