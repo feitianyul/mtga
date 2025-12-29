@@ -4,6 +4,7 @@ export default defineNuxtConfig({
   appDir: 'app',
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
+  modules: ["@nuxt/eslint"],
   components: {
     dirs: [{ path: '~/components', pathPrefix: false }],
   },

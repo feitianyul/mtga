@@ -1,14 +1,23 @@
+<script setup lang="ts">
+const { showDataTab, logs, init, runGreet } = useMtgaStore()
+
+onMounted(async () => {
+  await init()
+  await runGreet()
+})
+</script>
+
 <template>
   <AppShell>
     <template #left>
       <ConfigGroupPanel />
       <GlobalConfigPanel />
       <RuntimeOptionsPanel />
-      <MainTabs />
+      <MainTabs :show-data-tab="showDataTab" />
     </template>
 
     <template #right>
-      <LogPanel />
+      <LogPanel :logs="logs" />
     </template>
 
     <template #footer>
