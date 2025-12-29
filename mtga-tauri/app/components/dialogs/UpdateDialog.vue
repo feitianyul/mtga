@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import DOMPurify from "dompurify"
+
 const props = withDefaults(
   defineProps<{
     open?: boolean
@@ -19,6 +21,10 @@ const emit = defineEmits<{
   (event: "open-release"): void
 }>()
 
+const sanitizedNotesHtml = computed(() => {
+  return DOMPurify.sanitize(props.notesHtml)
+})
+
 const handleClose = () => {
   emit("close")
 }
@@ -35,7 +41,8 @@ const handleOpenRelease = () => {
         发现新版本{{ props.versionLabel ? `：${props.versionLabel}` : "" }}
       </h3>
       <div class="mt-3 rounded bg-base-200 p-3 text-sm">
-        <div v-if="props.notesHtml" v-html="props.notesHtml" />
+        <!-- eslint-disable-next-line vue/no-v-html -->
+        <div v-if="sanitizedNotesHtml" v-html="sanitizedNotesHtml" />
         <div v-else>该版本暂无更新说明。</div>
       </div>
       <div class="modal-action">
