@@ -18,11 +18,50 @@ def find_repo_root(start: Path) -> Path:
         p = p.parent
 
 
-# 迁移期：允许直接 import 根目录 modules/
+# 模块来源控制（显眼开关）
+# - MTGA_MODULES_SOURCE=auto|local|root
+#   auto(默认): 优先 src-tauri/modules，找不到再回退仓库根
+#   local: 强制使用 src-tauri/modules
+#   root: 强制使用仓库根 modules
+# - MTGA_MODULES_STRICT=1
+#   仅在 local/auto 时生效：要求 src-tauri/modules 必须存在，否则直接报错
+MODULES_SOURCE = os.environ.get("MTGA_MODULES_SOURCE", "auto").strip().lower()
+MODULES_STRICT = os.environ.get("MTGA_MODULES_STRICT") == "1"
+LOCAL_ROOT = Path(__file__).resolve().parent.parent
+LOCAL_MODULES = LOCAL_ROOT / "modules"
+
+
+def _resolve_modules_root() -> Path:
+    if MODULES_SOURCE in {"local", "src-tauri", "tauri"}:
+        if not LOCAL_MODULES.exists():
+            raise RuntimeError("MTGA_MODULES_SOURCE=local 但未找到 src-tauri/modules")
+        return LOCAL_ROOT
+
+    if MODULES_SOURCE in {"root", "repo", "repo-root"}:
+        return find_repo_root(Path(__file__).resolve())
+
+    if LOCAL_MODULES.exists():
+        return LOCAL_ROOT
+
+    if MODULES_STRICT:
+        raise RuntimeError("MTGA_MODULES_STRICT=1 但未找到 src-tauri/modules")
+    return find_repo_root(Path(__file__).resolve())
+
+
+modules_root = _resolve_modules_root()
+if MODULES_STRICT and modules_root != LOCAL_ROOT:
+    raise RuntimeError("MTGA_MODULES_STRICT=1 不允许回退到仓库根 modules")
+sys.path.insert(0, str(modules_root))
+
+
+# 迁移期：仍需仓库根用于版本号读取
 REPO_ROOT = find_repo_root(Path(__file__).resolve())
-sys.path.insert(0, str(REPO_ROOT))
 
 from anyio.from_thread import start_blocking_portal
+from pydantic import BaseModel
+from pytauri import Commands
+from pytauri_wheel.lib import builder_factory, context_factory
+
 from modules.runtime.resource_manager import (
     ResourceManager,
 )
@@ -32,9 +71,6 @@ from modules.runtime.resource_manager import (
 from modules.services.app_metadata import DEFAULT_METADATA
 from modules.services.app_version import resolve_app_version
 from modules.services.config_service import ConfigStore
-from pydantic import BaseModel
-from pytauri import Commands
-from pytauri_wheel.lib import builder_factory, context_factory
 
 from .commands import (
     register_cert_commands,
