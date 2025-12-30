@@ -8,8 +8,17 @@ import os
 import shutil
 import sys
 import tempfile
+from importlib import resources
+from pathlib import Path
 
 from platformdirs import user_data_dir
+
+# 资源路径开关（显眼开关）
+# - MTGA_RESOURCE_DIR=... 指定资源目录（最高优先级）
+# - MTGA_PATH_STRICT=1 找不到资源目录就报错，禁止回退旧逻辑
+# - 统一由 .env 提供（若未设置则按空/False 处理）
+RESOURCE_DIR = os.environ.get("MTGA_RESOURCE_DIR", "").strip()
+RESOURCE_STRICT = os.environ.get("MTGA_PATH_STRICT") == "1"
 
 
 def safe_print(message):
@@ -52,41 +61,74 @@ def _contains_packaged_resources(path):
     return any(os.path.exists(os.path.join(path, marker)) for marker in resource_markers)
 
 
+def _get_packaged_resource_dir() -> str | None:
+    try:
+        base = resources.files("modules") / "resources"
+        if base.is_dir():
+            with resources.as_file(base) as path:
+                return str(path)
+    except Exception:
+        return None
+    return None
+
+
+def _get_local_resource_dir() -> str | None:
+    path = Path(__file__).resolve().parent.parent / "resources"
+    if path.is_dir():
+        return str(path)
+    return None
+
+
 def get_program_resource_dir():
     """获取程序资源目录（临时目录，包含配置模板等）"""
-    if is_packaged():
-        exe_dir = os.path.dirname(sys.executable)
+    override_dir = RESOURCE_DIR
+    packaged_dir = _get_packaged_resource_dir()
+    local_dir = _get_local_resource_dir()
+    resource_dir = override_dir or packaged_dir or local_dir
+    if resource_dir:
+        return resource_dir
 
-        # macOS app bundle 的资源位于 Contents/MacOS 目录
-        if sys.platform == "darwin":
-            return exe_dir
+    if RESOURCE_STRICT:
+        raise RuntimeError("资源目录未找到（MTGA_PATH_STRICT=1）")
 
-        debug_lines = [f"[resdir] packaged=1 exe_dir={exe_dir}"]
-        candidates = []
-
-        # Nuitka 单文件模式会将资源解压到临时目录（__main__.__file__ 所在路径）
-        main_module = sys.modules.get("__main__")
-        main_file = getattr(main_module, "__file__", None) if main_module else None
-        if isinstance(main_file, str) and main_file:
-            candidates.append(os.path.dirname(main_file))
-
-        # 其次尝试可执行文件目录与当前工作目录
-        candidates.extend([exe_dir, os.getcwd()])
-
-        for path in candidates:
-            has_resources = _contains_packaged_resources(path)
-            debug_lines.append(f"[resdir] candidate={path} has_resources={has_resources}")
-            if has_resources:
-                safe_print("\n".join(debug_lines))
-                return path
-
-        # 若未找到包含资源的目录，仍回退到可执行文件目录
-        debug_lines.append("[resdir] fallback to exe_dir")
-        safe_print("\n".join(debug_lines))
-        return exe_dir
-    else:
+    if not is_packaged():
         # 开发环境使用项目根目录
         return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+    exe_dir = os.path.dirname(sys.executable)
+
+    # macOS app bundle 的资源位于 Contents/MacOS 目录
+    if sys.platform == "darwin":
+        return exe_dir
+
+    debug_lines = [f"[resdir] packaged=1 exe_dir={exe_dir}"]
+    candidates = []
+
+    # Nuitka 单文件模式会将资源解压到临时目录（__main__.__file__ 所在路径）
+    main_module = sys.modules.get("__main__")
+    main_file = getattr(main_module, "__file__", None) if main_module else None
+    if isinstance(main_file, str) and main_file:
+        candidates.append(os.path.dirname(main_file))
+
+    # 其次尝试可执行文件目录与当前工作目录
+    candidates.extend([exe_dir, os.getcwd()])
+
+    found_path = None
+    for path in candidates:
+        has_resources = _contains_packaged_resources(path)
+        debug_lines.append(f"[resdir] candidate={path} has_resources={has_resources}")
+        if has_resources:
+            found_path = path
+            break
+
+    if found_path:
+        safe_print("\n".join(debug_lines))
+        return found_path
+
+    # 若未找到包含资源的目录，仍回退到可执行文件目录
+    debug_lines.append("[resdir] fallback to exe_dir")
+    safe_print("\n".join(debug_lines))
+    return exe_dir
 
 
 def get_base_path():

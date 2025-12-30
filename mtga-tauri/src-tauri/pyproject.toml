@@ -27,6 +27,13 @@ dependencies = [
 requires = ["setuptools>=80"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools]
+packages = { find = { where = ["."] } }
+include-package-data = true
+
+[tool.setuptools.package-data]
+modules = ["resources/ca/**", "resources/openssl/**"]
+
 [dependency-groups]
 dev = [
     "pyright>=1.1.407",

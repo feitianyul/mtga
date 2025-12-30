@@ -257,3 +257,15 @@ pnpm dev
 $env:DEV_SERVER="http://localhost:3000"; uv run python -m mtga_app
 ```
 
+## Tauri 后端模块/资源对齐（关键约定）
+- 采用“复制方案”：`src-tauri/modules` 作为 Tauri 侧核心逻辑来源，仓库根 `modules` 仅供旧 GUI 使用。
+- `.env` 为唯一配置入口（支持 `MTGA_ENV_FILE` 覆盖路径），必须设置：
+  - `MTGA_MODULES_SOURCE`（auto/local/root）
+  - `MTGA_PATH_STRICT`（0/1）
+  - `MTGA_RESOURCE_DIR`（可空）
+- `mtga_app/__init__.py` 会最早加载 `.env`，并据此决定 `modules` 的导入来源。
+- 资源目录约定：`modules/resources/{ca,openssl}`；`ResourceManager` 优先用包资源，
+  其次本地 `src-tauri/modules/resources`，严格模式可禁止回退。
+- 软件图标由 Tauri 处理（`src-tauri/icons` + `tauri.conf.json`），不进入 Python 资源。
+- `src-tauri/pyproject.toml` 已声明 `modules` 包资源（`resources/ca`、`resources/openssl`）。 
+

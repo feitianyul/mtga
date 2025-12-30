@@ -18,15 +18,55 @@ def find_repo_root(start: Path) -> Path:
         p = p.parent
 
 
+# 统一 .env 入口（显眼开关）
+# - MTGA_ENV_FILE=... 指定 env 文件路径（默认使用 mtga-tauri/.env）
+# - 已存在的环境变量优先，不会被 .env 覆盖
+TAURI_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+ENV_FILE = Path(os.environ.get("MTGA_ENV_FILE", str(TAURI_PROJECT_ROOT / ".env")))
+
+
+def _load_env_file(path: Path) -> None:
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return
+    for line in raw.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if stripped.startswith("export "):
+            stripped = stripped[7:].strip()
+        if "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if value and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+_load_env_file(ENV_FILE)
+
+
 # 模块来源控制（显眼开关）
 # - MTGA_MODULES_SOURCE=auto|local|root
 #   auto(默认): 优先 src-tauri/modules，找不到再回退仓库根
 #   local: 强制使用 src-tauri/modules
 #   root: 强制使用仓库根 modules
-# - MTGA_MODULES_STRICT=1
+# - MTGA_PATH_STRICT=1
 #   仅在 local/auto 时生效：要求 src-tauri/modules 必须存在，否则直接报错
-MODULES_SOURCE = os.environ.get("MTGA_MODULES_SOURCE", "auto").strip().lower()
-MODULES_STRICT = os.environ.get("MTGA_MODULES_STRICT") == "1"
+MODULES_SOURCE = os.environ.get("MTGA_MODULES_SOURCE", "").strip().lower()
+if not MODULES_SOURCE:
+    raise RuntimeError("MTGA_MODULES_SOURCE 未设置（请在 .env 中配置）")
+
+_strict_raw = os.environ.get("MTGA_PATH_STRICT")
+if _strict_raw is None:
+    raise RuntimeError("MTGA_PATH_STRICT 未设置（请在 .env 中配置）")
+if _strict_raw not in {"0", "1"}:
+    raise RuntimeError("MTGA_PATH_STRICT 仅支持 0/1")
+STRICT_MODE = _strict_raw == "1"
 LOCAL_ROOT = Path(__file__).resolve().parent.parent
 LOCAL_MODULES = LOCAL_ROOT / "modules"
 
@@ -43,14 +83,14 @@ def _resolve_modules_root() -> Path:
     if LOCAL_MODULES.exists():
         return LOCAL_ROOT
 
-    if MODULES_STRICT:
-        raise RuntimeError("MTGA_MODULES_STRICT=1 但未找到 src-tauri/modules")
+    if STRICT_MODE:
+        raise RuntimeError("MTGA_PATH_STRICT=1 但未找到 src-tauri/modules")
     return find_repo_root(Path(__file__).resolve())
 
 
 modules_root = _resolve_modules_root()
-if MODULES_STRICT and modules_root != LOCAL_ROOT:
-    raise RuntimeError("MTGA_MODULES_STRICT=1 不允许回退到仓库根 modules")
+if STRICT_MODE and modules_root != LOCAL_ROOT:
+    raise RuntimeError("MTGA_PATH_STRICT=1 不允许回退到仓库根 modules")
 sys.path.insert(0, str(modules_root))
 
 
