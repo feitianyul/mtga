@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from typing import Any
 
+from pytauri import Commands
+
 from modules.services.app_metadata import DEFAULT_METADATA
 from modules.services.cert_service import (
     clear_ca_cert_result,
     generate_certificates_result,
     install_ca_cert_result,
 )
-from pytauri import Commands
 
 from .common import build_result_payload, collect_logs
 

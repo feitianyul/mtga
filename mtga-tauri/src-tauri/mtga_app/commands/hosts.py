@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
+from pydantic import BaseModel
+from pytauri import Commands
+
 from modules.services.hosts_service import (
     backup_hosts_file_result,
     modify_hosts_file_result,
@@ -9,8 +12,6 @@ from modules.services.hosts_service import (
     remove_hosts_entry_result,
     restore_hosts_file_result,
 )
-from pydantic import BaseModel
-from pytauri import Commands
 
 from .common import build_result_payload, collect_logs
 

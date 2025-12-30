@@ -6,6 +6,8 @@ import sys
 from functools import lru_cache
 from typing import Any
 
+from pytauri import Commands
+
 from modules.runtime.operation_result import OperationResult
 from modules.runtime.resource_manager import ResourceManager, copy_template_files
 from modules.services.app_metadata import DEFAULT_METADATA
@@ -14,7 +16,6 @@ from modules.services.user_data_service import (
     clear_user_data_result,
     restore_latest_backup_result,
 )
-from pytauri import Commands
 
 from .common import build_result_payload, collect_logs
 

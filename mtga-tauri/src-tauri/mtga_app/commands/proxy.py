@@ -4,6 +4,9 @@ from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
 
+from pydantic import BaseModel
+from pytauri import Commands
+
 from modules.network.network_environment import check_network_environment
 from modules.runtime.operation_result import OperationResult
 from modules.runtime.resource_manager import ResourceManager
@@ -17,8 +20,6 @@ from modules.services.cert_service import (
 )
 from modules.services.config_service import ConfigStore
 from modules.services.hosts_service import modify_hosts_file_result
-from pydantic import BaseModel
-from pytauri import Commands
 
 from .common import build_result_payload, collect_logs
 

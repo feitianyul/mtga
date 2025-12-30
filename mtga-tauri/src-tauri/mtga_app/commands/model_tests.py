@@ -3,12 +3,13 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Any, Literal
 
+from pydantic import BaseModel
+from pytauri import Commands
+
 from modules.actions import model_tests
 from modules.runtime.operation_result import OperationResult
 from modules.runtime.resource_manager import ResourceManager
 from modules.services.config_service import ConfigStore
-from pydantic import BaseModel
-from pytauri import Commands
 
 from .common import build_result_payload, collect_logs
 

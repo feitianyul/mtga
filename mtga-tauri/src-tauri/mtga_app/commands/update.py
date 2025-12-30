@@ -4,10 +4,11 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from pytauri import Commands
+
 from modules.services.app_metadata import DEFAULT_METADATA
 from modules.services.app_version import resolve_app_version
 from modules.services.update_service import check_for_updates_result
-from pytauri import Commands
 
 from .common import build_result_payload, collect_logs
 
