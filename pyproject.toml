@@ -55,9 +55,23 @@ win-build = [
 
 [tool.pyright]
 pythonVersion = "3.13"
-exclude = ["archive", ".uv_cache", ".venv"]
 venvPath = "."
 venv = ".venv"
+exclude = [
+    "archive",
+    ".uv_cache",
+    "**/node_modules",
+    "**/__pycache__",
+    # 👇 necessary, because when `tauri-cli bundles python,
+    # it will copy `pyembed` to the target directory (i.e., rust output dir).
+    "**/target",
+    # 👆
+    "**/dist",
+    "**/.venv",
+    "**/.*",
+    "mtga-tauri/src-tauri/pyembed/",
+    "mtga-tauri/src-tauri/app/",
+]
 
 [tool.ruff]
 line-length = 100

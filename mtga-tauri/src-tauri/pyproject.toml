@@ -43,10 +43,21 @@ dev = [
 
 [tool.pyright]
 pythonVersion = "3.13"
-exclude = [".uv_cache", ".venv"]
 venvPath = "."
 venv = ".venv"
 extraPaths = ["..", "../.."]
+exclude = [
+    ".uv_cache",
+    "**/node_modules",
+    "**/__pycache__",
+    # 👇 necessary, because when `tauri-cli bundles python,
+    # it will copy `pyembed` to the target directory (i.e., rust output dir).
+    "**/target",
+    # 👆
+    "**/dist",
+    "**/.venv",
+    "**/.*",
+]
 
 [tool.ruff]
 line-length = 100
