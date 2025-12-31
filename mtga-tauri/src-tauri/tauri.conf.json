@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "mtga-tauri",
   "version": "0.1.0",
-  "identifier": "com.mtga.app",
+  "identifier": "com.mtga.tauri",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:3000",
