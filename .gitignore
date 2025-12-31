@@ -28,3 +28,4 @@ MTGA_GUI.app
 node_modules
 tmp
 logs
+mtga-tauri/src-tauri/mtga_app.egg-info
