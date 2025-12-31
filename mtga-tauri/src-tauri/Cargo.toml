@@ -25,3 +25,9 @@ tauri = { version = "2.9.5", features = [] }
 tauri-plugin-log = "2"
 tauri-plugin-pytauri = { version = "0.8" }
 tauri-plugin-dialog = "2"
+
+[profile.bundle-dev]
+inherits = "dev"
+
+[profile.bundle-release]
+inherits = "release"
