@@ -1,6 +1,6 @@
 # UI 迁移总览（Nuxt + Tailwind + daisyUI）
 
-本文件合并原有分析/计划/配置说明，用于指导从 Tkinter UI 迁移到 `app/`。
+本文件合并原有分析/计划/配置说明，用于指导从 Tkinter UI 迁移到 `mtga-tauri/app/`。
 
 ## 迁移目标与组件拆分
 - 页面级布局：`AppShell`（标题 + 分栏）
@@ -43,11 +43,11 @@ app/
 ## 当前进度摘要（便于恢复上下文）
 - 已确定 UI 技术选型：Tailwind + daisyUI（基于 daisyUI 5 / Tailwind v4 的 CSS-first 配置方式）。
 - 已搭建组件骨架：`AppShell`、`LogPanel`、`FooterActions`、`panels/*`、`tabs/*`、`dialogs/*`。
-- 已在 `app/app.vue` 挂载骨架布局：左侧面板 + Tabs，右侧日志面板，底部按钮。
+- 已在 `mtga-tauri/app/app.vue` 挂载骨架布局：左侧面板 + Tabs，右侧日志面板，底部按钮。
 - 交互方式确认：前端通过 `pyInvoke` 调用 Python 后端命令（pytauri-wheel）。
 
 ## TODO（下一步执行清单）
-- [x] 安装并启用 Tailwind + daisyUI（创建 `app/assets/css/tailwind.css`，在 `nuxt.config.ts` 引入）。
+- [x] 安装并启用 Tailwind + daisyUI（创建 `mtga-tauri/app/assets/css/tailwind.css`，在 `mtga-tauri/nuxt.config.ts` 引入）。
 - [x] `MainTabs` 支持切换并挂载各 Tab 内容（证书/hosts/代理/数据/关于）。
 - [x] `ConfigGroupPanel` 改为可交互：列表数据、选中状态、增删改弹窗。
 - [x] `GlobalConfigPanel` 与 `RuntimeOptionsPanel` 接入真实数据与保存逻辑。
@@ -211,7 +211,7 @@ AboutTab:
 pnpm add -D tailwindcss daisyui
 ```
 
-`app/assets/css/tailwind.css`：
+`mtga-tauri/app/assets/css/tailwind.css`：
 ```css
 @import "tailwindcss";
 @plugin "daisyui";
@@ -222,7 +222,7 @@ pnpm add -D tailwindcss daisyui
 }
 ```
 
-`nuxt.config.ts` 引入样式：
+`mtga-tauri/nuxt.config.ts` 引入样式：
 ```ts
 export default defineNuxtConfig({
   css: ['./app/assets/css/tailwind.css'],
@@ -260,9 +260,9 @@ $env:DEV_SERVER="http://localhost:3000"; uv run python -m mtga_app
 ## 打包：嵌入 Python（Tauri bundle）
 ### 1) 准备嵌入解释器
 - `pyembed/python/...` 需要先准备（不是 `uv pip install` 自动生成）。
-- 使用 `python-build-standalone` 解压到 `src-tauri/pyembed/`：
-  - Windows：`src-tauri/pyembed/python/python.exe`
-  - macOS：`src-tauri/pyembed/python/bin/python3`
+- 使用 `python-build-standalone` 解压到 `mtga-tauri/src-tauri/pyembed/`：
+  - Windows：`mtga-tauri/src-tauri/pyembed/python/python.exe`
+  - macOS：`mtga-tauri/src-tauri/pyembed/python/bin/python3`
 
 ### 2) 安装后端到嵌入解释器
 在 `mtga-tauri/src-tauri`：
@@ -281,13 +281,13 @@ uv pip install --exact --python "./pyembed/python/bin/python3" --reinstall-packa
 
 ### 3) 放置 .env（必需）
 后端强依赖 `.env`（`MTGA_MODULES_SOURCE` / `MTGA_PATH_STRICT` 必填），需保证嵌入解释器可读取：
-- Windows：`src-tauri/pyembed/python/Lib/.env`
-- macOS：`src-tauri/pyembed/python/lib/python3.13/.env`（按实际版本调整）
+- Windows：`mtga-tauri/src-tauri/pyembed/python/Lib/.env`
+- macOS：`mtga-tauri/src-tauri/pyembed/python/lib/python3.13/.env`（按实际版本调整）
 
 或在启动器中设置 `MTGA_ENV_FILE` 指向 `.env` 绝对路径。
 
 ### 4) 配置 tauri-cli（仅打包用）
-新建 `src-tauri/tauri.bundle.json`：
+新建 `mtga-tauri/src-tauri/tauri.bundle.json`：
 ```json
 {
   "bundle": {
@@ -301,13 +301,13 @@ uv pip install --exact --python "./pyembed/python/bin/python3" --reinstall-packa
 ```
 > 不要把 `bundle.resources` 写进 `tauri.conf.json`，而是用 `--config` 传入。
 
-同时建议在 `src-tauri/.taurignore` 中加入：
+同时建议在 `mtga-tauri/src-tauri/.taurignore` 中加入：
 ```
 /pyembed/
 ```
 避免 `tauri dev` 每次复制庞大的解释器目录。
 
-`src-tauri/Cargo.toml` 增加：
+`mtga-tauri/src-tauri/Cargo.toml` 增加：
 ```toml
 [profile.bundle-dev]
 inherits = "dev"
@@ -317,6 +317,7 @@ inherits = "release"
 ```
 
 ### 5) Build & Bundle（环境变量 + 最终打包命令）
+**回到 `mtga-tauri` 根目录下。**
 设置编译期 Python：
 ```pwsh
 $env:PYO3_PYTHON = (Resolve-Path -LiteralPath ".\src-tauri\pyembed\python\python.exe").Path
@@ -331,20 +332,20 @@ install_name_tool -id '@rpath/libpython3.13.dylib' \
   ./src-tauri/pyembed/python/lib/libpython3.13.dylib
 ```
 
-最终打包（仓库根执行）：
+最终打包：
 ```bash
 pnpm -- tauri build --config="src-tauri/tauri.bundle.json" -- --profile bundle-release
 ```
 
 ## Tauri 后端模块/资源对齐（关键约定）
-- 采用“复制方案”：`src-tauri/modules` 作为 Tauri 侧核心逻辑来源，仓库根 `modules` 仅供旧 GUI 使用。
-- `.env` 为唯一配置入口（支持 `MTGA_ENV_FILE` 覆盖路径），必须设置：
+- 采用“复制方案”：`mtga-tauri/src-tauri/modules` 作为 Tauri 侧核心逻辑来源，仓库根 `modules` 仅供旧 GUI 使用。
+- `mtga-tauri/.env` 为唯一配置入口（支持 `MTGA_ENV_FILE` 覆盖路径），必须设置：
   - `MTGA_MODULES_SOURCE`（auto/local/root）
   - `MTGA_PATH_STRICT`（0/1）
   - `MTGA_RESOURCE_DIR`（可空）
-- `mtga_app/__init__.py` 会最早加载 `.env`，并据此决定 `modules` 的导入来源。
-- 资源目录约定：`modules/resources/{ca,openssl}`；`ResourceManager` 优先用包资源，
-  其次本地 `src-tauri/modules/resources`，严格模式可禁止回退。
-- 软件图标由 Tauri 处理（`src-tauri/icons` + `tauri.conf.json`），不进入 Python 资源。
-- `src-tauri/pyproject.toml` 已声明 `modules` 包资源（`resources/ca`、`resources/openssl`）。 
+- `mtga-tauri/mtga_app/__init__.py` 会最早加载 `mtga-tauri/.env`，并据此决定 `modules` 的导入来源。
+- 资源目录约定：`mtga-tauri/src-tauri/modules/resources/{ca,openssl}`；`ResourceManager` 优先用包资源，
+  其次本地 `mtga-tauri/src-tauri/modules/resources`，严格模式可禁止回退。
+- 软件图标由 Tauri 处理（`mtga-tauri/src-tauri/icons` + `mtga-tauri/tauri.conf.json`），不进入 Python 资源。
+- `mtga-tauri/src-tauri/pyproject.toml` 已声明 `modules` 包资源（`resources/ca`、`resources/openssl`）。 
 
