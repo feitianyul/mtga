@@ -11,7 +11,8 @@
     "lint": "eslint .",
     "typecheck": "vue-tsc --noEmit",
     "dev:py": "cd src-tauri && cross-env DEV_SERVER=http://localhost:3000 uv run python -m mtga_app",
-    "dev:all": "concurrently -k \"pnpm dev\" \"pnpm dev:py\""
+    "dev:all": "concurrently -k \"pnpm dev\" \"pnpm dev:py\"",
+    "tauri:bundle": "pnpm -- tauri build --config=\"src-tauri/tauri.bundle.json\" -- --profile bundle-release"
   },
   "dependencies": {
     "@tauri-apps/plugin-dialog": "~2.4.2",
