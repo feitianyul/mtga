@@ -57,6 +57,9 @@ exclude = [
     "**/dist",
     "**/.venv",
     "**/.*",
+    "**/build",
+    "**/mtga_app.egg-info",
+    "**/pyembed"
 ]
 
 [tool.ruff]

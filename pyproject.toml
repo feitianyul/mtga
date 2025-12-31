@@ -71,6 +71,7 @@ exclude = [
     "**/.*",
     "mtga-tauri/src-tauri/pyembed/",
     "mtga-tauri/src-tauri/app/",
+    "mtga-tauri/src-tauri/build/",
 ]
 
 [tool.ruff]
