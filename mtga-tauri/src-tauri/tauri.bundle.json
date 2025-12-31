@@ -4,6 +4,9 @@
     "targets": "all",
     "resources": {
       "pyembed/python": "./"
-    }
+    },
+    "icon": [
+    "icons/icon.ico"
+    ]
   }
 }

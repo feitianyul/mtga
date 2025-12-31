@@ -337,6 +337,66 @@ install_name_tool -id '@rpath/libpython3.13.dylib' \
 pnpm -- tauri build --config="src-tauri/tauri.bundle.json" -- --profile bundle-release
 ```
 
+### Windows 安装器/应用图标配置
+1) **NSIS 安装包（setup.exe）图标**
+在 `mtga-tauri/src-tauri/tauri.conf.json`：
+```json
+"bundle": {
+  "windows": {
+    "nsis": {
+      "installerIcon": "icons/icon.ico"
+    }
+  }
+}
+```
+
+2) **应用图标（程序窗口/任务栏/快捷方式）**
+在同一文件的 `bundle.icon` 中配置 `.ico`（Windows）：
+```json
+"bundle": {
+  "icon": [
+    "icons/icon.ico"
+  ]
+}
+```
+
+3) **MSI 安装界面图片（WiX banner/dialog BMP）**
+在 `mtga-tauri/src-tauri/tauri.conf.json`：
+```json
+"bundle": {
+  "windows": {
+    "wix": {
+      "bannerPath": "icons/wix-banner.bmp",
+      "dialogImagePath": "icons/wix-dialog.bmp"
+    }
+  }
+}
+```
+
+### MSI 图片生成（PowerShell 快速生成）
+使用现有 logo 生成 WiX 需要的两张 BMP：
+```pwsh
+Add-Type -AssemblyName System.Drawing
+$logoPath = (Resolve-Path -LiteralPath ".\src-tauri\icons\128x128@2x.png").Path
+$logo = [System.Drawing.Image]::FromFile($logoPath)
+
+$iconsDir = (Resolve-Path -LiteralPath ".\src-tauri\icons").Path
+
+# banner 493x58
+$banner = New-Object System.Drawing.Bitmap 493,58
+$g1 = [System.Drawing.Graphics]::FromImage($banner)
+$g1.Clear([System.Drawing.Color]::White)
+$g1.DrawImage($logo, 10, 4, 50, 50)
+$banner.Save((Join-Path $iconsDir "wix-banner.bmp"), [System.Drawing.Imaging.ImageFormat]::Bmp)
+
+# dialog 493x312
+$dialog = New-Object System.Drawing.Bitmap 493,312
+$g2 = [System.Drawing.Graphics]::FromImage($dialog)
+$g2.Clear([System.Drawing.Color]::White)
+$g2.DrawImage($logo, 20, 20, 80, 80)
+$dialog.Save((Join-Path $iconsDir "wix-dialog.bmp"), [System.Drawing.Imaging.ImageFormat]::Bmp)
+```
+
 ## Tauri 后端模块/资源对齐（关键约定）
 - 采用“复制方案”：`mtga-tauri/src-tauri/modules` 作为 Tauri 侧核心逻辑来源，仓库根 `modules` 仅供旧 GUI 使用。
 - `mtga-tauri/.env` 为唯一配置入口（支持 `MTGA_ENV_FILE` 覆盖路径），必须设置：
@@ -348,4 +408,3 @@ pnpm -- tauri build --config="src-tauri/tauri.bundle.json" -- --profile bundle-r
   其次本地 `mtga-tauri/src-tauri/modules/resources`，严格模式可禁止回退。
 - 软件图标由 Tauri 处理（`mtga-tauri/src-tauri/icons` + `mtga-tauri/tauri.conf.json`），不进入 Python 资源。
 - `mtga-tauri/src-tauri/pyproject.toml` 已声明 `modules` 包资源（`resources/ca`、`resources/openssl`）。 
-
