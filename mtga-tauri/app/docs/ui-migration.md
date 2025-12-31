@@ -207,7 +207,7 @@ AboutTab:
 
 ## Tailwind + daisyUI 最小集成（按 daisyUI 5 / Tailwind v4）
 依赖（示例 pnpm）：
-```
+```bash
 pnpm add -D tailwindcss daisyui
 ```
 
@@ -240,20 +240,20 @@ export default defineNuxtConfig({
 ## 迁移期开发环境下的开发方法
 ### 后端工程化
 在 `mtga-tauri/src-tauri` 下：
-```
+```bash
 uv venv
 uv pip install -e .
 ```
 
 ### 启动前端
 在 `mtga-tauri/app` 下：
-```
+```bash
 pnpm dev
 ```
 
 ### 启动后端
 在 `mtga-tauri/src-tauri` 下：
-```
+```pwsh
 $env:DEV_SERVER="http://localhost:3000"; uv run python -m mtga_app
 ```
 
@@ -268,13 +268,13 @@ $env:DEV_SERVER="http://localhost:3000"; uv run python -m mtga_app
 在 `mtga-tauri/src-tauri`：
 
 Windows：
-```
+```pwsh
 $env:PYTAURI_STANDALONE="1"
 uv pip install --exact --python ".\pyembed\python\python.exe" --reinstall-package mtga-app .
 ```
 
 macOS：
-```
+```zsh
 export PYTAURI_STANDALONE="1"
 uv pip install --exact --python "./pyembed/python/bin/python3" --reinstall-package mtga-app .
 ```
@@ -318,11 +318,11 @@ inherits = "release"
 
 ### 5) Build & Bundle（环境变量 + 最终打包命令）
 设置编译期 Python：
-```
+```pwsh
 $env:PYO3_PYTHON = (Resolve-Path -LiteralPath ".\src-tauri\pyembed\python\python.exe").Path
 ```
 macOS 还需：
-```
+```zsh
 export PYO3_PYTHON=$(realpath ./src-tauri/pyembed/python/bin/python3)
 export RUSTFLAGS=" \
   -C link-arg=-Wl,-rpath,@executable_path/../Resources/lib \
@@ -332,7 +332,7 @@ install_name_tool -id '@rpath/libpython3.13.dylib' \
 ```
 
 最终打包（仓库根执行）：
-```
+```bash
 pnpm -- tauri build --config="src-tauri/tauri.bundle.json" -- --profile bundle-release
 ```
 
