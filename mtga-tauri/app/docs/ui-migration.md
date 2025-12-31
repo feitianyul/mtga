@@ -257,6 +257,85 @@ pnpm dev
 $env:DEV_SERVER="http://localhost:3000"; uv run python -m mtga_app
 ```
 
+## 打包：嵌入 Python（Tauri bundle）
+### 1) 准备嵌入解释器
+- `pyembed/python/...` 需要先准备（不是 `uv pip install` 自动生成）。
+- 使用 `python-build-standalone` 解压到 `src-tauri/pyembed/`：
+  - Windows：`src-tauri/pyembed/python/python.exe`
+  - macOS：`src-tauri/pyembed/python/bin/python3`
+
+### 2) 安装后端到嵌入解释器
+在 `mtga-tauri/src-tauri`：
+
+Windows：
+```
+$env:PYTAURI_STANDALONE="1"
+uv pip install --exact --python ".\pyembed\python\python.exe" --reinstall-package mtga-app .
+```
+
+macOS：
+```
+export PYTAURI_STANDALONE="1"
+uv pip install --exact --python "./pyembed/python/bin/python3" --reinstall-package mtga-app .
+```
+
+### 3) 放置 .env（必需）
+后端强依赖 `.env`（`MTGA_MODULES_SOURCE` / `MTGA_PATH_STRICT` 必填），需保证嵌入解释器可读取：
+- Windows：`src-tauri/pyembed/python/Lib/.env`
+- macOS：`src-tauri/pyembed/python/lib/python3.13/.env`（按实际版本调整）
+
+或在启动器中设置 `MTGA_ENV_FILE` 指向 `.env` 绝对路径。
+
+### 4) 配置 tauri-cli（仅打包用）
+新建 `src-tauri/tauri.bundle.json`：
+```json
+{
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "resources": {
+      "pyembed/python": "./"
+    }
+  }
+}
+```
+> 不要把 `bundle.resources` 写进 `tauri.conf.json`，而是用 `--config` 传入。
+
+同时建议在 `src-tauri/.taurignore` 中加入：
+```
+/pyembed/
+```
+避免 `tauri dev` 每次复制庞大的解释器目录。
+
+`src-tauri/Cargo.toml` 增加：
+```toml
+[profile.bundle-dev]
+inherits = "dev"
+
+[profile.bundle-release]
+inherits = "release"
+```
+
+### 5) Build & Bundle（环境变量 + 最终打包命令）
+设置编译期 Python：
+```
+$env:PYO3_PYTHON = (Resolve-Path -LiteralPath ".\src-tauri\pyembed\python\python.exe").Path
+```
+macOS 还需：
+```
+export PYO3_PYTHON=$(realpath ./src-tauri/pyembed/python/bin/python3)
+export RUSTFLAGS=" \
+  -C link-arg=-Wl,-rpath,@executable_path/../Resources/lib \
+  -L $(realpath ./src-tauri/pyembed/python/lib)"
+install_name_tool -id '@rpath/libpython3.13.dylib' \
+  ./src-tauri/pyembed/python/lib/libpython3.13.dylib
+```
+
+最终打包（仓库根执行）：
+```
+pnpm -- tauri build --config="src-tauri/tauri.bundle.json" -- --profile bundle-release
+```
+
 ## Tauri 后端模块/资源对齐（关键约定）
 - 采用“复制方案”：`src-tauri/modules` 作为 Tauri 侧核心逻辑来源，仓库根 `modules` 仅供旧 GUI 使用。
 - `.env` 为唯一配置入口（支持 `MTGA_ENV_FILE` 覆盖路径），必须设置：
