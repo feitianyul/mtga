@@ -27,7 +27,6 @@ export const useMtgaApi = () => {
   const saveConfig = (payload: ConfigPayload) =>
     safeInvoke<boolean>("save_config", payload, false)
   const getAppInfo = () => safeInvoke<AppInfo>("get_app_info")
-  const getIsPackaged = () => safeInvoke<boolean>("is_packaged", undefined, false)
   const greet = (name: string) => safeInvoke<string>("greet", { name }, "")
   const hostsModify = (payload: {
     mode: "add" | "backup" | "restore" | "remove"
@@ -69,7 +68,6 @@ export const useMtgaApi = () => {
     loadConfig,
     saveConfig,
     getAppInfo,
-    getIsPackaged,
     greet,
     hostsModify,
     hostsOpen,

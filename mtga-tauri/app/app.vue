@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const { showDataTab, logs, init, runGreet } = useMtgaStore()
+const { logs, init, runGreet } = useMtgaStore()
 
 onMounted(async () => {
   await init()
@@ -13,7 +13,7 @@ onMounted(async () => {
       <ConfigGroupPanel />
       <GlobalConfigPanel />
       <RuntimeOptionsPanel />
-      <MainTabs :show-data-tab="showDataTab" />
+      <MainTabs />
     </template>
 
     <template #right>

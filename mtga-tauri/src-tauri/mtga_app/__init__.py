@@ -102,12 +102,7 @@ from pydantic import BaseModel
 from pytauri import Commands
 from pytauri_wheel.lib import builder_factory, context_factory
 
-from modules.runtime.resource_manager import (
-    ResourceManager,
-)
-from modules.runtime.resource_manager import (
-    is_packaged as resource_is_packaged,
-)
+from modules.runtime.resource_manager import ResourceManager
 from modules.services.app_metadata import DEFAULT_METADATA
 from modules.services.app_version import resolve_app_version
 from modules.services.config_service import ConfigStore
@@ -192,11 +187,6 @@ async def get_app_info() -> dict[str, Any]:
         "ca_common_name": metadata.ca_common_name,
         "api_key_visible_chars": metadata.api_key_visible_chars,
     }
-
-
-@command_registry.command()
-async def is_packaged() -> bool:
-    return resource_is_packaged()
 
 
 def main() -> int:

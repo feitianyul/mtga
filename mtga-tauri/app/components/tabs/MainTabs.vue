@@ -1,27 +1,13 @@
 <script setup lang="ts">
 
 type TabKey = "cert" | "hosts" | "proxy" | "data" | "about";
-
-const props = withDefaults(
-  defineProps<{
-    showDataTab?: boolean;
-  }>(),
-  {
-    showDataTab: true,
-  }
-);
-
-const allTabs: { key: TabKey; label: string }[] = [
+const tabs: { key: TabKey; label: string }[] = [
   { key: "cert", label: "证书管理" },
   { key: "hosts", label: "hosts文件管理" },
   { key: "proxy", label: "代理服务器操作" },
   { key: "data", label: "用户数据管理" },
   { key: "about", label: "关于" },
 ];
-
-const tabs = computed(() =>
-  props.showDataTab ? allTabs : allTabs.filter((tab) => tab.key !== "data")
-);
 
 const activeTab = ref<TabKey>("cert");
 
@@ -58,7 +44,7 @@ const selectTab = (key: TabKey) => {
         <section v-show="activeTab === 'proxy'">
           <ProxyTab />
         </section>
-        <section v-if="showDataTab" v-show="activeTab === 'data'">
+        <section v-show="activeTab === 'data'">
           <DataManagementTab />
         </section>
         <section v-show="activeTab === 'about'">

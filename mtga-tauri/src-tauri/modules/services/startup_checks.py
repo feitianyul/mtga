@@ -76,7 +76,7 @@ def emit_startup_logs(
     if env_ok:
         log(f"✅ {env_msg}")
         if is_packaged():
-            log("📦 运行在 Nuitka 打包环境中")
+            log("📦 运行在打包环境中")
         else:
             log("🔧 运行在开发环境中")
     else:

@@ -30,12 +30,20 @@ def safe_print(message):
         print(fallback)
 
 
-def is_packaged():
-    """检测是否在 Nuitka 打包环境中运行"""
+def get_packaging_runtime() -> str:
+    """检测运行时类型：tauri / nuitka / dev。"""
+    runtime = os.environ.get("MTGA_RUNTIME", "").strip().lower()
+    if runtime == "tauri":
+        return "tauri"
     main_module = sys.modules.get("__main__")
-    if main_module is not None:
-        return hasattr(main_module, "__compiled__")
-    return False
+    if main_module is not None and hasattr(main_module, "__compiled__"):
+        return "nuitka"
+    return "dev"
+
+
+def is_packaged() -> bool:
+    """检测是否在打包环境中运行（Nuitka/Tauri）。"""
+    return get_packaging_runtime() != "dev"
 
 
 def get_user_data_dir():
@@ -58,7 +66,11 @@ def _contains_packaged_resources(path):
     if not path:
         return False
     resource_markers = ("ca", "openssl", "tkinterweb_tkhtml")
-    return any(os.path.exists(os.path.join(path, marker)) for marker in resource_markers)
+    candidates = [path, os.path.join(path, "resources")]
+    for base in candidates:
+        if any(os.path.exists(os.path.join(base, marker)) for marker in resource_markers):
+            return True
+    return False
 
 
 def _get_packaged_resource_dir() -> str | None:
@@ -81,6 +93,7 @@ def _get_local_resource_dir() -> str | None:
 
 def get_program_resource_dir():
     """获取程序资源目录（临时目录，包含配置模板等）"""
+    runtime = get_packaging_runtime()
     override_dir = RESOURCE_DIR
     packaged_dir = _get_packaged_resource_dir()
     local_dir = _get_local_resource_dir()
@@ -91,7 +104,7 @@ def get_program_resource_dir():
     if RESOURCE_STRICT:
         raise RuntimeError("资源目录未找到（MTGA_PATH_STRICT=1）")
 
-    if not is_packaged():
+    if runtime == "dev":
         # 开发环境使用项目根目录
         return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -99,6 +112,9 @@ def get_program_resource_dir():
 
     # macOS app bundle 的资源位于 Contents/MacOS 目录
     if sys.platform == "darwin":
+        return exe_dir
+
+    if runtime == "tauri":
         return exe_dir
 
     debug_lines = [f"[resdir] packaged=1 exe_dir={exe_dir}"]
@@ -309,7 +325,7 @@ class ResourceManager:
         debug_info.append(f"用户数据目录: {self.user_data_dir}")
         debug_info.append(f"CA目录: {self.ca_path}")
         debug_info.append(f"OpenSSL路径: {self.openssl_path}")
-        debug_info.append(f"是否打包环境: {is_packaged()}")
+        debug_info.append(f"运行环境: {get_packaging_runtime()}")
 
         # 如果是打包环境，显示额外的调试信息
         if is_packaged():

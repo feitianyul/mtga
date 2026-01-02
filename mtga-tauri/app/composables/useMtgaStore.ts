@@ -62,7 +62,6 @@ export const useMtgaStore = () => {
   )
   const logs = useState<string[]>("mtga-logs", () => [])
   const appInfo = useState<AppInfo>("mtga-app-info", () => ({ ...DEFAULT_APP_INFO }))
-  const showDataTab = useState<boolean>("mtga-show-data-tab", () => true)
   const initialized = useState<boolean>("mtga-initialized", () => false)
 
   const appendLog = (message: string) => {
@@ -135,20 +134,12 @@ export const useMtgaStore = () => {
     return true
   }
 
-  const loadPackagedState = async () => {
-    const packaged = await api.getIsPackaged()
-    if (typeof packaged === "boolean") {
-      showDataTab.value = packaged
-    }
-    return packaged
-  }
-
   const init = async () => {
     if (initialized.value) {
       return
     }
     initialized.value = true
-    await Promise.all([loadAppInfo(), loadConfig(), loadPackagedState()])
+    await Promise.all([loadAppInfo(), loadConfig()])
   }
 
   const runGreet = async () => {
@@ -254,7 +245,6 @@ export const useMtgaStore = () => {
     runtimeOptions,
     logs,
     appInfo,
-    showDataTab,
     appendLog,
     loadConfig,
     saveConfig,

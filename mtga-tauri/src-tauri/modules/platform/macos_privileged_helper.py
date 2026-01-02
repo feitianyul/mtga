@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from modules.runtime.resource_manager import is_packaged
+    from modules.runtime.resource_manager import get_packaging_runtime
 except ImportError:
     # 作为脚本运行时，没有包上下文，补充模块搜索路径
     import sys
@@ -33,7 +33,7 @@ except ImportError:
     project_root = Path(__file__).resolve().parents[2]
     if str(project_root) not in sys.path:
         sys.path.append(str(project_root))
-    from modules.runtime.resource_manager import is_packaged
+    from modules.runtime.resource_manager import get_packaging_runtime
 
 JsonDict = dict[str, Any]
 JsonMapping = Mapping[str, Any]
@@ -178,7 +178,8 @@ class MacPrivilegeSession:
             self._helper_started = False
 
     def _start_helper(self, log_func) -> bool:
-        if is_packaged():
+        runtime = get_packaging_runtime()
+        if runtime == "nuitka":
             launcher = self._locate_packaged_launcher()
             if not launcher:
                 log_func("⚠️ 无法找到打包后的可执行文件，无法申请管理员权限")
