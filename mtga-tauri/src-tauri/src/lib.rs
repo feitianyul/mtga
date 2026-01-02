@@ -1,5 +1,8 @@
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    if !cfg!(debug_assertions) && std::env::var("MTGA_RUNTIME").is_err() {
+        std::env::set_var("MTGA_RUNTIME", "tauri");
+    }
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
