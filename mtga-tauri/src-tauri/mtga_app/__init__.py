@@ -3,9 +3,14 @@ from __future__ import annotations
 
 import os
 import sys
+import time
+import traceback
+from contextlib import suppress
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, cast
+
+from platformdirs import user_data_dir
 
 
 def find_repo_root(start: Path) -> Path:
@@ -16,6 +21,44 @@ def find_repo_root(start: Path) -> Path:
         if p.parent == p:
             raise RuntimeError("Repo root not found (expected modules/ and mtga-tauri/).")
         p = p.parent
+
+
+def _resolve_boot_log_path() -> Path:
+    try:
+        user_dir = user_data_dir("MTGA", appauthor=False, roaming=os.name == "nt")
+    except Exception:
+        user_dir = os.path.expanduser("~")
+    with suppress(Exception):
+        os.makedirs(user_dir, exist_ok=True)
+    return Path(user_dir) / "mtga_tauri_boot.log"
+
+
+_BOOT_LOG_PATH = _resolve_boot_log_path()
+
+
+def _boot_log(message: str) -> None:
+    try:
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S ")
+        with _BOOT_LOG_PATH.open("a", encoding="utf-8") as fh:
+            fh.write(f"{timestamp}{message}\n")
+    except Exception:
+        pass
+
+
+def _install_bootstrap_excepthook() -> None:
+    original = sys.excepthook
+
+    def handler(exc_type, exc_value, exc_traceback) -> None:
+        _boot_log("Uncaught exception during startup:")
+        for line in traceback.format_exception(exc_type, exc_value, exc_traceback):
+            _boot_log(line.rstrip("\n"))
+        original(exc_type, exc_value, exc_traceback)
+
+    sys.excepthook = handler
+
+
+_install_bootstrap_excepthook()
+_boot_log("mtga_app init start")
 
 
 # 统一 .env 入口（显眼开关）
@@ -95,7 +138,10 @@ sys.path.insert(0, str(modules_root))
 
 
 # 迁移期：仍需仓库根用于版本号读取
-REPO_ROOT = find_repo_root(Path(__file__).resolve())
+try:
+    REPO_ROOT = find_repo_root(Path(__file__).resolve())
+except RuntimeError:
+    REPO_ROOT = TAURI_PROJECT_ROOT
 
 from anyio.from_thread import start_blocking_portal
 from pydantic import BaseModel
@@ -112,6 +158,7 @@ from .commands import (
     register_hosts_commands,
     register_model_test_commands,
     register_proxy_commands,
+    register_startup_commands,
     register_update_commands,
     register_user_data_commands,
 )
@@ -121,6 +168,7 @@ register_cert_commands(command_registry)
 register_hosts_commands(command_registry)
 register_model_test_commands(command_registry)
 register_proxy_commands(command_registry)
+register_startup_commands(command_registry)
 register_update_commands(command_registry)
 register_user_data_commands(command_registry)
 

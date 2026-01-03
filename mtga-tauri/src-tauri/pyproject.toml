@@ -28,8 +28,12 @@ requires = ["setuptools>=80"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = { find = { where = ["."] } }
-include-package-data = true
+include-package-data = false
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mtga_app", "mtga_app.*", "modules", "modules.*"]
+exclude = ["build", "build.*", "target", "target.*", "pyembed", "pyembed.*"]
 
 [tool.setuptools.package-data]
 modules = ["resources/ca/**", "resources/openssl/**"]

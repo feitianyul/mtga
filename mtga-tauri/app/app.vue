@@ -1,9 +1,8 @@
 <script setup lang="ts">
-const { logs, init, runGreet } = useMtgaStore()
+const { logs, init } = useMtgaStore()
 
 onMounted(async () => {
   await init()
-  await runGreet()
 })
 </script>
 

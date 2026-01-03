@@ -65,8 +65,7 @@ export const useMtgaStore = () => {
   const initialized = useState<boolean>("mtga-initialized", () => false)
 
   const appendLog = (message: string) => {
-    const stamp = new Date().toLocaleTimeString()
-    logs.value.push(`[${stamp}] ${message}`)
+    logs.value.push(message)
   }
 
   const appendLogs = (entries?: string[]) => {
@@ -134,19 +133,73 @@ export const useMtgaStore = () => {
     return true
   }
 
+  const buildStartupLogs = (details: Record<string, unknown>) => {
+    const envOk = details["env_ok"] === true
+    const envMessage = coerceText(details["env_message"])
+    if (envMessage) {
+      appendLog(`${envOk ? "✅" : "❌"} ${envMessage}`)
+    }
+    if (envOk) {
+      const runtime = coerceText(details["runtime"])
+      if (runtime === "tauri" || runtime === "nuitka") {
+        appendLog("📦 运行在打包环境中")
+      } else {
+        appendLog("🔧 运行在开发环境中")
+      }
+    }
+
+    const allowFlag =
+      coerceText(details["allow_unsafe_hosts_flag"]) || "--allow-unsafe-hosts"
+    const hostsModifyBlocked = details["hosts_modify_blocked"] === true
+    if (hostsModifyBlocked) {
+      const status = coerceText(details["hosts_modify_block_status"]) || "unknown"
+      appendLog(
+        `⚠️ 检测到 hosts 文件写入受限（status=${status}），已启用受限 hosts 模式：添加将回退为追加写入（无法保证原子性增删/去重），自动移除/还原将被禁用。`
+      )
+      appendLog(
+        `⚠️ 你可以点击「打开hosts文件」手动修改；或使用启动参数 ${allowFlag} 覆盖此检查以强制尝试原子写入（风险自负）。`
+      )
+    } else {
+      const preflightOk = details["hosts_preflight_ok"] === true
+      const preflightStatus = coerceText(details["hosts_preflight_status"])
+      if (preflightStatus && !preflightOk) {
+        appendLog(
+          `⚠️ hosts 预检未通过（status=${preflightStatus}），但已使用启动参数 ${allowFlag} 覆盖；后续自动修改可能失败。`
+        )
+      }
+    }
+
+    if (details["explicit_proxy_detected"] === true) {
+      appendLog(
+        "⚠️".repeat(21) +
+          "\n检测到显式代理配置：部分应用可能优先走代理，从而绕过 hosts 导流。"
+      )
+      appendLog("建议：1. 关闭显式代理（如clash的系统代理），或改用 TUN/VPN")
+      appendLog("      2. 检查 Trae 的代理设置。\n" + "⚠️".repeat(21))
+    }
+
+    appendLog("MTGA GUI 已启动")
+    appendLog("请选择操作或直接使用一键启动...")
+  }
+
+  const loadStartupStatus = async () => {
+    const result = await api.getStartupStatus()
+    if (!result) {
+      appendLog("启动日志加载失败：无法连接后端")
+      return false
+    }
+    if (result.details && typeof result.details === "object") {
+      buildStartupLogs(result.details as Record<string, unknown>)
+    }
+    return result.ok
+  }
+
   const init = async () => {
     if (initialized.value) {
       return
     }
     initialized.value = true
-    await Promise.all([loadAppInfo(), loadConfig()])
-  }
-
-  const runGreet = async () => {
-    const response = await api.greet("bifang")
-    if (response) {
-      appendLog(response)
-    }
+    await Promise.all([loadAppInfo(), loadConfig(), loadStartupStatus()])
   }
 
   const buildProxyPayload = () => ({
@@ -249,7 +302,6 @@ export const useMtgaStore = () => {
     loadConfig,
     saveConfig,
     init,
-    runGreet,
     runGenerateCertificates,
     runInstallCaCert,
     runClearCaCert,
