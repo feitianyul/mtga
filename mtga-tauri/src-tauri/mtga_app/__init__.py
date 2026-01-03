@@ -172,6 +172,25 @@ register_startup_commands(command_registry)
 register_update_commands(command_registry)
 register_user_data_commands(command_registry)
 
+_invoke_state: dict[str, Any] = {
+    "portal": None,
+    "portal_context": None,
+    "handler": None,
+}
+
+
+def get_py_invoke_handler() -> Any:
+    handler = _invoke_state["handler"]
+    if handler is not None:
+        return handler
+    portal_context = start_blocking_portal("asyncio")
+    portal = portal_context.__enter__()
+    _invoke_state["portal_context"] = portal_context
+    _invoke_state["portal"] = portal
+    handler = command_registry.generate_handler(portal)
+    _invoke_state["handler"] = handler
+    return handler
+
 
 class GreetPayload(BaseModel):
     name: str
