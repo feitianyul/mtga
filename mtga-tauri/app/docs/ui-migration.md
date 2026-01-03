@@ -259,7 +259,7 @@ $env:DEV_SERVER="http://localhost:3000"; uv run python -m mtga_app
 
 ## 打包：嵌入 Python（Tauri bundle）
 ### 1) 准备嵌入解释器
-- `pyembed/python/...` 需要先准备（不是 `uv pip install` 自动生成）。
+- 目录 `mtga-tauri/src-tauri/pyembed/...` 需要先准备。
 - 使用 `python-build-standalone` 解压到 `mtga-tauri/src-tauri/pyembed/`：
   - Windows：`mtga-tauri/src-tauri/pyembed/python/python.exe`
   - macOS：`mtga-tauri/src-tauri/pyembed/python/bin/python3`
