@@ -19,12 +19,18 @@ const handleOpen = () => {
 </script>
 
 <template>
-  <div class="space-y-3">
-    <button class="btn btn-sm w-full" @click="handleModify">修改hosts文件</button>
-    <div class="grid grid-cols-2 gap-2">
-      <button class="btn btn-sm" @click="handleBackup">备份hosts</button>
-      <button class="btn btn-sm" @click="handleRestore">还原hosts</button>
+  <div class="mtga-soft-panel space-y-3">
+    <div>
+      <div class="text-sm font-semibold text-slate-900">hosts 文件</div>
+      <div class="text-xs text-slate-500">快速修改与备份恢复</div>
     </div>
-    <button class="btn btn-sm w-full" @click="handleOpen">打开hosts文件</button>
+    <div class="space-y-2">
+      <button class="btn btn-primary btn-sm w-full" @click="handleModify">修改hosts文件</button>
+      <div class="grid grid-cols-2 gap-2">
+        <button class="btn btn-outline btn-sm" @click="handleBackup">备份hosts</button>
+        <button class="btn btn-outline btn-sm" @click="handleRestore">还原hosts</button>
+      </div>
+      <button class="btn btn-outline btn-sm w-full" @click="handleOpen">打开hosts文件</button>
+    </div>
   </div>
 </template>

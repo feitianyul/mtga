@@ -17,16 +17,23 @@ const selectTab = (key: TabKey) => {
 </script>
 
 <template>
-  <div class="card bg-base-200 shadow-sm">
-    <div class="card-body p-4">
-      <div role="tablist" class="tabs tabs-bordered">
+  <div class="mtga-card">
+    <div class="mtga-card-body">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 class="mtga-card-title">功能操作</h2>
+          <p class="mtga-card-subtitle">证书 / hosts / 代理 / 数据 / 关于</p>
+        </div>
+        <span class="mtga-chip">工具集</span>
+      </div>
+      <div role="tablist" class="mt-4 flex flex-wrap gap-3 border-b border-slate-200/70 pb-2">
         <button
           v-for="tab in tabs"
           :key="tab.key"
           role="tab"
           type="button"
-          class="tab"
-          :class="{ 'tab-active': activeTab === tab.key }"
+          class="px-3 py-2 text-sm font-medium text-slate-500 transition"
+          :class="activeTab === tab.key ? 'border-b-2 border-teal-500 text-slate-900' : 'border-b-2 border-transparent hover:text-slate-800'"
           :aria-selected="activeTab === tab.key"
           @click="selectTab(tab.key)"
         >

@@ -63,6 +63,10 @@ export const useMtgaStore = () => {
   const logs = useState<string[]>("mtga-logs", () => [])
   const appInfo = useState<AppInfo>("mtga-app-info", () => ({ ...DEFAULT_APP_INFO }))
   const initialized = useState<boolean>("mtga-initialized", () => false)
+  const updateDialogOpen = useState<boolean>("mtga-update-dialog-open", () => false)
+  const updateVersionLabel = useState<string>("mtga-update-version-label", () => "")
+  const updateNotesHtml = useState<string>("mtga-update-notes-html", () => "")
+  const updateReleaseUrl = useState<string>("mtga-update-release-url", () => "")
 
   const appendLog = (message: string) => {
     logs.value.push(message)
@@ -283,7 +287,56 @@ export const useMtgaStore = () => {
 
   const runCheckUpdates = async () => {
     const result = await api.checkUpdates()
-    return applyInvokeResult(result, "检查更新")
+    const ok = applyInvokeResult(result, "检查更新")
+    if (!result || !result.details || typeof result.details !== "object") {
+      return ok
+    }
+    const details = result.details as Record<string, unknown>
+    const updateResult =
+      typeof details["update_result"] === "object" && details["update_result"]
+        ? (details["update_result"] as Record<string, unknown>)
+        : details
+    const status = coerceText(updateResult["status"])
+    if (status === "new_version") {
+      updateVersionLabel.value = coerceText(updateResult["latest_version"])
+      updateNotesHtml.value = coerceText(updateResult["release_notes"])
+      updateReleaseUrl.value = coerceText(updateResult["release_url"])
+      updateDialogOpen.value = true
+    } else if (status === "up_to_date") {
+      const latestVersion = coerceText(updateResult["latest_version"])
+      if (latestVersion) {
+        appendLog(`已是最新版本：${latestVersion}`)
+      }
+    }
+    return ok
+  }
+
+  const closeUpdateDialog = () => {
+    updateDialogOpen.value = false
+  }
+
+  const openUpdateRelease = async () => {
+    const url = updateReleaseUrl.value.trim()
+    if (!url || typeof window === "undefined") {
+      return
+    }
+    const isTauri =
+      typeof navigator !== "undefined" && /tauri/i.test(navigator.userAgent)
+    if (isTauri) {
+      try {
+        const { open } = await import("@tauri-apps/plugin-shell")
+        await open(url)
+        return
+      } catch (error) {
+        console.warn("[mtga] open release url failed", error)
+        appendLog("打开发布页失败，请手动复制链接")
+        return
+      }
+    }
+    const opened = window.open(url, "_blank", "noopener,noreferrer")
+    if (!opened) {
+      window.location.href = url
+    }
   }
 
   const runPlaceholder = (label: string) => {
@@ -298,6 +351,10 @@ export const useMtgaStore = () => {
     runtimeOptions,
     logs,
     appInfo,
+    updateDialogOpen,
+    updateVersionLabel,
+    updateNotesHtml,
+    updateReleaseUrl,
     appendLog,
     loadConfig,
     saveConfig,
@@ -317,6 +374,8 @@ export const useMtgaStore = () => {
     runUserDataRestoreLatest,
     runUserDataClear,
     runCheckUpdates,
+    closeUpdateDialog,
+    openUpdateRelease,
     runPlaceholder,
   }
 }

@@ -5,3 +5,52 @@
 @plugin "daisyui" {
   themes: light --default;
 }
+
+@layer base {
+  :root {
+    --mtga-bg: #f7f8fb;
+    --mtga-surface: #ffffff;
+    --mtga-surface-soft: #f3f6fa;
+    --mtga-border: #e5e7eb;
+    --mtga-accent: #0ea5a4;
+    --mtga-accent-strong: #0891b2;
+    --mtga-warn: #f59e0b;
+    --mtga-text: #0f172a;
+    --mtga-text-muted: #64748b;
+  }
+
+  body {
+    background-color: var(--mtga-bg);
+    background-image:
+      radial-gradient(circle at 15% 20%, rgba(14, 165, 164, 0.08), transparent 40%),
+      radial-gradient(circle at 85% 0%, rgba(14, 116, 144, 0.08), transparent 38%),
+      linear-gradient(120deg, #f8fafc 0%, #eef2ff 55%, #f1f5f9 100%);
+    color: var(--mtga-text);
+  }
+}
+
+@layer components {
+  .mtga-card {
+    @apply rounded-2xl border border-slate-200/70 bg-white/85 shadow-[0_18px_45px_-32px_rgba(15,23,42,0.4)] backdrop-blur;
+  }
+
+  .mtga-card-body {
+    @apply p-5;
+  }
+
+  .mtga-card-title {
+    @apply text-base font-semibold tracking-tight text-slate-900;
+  }
+
+  .mtga-card-subtitle {
+    @apply text-xs text-slate-500;
+  }
+
+  .mtga-chip {
+    @apply inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/90 px-3 py-1 text-xs text-slate-600 shadow-sm;
+  }
+
+  .mtga-soft-panel {
+    @apply rounded-xl border border-slate-200/80 bg-slate-50/80 p-3;
+  }
+}

@@ -49,11 +49,12 @@ def render_markdown_via_github_api(
     - 可选注入仅与字体相关的最小 CSS（用于沿用 GUI 的全局字体设置）。
     - 渲染失败时会降级为 <pre> 纯文本。
     """
-    safe_source = _replace_emoji_shortcodes_with_img(
-        markdown_text or "",
-        timeout=timeout,
-        user_agent=user_agent,
-    )
+    # safe_source = _replace_emoji_shortcodes_with_img(
+    #     markdown_text or "",
+    #     timeout=timeout,
+    #     user_agent=user_agent,
+    # )
+    safe_source = markdown_text or ""
 
     font_family = font.family if font else None
     font_size = font.size if font else None
@@ -95,8 +96,8 @@ def render_markdown_via_github_api(
         )
         if response.status_code == requests.codes.ok:  # type: ignore[attr-defined]
             rendered_fragment = response.text or ""
-            rendered_fragment = _replace_g_emoji_with_img(rendered_fragment)
-            rendered_fragment = _style_emoji_images(rendered_fragment)
+            # rendered_fragment = _replace_g_emoji_with_img(rendered_fragment)
+            # rendered_fragment = _style_emoji_images(rendered_fragment)
             return "".join(
                 (
                     "<html><head><meta charset='utf-8'>",

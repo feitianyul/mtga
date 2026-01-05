@@ -7,11 +7,14 @@ const handleCheckUpdates = () => {
 </script>
 
 <template>
-  <div class="space-y-3">
-    <div class="text-base font-semibold">
-      {{ appInfo.display_name }} {{ appInfo.version }}
+  <div class="mtga-soft-panel space-y-3">
+    <div>
+      <div class="text-sm font-semibold text-slate-900">
+        {{ appInfo.display_name }} {{ appInfo.version }}
+      </div>
+      <div class="text-xs text-slate-500">关于与更新信息</div>
     </div>
-    <button class="btn btn-sm" @click="handleCheckUpdates">检查更新</button>
-    <div class="text-xs text-base-content/60">powered by BiFangKNT</div>
+    <button class="btn btn-outline btn-sm w-fit" @click="handleCheckUpdates">检查更新</button>
+    <div class="text-xs text-slate-400">powered by BiFangKNT</div>
   </div>
 </template>

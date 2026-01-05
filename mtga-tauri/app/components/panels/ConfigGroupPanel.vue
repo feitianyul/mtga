@@ -43,10 +43,6 @@ const hasSelection = computed(
     selectedIndex.value < configGroups.value.length
 )
 
-const apiKeyVisibleChars = computed(
-  () => store.appInfo.value.api_key_visible_chars || 4
-)
-
 const normalizeMiddleRoute = (value: string) => {
   let raw = value.trim()
   if (!raw) {
@@ -67,6 +63,13 @@ const normalizeMiddleRoute = (value: string) => {
 const getDisplayName = (group: ConfigGroup, index: number) =>
   group.name?.trim() || `配置组 ${index + 1}`
 
+/**
+ * 获取 API Key 的显示文本
+ * 规则：
+ * 1. 长度 <= 12 位时，全部显示为星号
+ * 2. 长度 > 12 位时，每超出一位显示一位明文，上限为 4 位明文
+ * 3. 显示的总长度（星号+明文）与实际长度一致
+ */
 const getApiKeyDisplay = (group: ConfigGroup) => {
   if ("target_model_id" in group) {
     return group.target_model_id || "(无)"
@@ -75,11 +78,18 @@ const getApiKeyDisplay = (group: ConfigGroup) => {
   if (!apiKey) {
     return "(无)"
   }
-  const visible = apiKeyVisibleChars.value
-  if (apiKey.length > visible) {
-    return `${"*".repeat(apiKey.length - visible)}${apiKey.slice(-visible)}`
+
+  const len = apiKey.length
+  const threshold = 12
+  const maxVisible = 4
+
+  // 计算可见字符数：超出阈值的部分，且不超过上限
+  const visibleCount = Math.min(Math.max(0, len - threshold), maxVisible)
+
+  if (visibleCount > 0) {
+    return `${"*".repeat(len - visibleCount)}${apiKey.slice(-visibleCount)}`
   }
-  return "***"
+  return "*".repeat(len)
 }
 
 const refreshList = async () => {
@@ -268,47 +278,69 @@ const moveDown = async () => {
 </script>
 
 <template>
-  <div class="card bg-base-200 shadow-sm">
-    <div class="card-body p-4">
-      <div class="flex items-center justify-between">
-        <h2 class="card-title text-base">代理服务器配置组</h2>
-        <div class="flex gap-2">
-          <button class="btn btn-sm" @click="requestTest">测活</button>
-          <button class="btn btn-sm" @click="refreshList">刷新</button>
+  <div class="mtga-card">
+    <div class="mtga-card-body">
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 class="mtga-card-title">代理服务器配置组</h2>
+          <p class="mtga-card-subtitle">管理模型路由与鉴权组合</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="btn btn-xs btn-outline" @click="requestTest">测活</button>
+          <button class="btn btn-xs btn-outline" @click="refreshList">刷新</button>
         </div>
       </div>
 
-      <div class="mt-3 grid gap-4 lg:grid-cols-[1fr,160px]">
-        <div class="overflow-auto rounded bg-base-100">
-          <table class="table table-sm">
-            <thead>
-              <tr>
-                <th>序号</th>
-                <th>API URL</th>
-                <th>实际模型ID</th>
+      <div class="mt-4 grid gap-4 lg:grid-cols-[1fr,180px]">
+        <div 
+          class="rounded-xl border border-slate-200/70 bg-white/80 overflow-hidden" 
+          style="--row-h: 36px; --head-h: 38px;"
+        >
+          <table class="table table-sm text-sm border-separate border-spacing-0">
+            <thead class="block bg-slate-50/50">
+              <tr class="table w-full table-fixed" style="height: var(--head-h)">
+                <th class="w-16 text-center">序号</th>
+                <th class="w-[40%]">API URL</th>
+                <th class="w-[30%]">实际模型ID</th>
                 <th>API Key</th>
               </tr>
             </thead>
-            <tbody v-if="configGroups.length">
+            <tbody 
+              v-if="configGroups.length" 
+              class="block overflow-y-auto" 
+              style="max-height: calc(var(--row-h) * 4); scrollbar-gutter: stable;"
+            >
               <tr
                 v-for="(group, index) in configGroups"
                 :key="index"
-                class="cursor-pointer"
-                :class="{ 'bg-base-300': selectedIndex === index }"
+                class="table w-full table-fixed cursor-pointer transition-colors"
+                :class="selectedIndex === index ? 'bg-teal-50/80' : 'hover:bg-slate-50'"
+                :style="{ height: 'var(--row-h)' }"
                 :title="group.name || ''"
                 @click="selectedIndex = index"
               >
-                <td class="text-center">{{ index + 1 }}</td>
-                <td class="truncate">
+                <td
+                  class="w-16 border-l-4 text-center"
+                  :class="
+                    selectedIndex === index
+                      ? 'border-teal-400 text-slate-900'
+                      : 'border-transparent text-slate-600'
+                  "
+                >
+                  {{ index + 1 }}
+                </td>
+                <td class="w-[40%] truncate text-slate-700">
                   {{ group.api_url || "(未填写)" }}
                 </td>
-                <td class="truncate">{{ group.model_id || "(未填写)" }}</td>
-                <td class="truncate">{{ getApiKeyDisplay(group) }}</td>
+                <td class="w-[30%] truncate text-slate-700">
+                  {{ group.model_id || "(未填写)" }}
+                </td>
+                <td class="truncate text-slate-700">{{ getApiKeyDisplay(group) }}</td>
               </tr>
             </tbody>
-            <tbody v-else>
-              <tr>
-                <td colspan="4" class="py-6 text-center text-sm text-base-content/60">
+            <tbody v-else class="block">
+              <tr class="table w-full">
+                <td colspan="4" class="py-6 text-center text-sm text-slate-400">
                   暂无配置组
                 </td>
               </tr>
@@ -317,45 +349,60 @@ const moveDown = async () => {
         </div>
 
         <div class="space-y-2">
-          <button class="btn btn-sm w-full" @click="openAdd">新增</button>
-          <button class="btn btn-sm w-full" @click="openEdit">修改</button>
-          <button class="btn btn-sm w-full" @click="requestDelete">删除</button>
-          <button class="btn btn-sm w-full" @click="moveUp">上移</button>
-          <button class="btn btn-sm w-full" @click="moveDown">下移</button>
+          <button class="btn btn-primary btn-sm w-full" @click="openAdd">新增</button>
+          <button class="btn btn-outline btn-sm w-full" @click="openEdit">修改</button>
+          <button class="btn btn-outline btn-sm w-full text-error hover:bg-error/10" @click="requestDelete">
+            删除
+          </button>
+          <div class="h-px bg-slate-200/70"></div>
+          <button class="btn btn-outline btn-sm w-full" @click="moveUp">上移</button>
+          <button class="btn btn-outline btn-sm w-full" @click="moveDown">下移</button>
         </div>
       </div>
     </div>
   </div>
 
   <dialog class="modal" :open="editorOpen">
-    <div class="modal-box">
-      <h3 class="text-lg font-bold">
-        {{ editorMode === "add" ? "新增配置组" : "修改配置组" }}
-      </h3>
-      <div class="mt-4 space-y-3">
-        <label class="form-control">
-          <div class="label">
-            <span class="label-text">配置组名称（可选）</span>
+    <div class="modal-box mtga-card">
+      <div class="mtga-card-body">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <h3 class="text-lg font-semibold text-slate-900">
+              {{ editorMode === "add" ? "新增配置组" : "修改配置组" }}
+            </h3>
+            <p class="text-xs text-slate-500">配置代理目标与鉴权参数</p>
           </div>
-          <input v-model="form.name" class="input input-bordered w-full" />
+          <span class="mtga-chip">配置编辑</span>
+        </div>
+      </div>
+      <div class="mt-2 space-y-3 px-5 pb-5">
+        <label class="form-control">
+          <div class="label pb-1">
+            <span class="label-text text-xs text-slate-500">配置组名称（可选）</span>
+          </div>
+          <input v-model="form.name" class="input input-bordered w-full bg-white/80" />
         </label>
         <label class="form-control">
-          <div class="label">
-            <span class="label-text">* API URL</span>
+          <div class="label pb-1">
+            <span class="label-text text-xs text-slate-500">* API URL</span>
           </div>
-          <input v-model="form.api_url" class="input input-bordered w-full" />
+          <input v-model="form.api_url" class="input input-bordered w-full bg-white/80" />
         </label>
         <label class="form-control">
-          <div class="label">
-            <span class="label-text">* 实际模型ID</span>
+          <div class="label pb-1">
+            <span class="label-text text-xs text-slate-500">* 实际模型ID</span>
           </div>
-          <input v-model="form.model_id" class="input input-bordered w-full" />
+          <input v-model="form.model_id" class="input input-bordered w-full bg-white/80" />
         </label>
         <label class="form-control">
-          <div class="label">
-            <span class="label-text">* API Key</span>
+          <div class="label pb-1">
+            <span class="label-text text-xs text-slate-500">* API Key</span>
           </div>
-          <input v-model="form.api_key" class="input input-bordered w-full" type="password" />
+          <input
+            v-model="form.api_key"
+            class="input input-bordered w-full bg-white/80"
+            type="password"
+          />
         </label>
         <div class="flex items-center gap-3">
           <label class="flex items-center gap-2">
@@ -368,16 +415,16 @@ const moveDown = async () => {
           </label>
           <input
             v-model="form.middle_route"
-            class="input input-bordered w-full"
+            class="input input-bordered w-full bg-white/80"
             :disabled="!middleRouteEnabled"
             :placeholder="DEFAULT_MIDDLE_ROUTE"
           />
         </div>
-        <p v-if="formError" class="text-sm text-error">{{ formError }}</p>
-        <p class="text-xs text-base-content/60">* 为必填项</p>
+        <p v-if="formError" class="text-sm text-error">{{ formError }}</p>      
+        <p class="text-xs text-slate-400">* 为必填项</p>
       </div>
-      <div class="modal-action">
-        <button class="btn" @click="closeEditor">取消</button>
+      <div class="modal-action px-5 pb-5">
+        <button class="btn btn-ghost" @click="closeEditor">取消</button>
         <button class="btn btn-primary" @click="handleSave">保存</button>
       </div>
     </div>

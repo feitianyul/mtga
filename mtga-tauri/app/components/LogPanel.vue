@@ -12,6 +12,8 @@ const props = withDefaults(
 
 const logBox = ref<HTMLDivElement | null>(null)
 
+const logCount = computed(() => props.logs?.length ?? 0)
+
 const formattedLogs = computed(() =>
   props.logs && props.logs.length ? props.logs.join("\n") : props.emptyText
 )
@@ -29,12 +31,21 @@ watch(
 </script>
 
 <template>
-  <div class="card bg-base-200 shadow-sm">
-    <div class="card-body p-4">
-      <h2 class="card-title text-base">日志</h2>
+  <div class="mtga-card">
+    <div class="mtga-card-body">
+      <div class="flex items-center justify-between gap-3">
+        <div>
+          <h2 class="mtga-card-title">运行日志</h2>
+          <p class="mtga-card-subtitle">实时记录后端与操作状态</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="mtga-chip">实时输出</span>
+          <span class="text-xs text-slate-500">共 {{ logCount }} 条</span>
+        </div>
+      </div>
       <div
         ref="logBox"
-        class="mt-2 h-80 overflow-auto rounded bg-base-100 p-3 text-sm font-mono text-base-content/80"
+        class="mt-4 h-80 overflow-auto rounded-xl border border-slate-200/80 bg-[linear-gradient(135deg,rgba(15,23,42,0.04),rgba(14,165,164,0.06))] p-4 text-sm font-mono text-slate-700"
       >
         <pre class="whitespace-pre-wrap leading-relaxed">{{ formattedLogs }}</pre>
       </div>

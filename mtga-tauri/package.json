@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@tauri-apps/plugin-dialog": "~2.4.2",
+    "@tauri-apps/plugin-shell": "^2.3.3",
     "dompurify": "^3.3.1",
     "nuxt": "^4.2.2",
     "tauri-plugin-pytauri-api": "^0.8.0",
