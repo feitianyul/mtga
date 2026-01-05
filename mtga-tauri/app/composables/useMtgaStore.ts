@@ -61,6 +61,8 @@ export const useMtgaStore = () => {
     () => ({ ...DEFAULT_RUNTIME_OPTIONS })
   )
   const logs = useState<string[]>("mtga-logs", () => [])
+  const logCursor = useState<number>("mtga-log-cursor", () => 0)
+  const logStreamActive = useState<boolean>("mtga-log-stream-active", () => false)
   const appInfo = useState<AppInfo>("mtga-app-info", () => ({ ...DEFAULT_APP_INFO }))
   const initialized = useState<boolean>("mtga-initialized", () => false)
   const updateDialogOpen = useState<boolean>("mtga-update-dialog-open", () => false)
@@ -87,11 +89,42 @@ export const useMtgaStore = () => {
       appendLog(`${fallbackMessage}失败：无法连接后端`)
       return false
     }
-    appendLogs(result.logs)
     if (result.message) {
       appendLog(result.message)
     }
     return result.ok
+  }
+
+  const startLogStream = () => {
+    if (logStreamActive.value) {
+      return
+    }
+    logStreamActive.value = true
+
+    const loop = async () => {
+      if (!logStreamActive.value) {
+        return
+      }
+      const result = await api.pullLogs({
+        after_id: logCursor.value || null,
+        timeout_ms: 0,
+        max_items: 200,
+      })
+      if (!logStreamActive.value) {
+        return
+      }
+      if (result) {
+        if (Array.isArray(result.items) && result.items.length) {
+          appendLogs(result.items)
+        }
+        if (typeof result.next_id === "number") {
+          logCursor.value = result.next_id
+        }
+      }
+      setTimeout(loop, 200)
+    }
+
+    void loop()
   }
 
   const loadConfig = async () => {
@@ -203,6 +236,7 @@ export const useMtgaStore = () => {
       return
     }
     initialized.value = true
+    startLogStream()
     await Promise.all([loadAppInfo(), loadConfig(), loadStartupStatus()])
   }
 
@@ -350,12 +384,14 @@ export const useMtgaStore = () => {
     mtgaAuthKey,
     runtimeOptions,
     logs,
+    logCursor,
     appInfo,
     updateDialogOpen,
     updateVersionLabel,
     updateNotesHtml,
     updateReleaseUrl,
     appendLog,
+    startLogStream,
     loadConfig,
     saveConfig,
     init,

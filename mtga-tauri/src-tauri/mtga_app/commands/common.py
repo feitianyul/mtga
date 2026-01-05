@@ -4,6 +4,7 @@ from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any
 
+from modules.runtime.log_bus import push_log
 from modules.runtime.operation_result import OperationResult
 from modules.runtime.result_messages import describe_result
 
@@ -14,7 +15,9 @@ def collect_logs() -> tuple[list[str], Any]:
     def _log(message: Any) -> None:
         if message is None:
             return
-        logs.append(str(message))
+        text = str(message)
+        logs.append(text)
+        push_log(text)
 
     return logs, _log
 

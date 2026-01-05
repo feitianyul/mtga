@@ -1,6 +1,6 @@
 import { pyInvoke } from "tauri-plugin-pytauri-api"
 
-import type { AppInfo, ConfigPayload, InvokeResult } from "./mtgaTypes"
+import type { AppInfo, ConfigPayload, InvokeResult, LogPullResult } from "./mtgaTypes"
 
 type InvokePayload = Record<string, unknown>
 
@@ -63,6 +63,11 @@ export const useMtgaApi = () => {
     safeInvoke<InvokeResult>("user_data_restore_latest")
   const userDataClear = () => safeInvoke<InvokeResult>("user_data_clear")
   const checkUpdates = () => safeInvoke<InvokeResult>("check_updates")
+  const pullLogs = (payload: {
+    after_id?: number | null
+    timeout_ms?: number
+    max_items?: number
+  }) => safeInvoke<LogPullResult>("pull_logs_command", payload)
 
   return {
     loadConfig,
@@ -84,5 +89,6 @@ export const useMtgaApi = () => {
     userDataRestoreLatest,
     userDataClear,
     checkUpdates,
+    pullLogs,
   }
 }

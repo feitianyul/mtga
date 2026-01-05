@@ -30,3 +30,8 @@ export type InvokeResult = {
   details?: Record<string, unknown>
   logs?: string[]
 }
+
+export type LogPullResult = {
+  items?: string[]
+  next_id?: number
+}

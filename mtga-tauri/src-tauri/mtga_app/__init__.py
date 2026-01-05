@@ -156,6 +156,7 @@ from modules.services.config_service import ConfigStore
 from .commands import (
     register_cert_commands,
     register_hosts_commands,
+    register_log_commands,
     register_model_test_commands,
     register_proxy_commands,
     register_startup_commands,
@@ -166,6 +167,7 @@ from .commands import (
 command_registry = Commands()
 register_cert_commands(command_registry)
 register_hosts_commands(command_registry)
+register_log_commands(command_registry)
 register_model_test_commands(command_registry)
 register_proxy_commands(command_registry)
 register_startup_commands(command_registry)
