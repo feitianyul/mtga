@@ -189,6 +189,9 @@ def register_proxy_commands(commands: Commands) -> None:
             log=log_func,
             show_idle_message=True,
         )
+        hosts_result = modify_hosts_file_result(action="remove", log_func=log_func)
+        if not hosts_result.ok:
+            log_func(f"⚠️ {hosts_result.message or 'hosts 条目清理失败'}")
         return build_result_payload(result, logs, "代理服务器停止完成")
 
     @commands.command()
