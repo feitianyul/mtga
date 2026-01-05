@@ -195,6 +195,12 @@ def register_proxy_commands(commands: Commands) -> None:
     async def proxy_check_network() -> dict[str, Any]:
         logs, log_func = collect_logs()
         report = check_network_environment(log_func=log_func, emit_logs=True)
+        if not report.explicit_proxy_detected:
+            log_func("✅ 未检测到系统/环境变量层面的显式代理配置。")
+            log_func(
+                "ℹ️ 若仍无法连接，请检查 Trae 的代理设置，"
+                "或是否启用了 TUN/VPN/安全软件网络防护。"
+            )
         result = OperationResult.success(report=report)
         return build_result_payload(result, logs, "网络环境检查完成")
 
