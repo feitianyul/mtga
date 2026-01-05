@@ -32,7 +32,7 @@ const selectTab = (key: TabKey) => {
           :key="tab.key"
           role="tab"
           type="button"
-          class="px-3 py-2 text-sm font-medium text-slate-500 transition"
+          class="cursor-pointer px-3 py-2 text-sm font-medium text-slate-500 transition-colors duration-150"
           :class="activeTab === tab.key ? 'border-b-2 border-teal-500 text-slate-900' : 'border-b-2 border-transparent hover:text-slate-800'"
           :aria-selected="activeTab === tab.key"
           @click="selectTab(tab.key)"
