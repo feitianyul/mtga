@@ -15,6 +15,6 @@ const handleCheckUpdates = () => {
       <div class="text-xs text-slate-500">关于与更新信息</div>
     </div>
     <button class="btn btn-outline btn-sm w-fit" @click="handleCheckUpdates">检查更新</button>
-    <div class="text-xs text-slate-400">powered by BiFangKNT</div>
+    <div class="text-xs text-slate-400 text-center">powered by BiFangKNT</div>
   </div>
 </template>
