@@ -7,10 +7,14 @@ import time
 import traceback
 from contextlib import suppress
 from functools import lru_cache
+from importlib import import_module
 from pathlib import Path
 from typing import Any, cast
 
 from platformdirs import user_data_dir
+
+MTGA_PLATFORM = "tauri"
+os.environ.setdefault("MTGA_PLATFORM", MTGA_PLATFORM)
 
 
 def find_repo_root(start: Path) -> Path:
@@ -45,6 +49,12 @@ def _boot_log(message: str) -> None:
         pass
 
 
+def _try_push_log(message: str) -> None:
+    with suppress(Exception):
+        push_log = import_module("modules.runtime.log_bus").push_log
+        push_log(message)
+
+
 def _install_bootstrap_excepthook() -> None:
     original = sys.excepthook
 
@@ -52,6 +62,7 @@ def _install_bootstrap_excepthook() -> None:
         _boot_log("Uncaught exception during startup:")
         for line in traceback.format_exception(exc_type, exc_value, exc_traceback):
             _boot_log(line.rstrip("\n"))
+            _try_push_log(line.rstrip("\n"))
         original(exc_type, exc_value, exc_traceback)
 
     sys.excepthook = handler
@@ -135,6 +146,15 @@ modules_root = _resolve_modules_root()
 if STRICT_MODE and modules_root != LOCAL_ROOT:
     raise RuntimeError("MTGA_PATH_STRICT=1 不允许回退到仓库根 modules")
 sys.path.insert(0, str(modules_root))
+
+try:
+    from modules.platform.platform_context import get_platform
+
+    get_platform()
+except Exception as exc:
+    _boot_log(f"Platform detection failed: {exc}")
+    _try_push_log(f"平台识别失败: {exc}")
+    raise
 
 
 # 迁移期：仍需仓库根用于版本号读取
