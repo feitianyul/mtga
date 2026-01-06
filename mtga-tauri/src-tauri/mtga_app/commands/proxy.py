@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import suppress
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
@@ -8,6 +9,7 @@ from pydantic import BaseModel
 from pytauri import Commands
 
 from modules.network.network_environment import check_network_environment
+from modules.runtime.log_bus import push_log as default_push_log
 from modules.runtime.operation_result import OperationResult
 from modules.runtime.resource_manager import ResourceManager
 from modules.runtime.thread_manager import ThreadManager
@@ -60,6 +62,27 @@ def _set_proxy_instance(instance: Any | None) -> None:
 
 def _get_proxy_instance() -> Any | None:
     return _get_proxy_state().proxy_instance
+
+
+def stop_proxy_for_shutdown(*, log_func=None) -> OperationResult:
+    if log_func is None:
+        log_func = default_push_log
+    def _log(message: str) -> None:
+        with suppress(Exception):
+            log_func(message)
+
+    _log("收到退出信号，准备停止代理服务器...")
+    result = proxy_orchestration.stop_proxy_instance_result(
+        get_proxy_instance=_get_proxy_instance,
+        set_proxy_instance=_set_proxy_instance,
+        log=_log,
+        reason="shutdown",
+        show_idle_message=True,
+    )
+    hosts_result = modify_hosts_file_result(action="remove", log_func=_log)
+    if not hosts_result.ok:
+        _log(f"⚠️ {hosts_result.message or 'hosts 条目清理失败'}")
+    return result
 
 
 def _stop_proxy_instance_result(

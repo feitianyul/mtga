@@ -1,6 +1,12 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
+use std::time::Duration;
 
 use pyo3::prelude::*;
+use tauri::{Manager, RunEvent, WindowEvent};
 
 fn resolve_python_home() -> Option<PathBuf> {
     if let Some(home) = std::env::var_os("PYTHONHOME") {
@@ -30,7 +36,7 @@ fn resolve_python_home() -> Option<PathBuf> {
     None
 }
 
-fn resolve_python_paths(python_home: &PathBuf) -> Vec<PathBuf> {
+fn resolve_python_paths(python_home: &Path) -> Vec<PathBuf> {
     let mut paths = Vec::new();
     let lib = python_home.join("Lib");
     if lib.exists() {
@@ -52,7 +58,10 @@ fn resolve_python_paths(python_home: &PathBuf) -> Vec<PathBuf> {
             if !path.is_dir() {
                 continue;
             }
-            let name = path.file_name().and_then(|value| value.to_str()).unwrap_or("");
+            let name = path
+                .file_name()
+                .and_then(|value| value.to_str())
+                .unwrap_or("");
             if !name.starts_with("python") {
                 continue;
             }
@@ -66,7 +75,7 @@ fn resolve_python_paths(python_home: &PathBuf) -> Vec<PathBuf> {
     paths
 }
 
-fn resolve_env_file(python_home: &PathBuf) -> Option<PathBuf> {
+fn resolve_env_file(python_home: &Path) -> Option<PathBuf> {
     let windows_candidate = python_home.join("Lib").join(".env");
     if windows_candidate.exists() {
         return Some(windows_candidate);
@@ -96,9 +105,7 @@ fn resolve_env_file(python_home: &PathBuf) -> Option<PathBuf> {
 
 fn ensure_python_env() -> Option<PathBuf> {
     let home = resolve_python_home();
-    let Some(home_path) = home.as_ref() else {
-        return None;
-    };
+    let home_path = home.as_ref()?;
 
     if std::env::var_os("PYTHONHOME").is_none() {
         std::env::set_var("PYTHONHOME", home_path);
@@ -134,6 +141,24 @@ fn build_py_invoke_handler() -> PyResult<PyObject> {
     })
 }
 
+fn stop_proxy_on_close() {
+    Python::with_gil(|py| {
+        let module = PyModule::import(py, "mtga_app.commands.proxy")?;
+        let handler = module.getattr("stop_proxy_for_shutdown")?;
+        let _ = handler.call0();
+        Ok::<(), PyErr>(())
+    })
+    .ok();
+}
+
+fn spawn_shutdown(app_handle: tauri::AppHandle) {
+    std::thread::spawn(move || {
+        stop_proxy_on_close();
+        std::thread::sleep(Duration::from_millis(500));
+        app_handle.exit(0);
+    });
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     if !cfg!(debug_assertions) && std::env::var("MTGA_RUNTIME").is_err() {
@@ -144,8 +169,9 @@ pub fn run() {
     pyo3::prepare_freethreaded_python();
     let py_invoke_handler =
         build_py_invoke_handler().expect("Failed to initialize Python invoke handler");
+    let shutdown_started = Arc::new(AtomicBool::new(false));
 
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_pytauri::init(py_invoke_handler))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
@@ -159,6 +185,30 @@ pub fn run() {
             }
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .on_window_event({
+            let shutdown_started = Arc::clone(&shutdown_started);
+            move |window, event| {
+                if let WindowEvent::CloseRequested { api, .. } = event {
+                    if shutdown_started.swap(true, Ordering::SeqCst) {
+                        return;
+                    }
+                    api.prevent_close();
+                    let app_handle = window.app_handle().clone();
+                    spawn_shutdown(app_handle);
+                }
+            }
+        })
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+
+    let shutdown_started = Arc::clone(&shutdown_started);
+    app.run(move |app_handle, event| {
+        if let RunEvent::ExitRequested { api, .. } = event {
+            if shutdown_started.swap(true, Ordering::SeqCst) {
+                return;
+            }
+            api.prevent_exit();
+            spawn_shutdown(app_handle.clone());
+        }
+    });
 }
