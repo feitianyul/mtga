@@ -245,7 +245,25 @@ class MacPrivilegeSession:
         candidates: list[Path] = []
         exec_path = Path(sys.executable)
         if exec_path.is_file():
-            candidates.append(exec_path)
+            if exec_path.name.startswith("python"):
+                candidates.append(exec_path)
+            else:
+                exe_dir = exec_path.parent
+                contents_dir = exe_dir.parent
+                resources_bin = contents_dir / "Resources" / "bin"
+                for bin_name in ("python3", "python3.13", "python"):
+                    candidate = resources_bin / bin_name
+                    if candidate.is_file():
+                        candidates.append(candidate)
+                        break
+        python_home = os.environ.get("PYTHONHOME")
+        if python_home:
+            bin_dir = Path(python_home) / "bin"
+            for bin_name in ("python3", "python"):
+                candidate = bin_dir / bin_name
+                if candidate.is_file():
+                    candidates.append(candidate)
+                    break
         for bin_name in ("python3", "python"):
             found = shutil.which(bin_name)
             if found:
