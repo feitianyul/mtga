@@ -9,18 +9,8 @@ dependencies = [
     "pytauri-wheel==0.8.*",
     "flask",
     "requests",
-    "werkzeug",
-    "jinja2",
-    "itsdangerous",
-    "click",
-    "urllib3",
-    "idna",
-    "certifi",
     "platformdirs>=4.3.0",
     "PyYAML",
-    "tkinterweb>=4.9.0",
-    "pyobjc>=12.1 ; sys_platform == 'darwin'",
-    "charset-normalizer>=3.4.4",
 ]
 
 [build-system]
