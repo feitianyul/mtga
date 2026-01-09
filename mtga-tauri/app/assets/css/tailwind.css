@@ -88,23 +88,73 @@
     @apply rounded-xl border border-slate-200/80 p-3;
   }
 
+  /* 
+     mtga-tooltip 基础定义
+     我们保留原生 tooltip 类以支持 daisyUI 的基础样式（如 cursor），
+     但通过全局代理元素来渲染实际的提示框，以逃逸 overflow: hidden。
+  */
   .mtga-tooltip {
     position: relative;
     z-index: 30;
   }
 
+  /* 隐藏原生的 daisyUI tooltip 伪元素，改用全局代理 */
   .mtga-tooltip::before,
   .mtga-tooltip::after {
-    z-index: 40;
+    display: none !important;
   }
 
-  /* 强制所有 mtga-tooltip 支持换行 */
-  .mtga-tooltip::before {
-    display: inline-block !important;
-    white-space: pre-line !important;
-    text-align: left !important;
-    max-width: var(--mtga-tooltip-max, 280px) !important;
+  /* 全局 Tooltip 代理样式 */
+  .mtga-tooltip-proxy {
+    position: fixed;
+    z-index: 9999;
+    pointer-events: none;
+    
+    /* 基础视觉样式：匹配按钮悬停态与品牌色 */
+    background-color: #fffbeb; /* amber-50 */
+    color: var(--mtga-text);
+    border: 1px solid var(--mtga-accent); /* 使用品牌金黄色 */
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.75rem; /* 匹配按钮的 rounded-xl */
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.25rem;
+    box-shadow: 0 10px 15px -3px rgba(240, 187, 50, 0.2); /* 带有品牌色的阴影 */
+    white-space: pre-line;
+    text-align: left;
     word-break: break-all;
-    content: attr(data-tip) !important;
+    max-width: var(--mtga-tooltip-max, 280px);
+
+    /* 动画效果 */
+    animation: mtga-tooltip-in 0.15s ease-out forwards;
+
+    /* 锚点定位核心 */
+    @supports (anchor-name: --test) {
+      position-anchor: --mtga-tooltip-anchor;
+      bottom: calc(anchor(top) + 10px);
+      left: anchor(center);
+      translate: -50% 0;
+      top: auto;
+    }
+  }
+
+  /* 代理元素的箭头 */
+  .mtga-tooltip-proxy::after {
+    content: "";
+    position: absolute;
+    bottom: -5px; /* 微调位置以对齐边框 */
+    left: 50%;
+    translate: -50% 0;
+    width: 8px;
+    height: 8px;
+    background-color: #fffbeb;
+    border-right: 1px solid var(--mtga-accent);
+    border-bottom: 1px solid var(--mtga-accent);
+    transform: rotate(45deg);
+  }
+
+  @keyframes mtga-tooltip-in {
+    from { opacity: 0; transform: scale(0.95) translateY(4px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
   }
 }

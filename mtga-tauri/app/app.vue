@@ -17,6 +17,47 @@ const {
 const activeTab = ref('config-group')
 
 /**
+ * 全局 Tooltip 代理状态
+ */
+const tooltipProxy = reactive({
+  show: false,
+  content: '',
+  maxWidth: '280px'
+})
+
+// 记录当前激活了锚点的元素，用于及时清理
+let lastAnchorTarget: HTMLElement | null = null
+
+/**
+ * 监听全局鼠标悬停，捕获 mtga-tooltip 元素
+ */
+const handleGlobalMouseOver = (e: MouseEvent) => {
+  const target = (e.target as HTMLElement).closest('.mtga-tooltip') as HTMLElement
+  
+  if (target) {
+    // 如果目标换了，先清理旧目标的锚点
+    if (lastAnchorTarget && lastAnchorTarget !== target) {
+      lastAnchorTarget.style.removeProperty('anchor-name')
+    }
+    
+    tooltipProxy.content = target.getAttribute('data-tip') || ''
+    tooltipProxy.maxWidth = target.style.getPropertyValue('--mtga-tooltip-max') || '280px'
+    tooltipProxy.show = true
+    
+    // 给新目标设置锚点名称
+    target.style.setProperty('anchor-name', '--mtga-tooltip-anchor')
+    lastAnchorTarget = target
+  } else {
+    tooltipProxy.show = false
+    // 离开 tooltip 区域时清理锚点
+    if (lastAnchorTarget) {
+      lastAnchorTarget.style.removeProperty('anchor-name')
+      lastAnchorTarget = null
+    }
+  }
+}
+
+/**
  * 导航菜单配置
  */
 const navigation = [
@@ -33,7 +74,8 @@ onMounted(async () => {
 </script>
 
 <template>
-  <AppShell>
+  <div @mouseover="handleGlobalMouseOver">
+    <AppShell>
     <template #left>
       <div class="flex items-stretch h-full min-h-0">
         <!-- 垂直菜单栏 -->
@@ -96,4 +138,14 @@ onMounted(async () => {
     @close="closeUpdateDialog"
     @open-release="openUpdateRelease"
   />
+
+  <!-- 全局 Tooltip 代理，用于逃逸容器剪裁 -->
+  <div 
+    v-show="tooltipProxy.show" 
+    class="mtga-tooltip-proxy"
+    :style="{ '--mtga-tooltip-max': tooltipProxy.maxWidth }"
+  >
+    {{ tooltipProxy.content }}
+  </div>
+</div>
 </template>
