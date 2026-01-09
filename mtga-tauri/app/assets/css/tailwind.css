@@ -12,19 +12,23 @@
     --mtga-surface: #ffffff;
     --mtga-surface-soft: #f3f6fa;
     --mtga-border: #e5e7eb;
-    --mtga-accent: #0ea5a4;
-    --mtga-accent-strong: #0891b2;
+    --mtga-accent: #f0bb32;
+    --mtga-accent-strong: #d9a307;
     --mtga-warn: #f59e0b;
     --mtga-text: #0f172a;
     --mtga-text-muted: #64748b;
+
+    /* 覆盖 daisyUI 的 primary 颜色 */
+    --color-primary: var(--mtga-accent);
+    --color-primary-content: #1e293b;
   }
 
   body {
     background-color: var(--mtga-bg);
     background-image:
-      radial-gradient(circle at 15% 20%, rgba(14, 165, 164, 0.08), transparent 40%),
-      radial-gradient(circle at 85% 0%, rgba(14, 116, 144, 0.08), transparent 38%),
-      linear-gradient(120deg, #f8fafc 0%, #eef2ff 55%, #f1f5f9 100%);
+      radial-gradient(circle at 15% 20%, rgba(240, 187, 50, 0.1), transparent 40%),
+      radial-gradient(circle at 85% 0%, rgba(217, 163, 7, 0.08), transparent 38%),
+      linear-gradient(120deg, #f8fafc 0%, #fffbeb 55%, #f1f5f9 100%);
     color: var(--mtga-text);
   }
 }

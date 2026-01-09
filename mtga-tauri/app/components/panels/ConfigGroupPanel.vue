@@ -298,7 +298,7 @@ const moveDown = async () => {
         </div>
         <div class="flex items-center gap-2">
           <button
-            class="btn btn-xs btn-outline tooltip mtga-tooltip"
+            class="btn btn-sm btn-outline rounded-xl border-slate-200 hover:border-amber-500 hover:bg-amber-50/50 hover:text-amber-600 tooltip mtga-tooltip"
             :data-tip="testTooltip"
             style="--mtga-tooltip-max: 250px;"
             @click="requestTest"
@@ -306,7 +306,7 @@ const moveDown = async () => {
             测活
           </button>
           <button
-            class="btn btn-xs btn-outline tooltip mtga-tooltip"
+            class="btn btn-sm btn-outline rounded-xl border-slate-200 hover:border-amber-500 hover:bg-amber-50/50 hover:text-amber-600 tooltip mtga-tooltip"
             :data-tip="refreshTooltip"
             style="--mtga-tooltip-max: 250px;"
             @click="refreshList"
@@ -339,7 +339,7 @@ const moveDown = async () => {
                 v-for="(group, index) in configGroups"
                 :key="index"
                 class="table w-full table-fixed cursor-pointer transition-colors"
-                :class="selectedIndex === index ? 'bg-teal-50/80' : 'hover:bg-slate-50'"
+                :class="selectedIndex === index ? 'bg-amber-50/80' : 'hover:bg-slate-50'"
                 :style="{ height: 'var(--row-h)' }"
                 :title="group.name || ''"
                 @click="selectedIndex = index"
@@ -348,7 +348,7 @@ const moveDown = async () => {
                   class="w-16 border-l-4 text-center"
                   :class="
                     selectedIndex === index
-                      ? 'border-teal-400 text-slate-900'
+                      ? 'border-amber-400 text-slate-900'
                       : 'border-transparent text-slate-600'
                   "
                 >
@@ -374,14 +374,14 @@ const moveDown = async () => {
         </div>
 
         <div class="space-y-2">
-          <button class="btn btn-primary btn-sm w-full" @click="openAdd">新增</button>
-          <button class="btn btn-outline btn-sm w-full" @click="openEdit">修改</button>
-          <button class="btn btn-outline btn-sm w-full text-error hover:bg-error/10" @click="requestDelete">
+          <button class="btn btn-primary btn-sm w-full rounded-xl shadow-sm" @click="openAdd">新增</button>
+          <button class="btn btn-outline btn-sm w-full rounded-xl border-slate-200 hover:border-amber-500 hover:bg-amber-50/50 hover:text-amber-600" @click="openEdit">修改</button>
+          <button class="btn btn-outline btn-sm w-full rounded-xl border-slate-200 text-error hover:bg-error/10 hover:border-error" @click="requestDelete">
             删除
           </button>
-          <div class="h-px bg-slate-200/70"></div>
-          <button class="btn btn-outline btn-sm w-full" @click="moveUp">上移</button>
-          <button class="btn btn-outline btn-sm w-full" @click="moveDown">下移</button>
+          <div class="h-px bg-slate-200/70 mx-1"></div>
+          <button class="btn btn-outline btn-sm w-full rounded-xl border-slate-200 hover:border-slate-300 hover:bg-slate-50" @click="moveUp">上移</button>
+          <button class="btn btn-outline btn-sm w-full rounded-xl border-slate-200 hover:border-slate-300 hover:bg-slate-50" @click="moveDown">下移</button>
         </div>
       </div>
     </div>
@@ -449,8 +449,8 @@ const moveDown = async () => {
         <p class="text-xs text-slate-400 pt-4">* 为必填项</p>
       </div>
       <div class="modal-action px-5 pb-5">
-        <button class="btn btn-ghost" @click="closeEditor">取消</button>
-        <button class="btn btn-primary" @click="handleSave">保存</button>
+        <button class="btn btn-ghost rounded-xl" @click="closeEditor">取消</button>
+        <button class="btn btn-primary rounded-xl px-8 shadow-sm" @click="handleSave">保存</button>
       </div>
     </div>
   </dialog>

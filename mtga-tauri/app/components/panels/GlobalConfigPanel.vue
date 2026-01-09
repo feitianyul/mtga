@@ -96,7 +96,7 @@ const handleSave = async () => {
         <div class="flex items-center justify-between gap-3">
           <span class="text-xs text-slate-500">保存后会同步所有配置组</span>
           <button
-            class="btn btn-primary btn-sm px-4 shadow-[0_12px_24px_-18px_rgba(14,165,164,0.8)]"
+            class="btn btn-primary btn-sm px-4 rounded-xl"
             :disabled="saving"
             @click="handleSave"
           >

@@ -32,13 +32,13 @@ const handleClear = () => {
       <div class="text-xs text-slate-500">生成、安装与清理本地证书</div>
     </div>
     <div class="space-y-2">
-      <button class="btn btn-primary btn-sm w-full" @click="handleGenerate">
+      <button class="btn btn-primary btn-sm w-full rounded-xl shadow-sm" @click="handleGenerate">
         生成CA和服务器证书
       </button>
       <div class="grid grid-cols-2 gap-2">
-        <button class="btn btn-primary btn-sm" @click="handleInstall">安装CA证书</button>
+        <button class="btn btn-primary btn-sm rounded-xl shadow-sm" @click="handleInstall">安装CA证书</button>
         <button
-          class="btn btn-outline btn-sm text-error hover:bg-error/10 tooltip mtga-tooltip"
+          class="btn btn-outline btn-sm rounded-xl border-slate-200 text-error hover:bg-error/10 hover:border-error tooltip mtga-tooltip"
           :data-tip="clearCaTooltip"
           style="--mtga-tooltip-max: 280px;"
           @click="handleClear"
