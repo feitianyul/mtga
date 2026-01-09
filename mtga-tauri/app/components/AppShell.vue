@@ -16,12 +16,6 @@
               <slot name="subtitle">一站式代理与证书管理面板</slot>
             </div>
           </div>
-          <div class="flex flex-wrap items-center gap-2">
-            <slot name="meta">
-              <span class="mtga-chip">本地控制台</span>
-              <span class="mtga-chip">实时配置</span>
-            </slot>
-          </div>
         </div>
       </header>
 

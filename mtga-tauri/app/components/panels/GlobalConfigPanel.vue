@@ -66,7 +66,7 @@ const handleSave = async () => {
         >
           <input
             v-model="mappedModelId"
-            class="input input-bordered w-full bg-white/80"
+            class="input input-bordered w-full bg-white/50"
             placeholder="例如：gpt-5"
           />
         </div>
@@ -83,7 +83,7 @@ const handleSave = async () => {
         >
           <input
             v-model="mtgaAuthKey"
-            class="input input-bordered w-full bg-white/80"
+            class="input input-bordered w-full bg-white/50"
             placeholder="例如：111"
             type="password"
           />

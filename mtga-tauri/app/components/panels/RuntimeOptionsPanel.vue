@@ -48,7 +48,7 @@ const debugModeTooltip = [
         </label>
         <select
           v-model="options.streamMode"
-          class="select select-bordered select-sm bg-white/80"
+          class="select select-bordered select-sm bg-white/50"
           :disabled="!options.forceStream"
         >
           <option value="true">true</option>

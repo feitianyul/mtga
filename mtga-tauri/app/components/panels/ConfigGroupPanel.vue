@@ -316,12 +316,12 @@ const moveDown = async () => {
 
   <div class="mt-4 grid gap-4 lg:grid-cols-[1fr,180px]">
     <div 
-      class="min-w-0 rounded-xl border border-slate-200/70 bg-white/80 overflow-hidden flex flex-col" 
+      class="min-w-0 rounded-xl border border-slate-200/70 bg-white/50 backdrop-blur-md overflow-hidden flex flex-col" 
       style="--row-h: 36px; --head-h: 38px;"
     >
       <div class="overflow-auto custom-scrollbar flex-1 max-h-[260px]">
         <table class="table table-sm w-full text-sm border-separate border-spacing-0">
-          <thead class="sticky top-0 z-10 bg-slate-50/90 backdrop-blur-sm">
+          <thead class="sticky top-0 z-10 bg-slate-50/70 backdrop-blur-md">
             <tr style="height: var(--head-h)">
               <th class="w-16 text-center border-b border-slate-200/60">序号</th>
               <th class="min-w-[140px] border-b border-slate-200/60">API URL</th>
