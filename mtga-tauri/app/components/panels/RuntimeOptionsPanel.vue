@@ -24,14 +24,14 @@ const debugModeTooltip = [
       <div class="mt-4 space-y-3">
         <div class="mtga-soft-panel space-y-3">
           <label
-            class="flex items-center gap-3 text-sm text-slate-700 tooltip mtga-tooltip"
+            class="flex items-center gap-3 text-sm text-slate-700 tooltip mtga-tooltip cursor-pointer hover:bg-slate-100/50 rounded px-3 py-2 -my-1 transition-colors"
             :data-tip="debugModeTooltip"
             style="--mtga-tooltip-max: 500px;"
           >
             <input v-model="options.debugMode" type="checkbox" class="checkbox checkbox-sm" />
             <span>开启调试模式</span>
           </label>
-          <label class="flex items-center gap-3 text-sm text-slate-700">
+          <label class="flex items-center gap-3 text-sm text-slate-700 cursor-pointer hover:bg-slate-100/50 rounded px-3 py-2 -my-1 transition-colors">
             <input
               v-model="options.disableSslStrict"
               type="checkbox"
@@ -40,7 +40,7 @@ const debugModeTooltip = [
             <span>关闭SSL严格模式</span>
           </label>
           <div class="flex flex-wrap items-center gap-3 text-sm text-slate-700">
-            <label class="flex items-center gap-3">
+            <label class="flex items-center gap-3 cursor-pointer hover:bg-slate-100/50 rounded px-3 py-2 -my-1 transition-colors">
               <input
                 v-model="options.forceStream"
                 type="checkbox"
