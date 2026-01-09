@@ -24,8 +24,12 @@ const activeTab = ref('config-group')
 const tooltipProxy = reactive({
   show: false,
   content: '',
-  maxWidth: '280px'
+  maxWidth: '280px',
+  style: {} as Record<string, string>
 })
+
+// 检测是否支持 CSS 锚点定位 API (macOS WebKit 目前不支持)
+const supportsAnchor = typeof CSS !== 'undefined' && CSS.supports && CSS.supports('anchor-name', '--test')
 
 // 记录当前激活了锚点的元素，用于及时清理
 let lastAnchorTarget: HTMLElement | null = null
@@ -46,8 +50,20 @@ const handleGlobalMouseOver = (e: MouseEvent) => {
     tooltipProxy.maxWidth = target.style.getPropertyValue('--mtga-tooltip-max') || '280px'
     tooltipProxy.show = true
     
-    // 给新目标设置锚点名称
-    target.style.setProperty('anchor-name', '--mtga-tooltip-anchor')
+    if (supportsAnchor) {
+      // 支持锚点定位：给新目标设置锚点名称
+      target.style.setProperty('anchor-name', '--mtga-tooltip-anchor')
+      tooltipProxy.style = {}
+    } else {
+      // 不支持锚点定位 (如 macOS)：手动计算位置
+      const rect = target.getBoundingClientRect()
+      tooltipProxy.style = {
+        left: `${rect.left + rect.width / 2}px`,
+        bottom: `${window.innerHeight - rect.top + 10}px`,
+        top: 'auto'
+      }
+    }
+    
     lastAnchorTarget = target
   } else {
     tooltipProxy.show = false
@@ -145,7 +161,10 @@ onMounted(async () => {
   <div 
     v-show="tooltipProxy.show" 
     class="mtga-tooltip-proxy"
-    :style="{ '--mtga-tooltip-max': tooltipProxy.maxWidth }"
+    :style="{ 
+      '--mtga-tooltip-max': tooltipProxy.maxWidth,
+      ...tooltipProxy.style 
+    }"
   >
     {{ tooltipProxy.content }}
   </div>

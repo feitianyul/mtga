@@ -127,13 +127,15 @@
 
     /* 动画效果 */
     animation: mtga-tooltip-in 0.15s ease-out forwards;
+    
+    /* 居中偏移量 */
+    translate: -50% 0;
 
     /* 锚点定位核心 */
     @supports (anchor-name: --test) {
       position-anchor: --mtga-tooltip-anchor;
       bottom: calc(anchor(top) + 10px);
       left: anchor(center);
-      translate: -50% 0;
       top: auto;
     }
   }
