@@ -6,12 +6,14 @@ const {
   updateVersionLabel,
   updateNotesHtml,
   updateReleaseUrl,
+  runCheckUpdatesOnce,
   closeUpdateDialog,
   openUpdateRelease,
 } = useMtgaStore()
 
 onMounted(async () => {
   await init()
+  await runCheckUpdatesOnce()
 })
 </script>
 

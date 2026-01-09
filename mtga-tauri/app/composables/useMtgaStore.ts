@@ -71,6 +71,10 @@ export const useMtgaStore = () => {
   const updateVersionLabel = useState<string>("mtga-update-version-label", () => "")
   const updateNotesHtml = useState<string>("mtga-update-notes-html", () => "")
   const updateReleaseUrl = useState<string>("mtga-update-release-url", () => "")
+  const updateAutoChecked = useState<boolean>(
+    "mtga-update-auto-checked",
+    () => false
+  )
 
   const appendLog = (message: string) => {
     logs.value.push(message)
@@ -347,6 +351,14 @@ export const useMtgaStore = () => {
     return ok
   }
 
+  const runCheckUpdatesOnce = async () => {
+    if (updateAutoChecked.value) {
+      return false
+    }
+    updateAutoChecked.value = true
+    return runCheckUpdates()
+  }
+
   const closeUpdateDialog = () => {
     updateDialogOpen.value = false
   }
@@ -412,6 +424,7 @@ export const useMtgaStore = () => {
     runUserDataRestoreLatest,
     runUserDataClear,
     runCheckUpdates,
+    runCheckUpdatesOnce,
     closeUpdateDialog,
     openUpdateRelease,
     runPlaceholder,
