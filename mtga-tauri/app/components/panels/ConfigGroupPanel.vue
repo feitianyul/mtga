@@ -333,14 +333,14 @@ const moveDown = async () => {
             <tr
               v-for="(group, index) in configGroups"
               :key="index"
-              class="cursor-pointer transition-colors hover:bg-slate-50"
-              :class="selectedIndex === index ? 'bg-amber-50/80' : ''"
+              class="cursor-pointer transition-colors hover:bg-amber-100/30 group"
+              :class="selectedIndex === index ? 'bg-amber-100/70' : ''"
               :style="{ height: 'var(--row-h)' }"
               :title="group.name || ''"
               @click="selectedIndex = index"
             >
               <td
-                class="w-16 border-l-4 text-center"
+                class="w-16 border-l-4 text-center transition-all"
                 :class="
                   selectedIndex === index
                     ? 'border-amber-400 text-slate-900'
@@ -349,13 +349,24 @@ const moveDown = async () => {
               >
                 {{ index + 1 }}
               </td>
-              <td class="truncate max-w-[200px] text-slate-700">
+              <td 
+                class="truncate max-w-[200px] text-slate-700 transition-all"
+                :class="selectedIndex === index ? 'border-amber-400' : 'border-transparent'"
+              >
                 {{ group.api_url || "(未填写)" }}
               </td>
-              <td class="truncate max-w-[150px] text-slate-700">
+              <td 
+                class="truncate max-w-[150px] text-slate-700 transition-all"
+                :class="selectedIndex === index ? 'border-amber-400' : 'border-transparent'"
+              >
                 {{ group.model_id || "(未填写)" }}
               </td>
-              <td class="truncate max-w-[200px] text-slate-700">{{ getApiKeyDisplay(group) }}</td>
+              <td 
+                class="truncate max-w-[200px] text-slate-700 transition-all"
+                :class="selectedIndex === index ? 'border-amber-400' : 'border-transparent'"
+              >
+                {{ getApiKeyDisplay(group) }}
+              </td>
             </tr>
           </tbody>
           <tbody v-else>
