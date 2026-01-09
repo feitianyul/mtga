@@ -1,5 +1,5 @@
 <template>
-  <div class="h-screen flex flex-col overflow-hidden bg-slate-50">
+  <div class="h-screen flex flex-col overflow-hidden">
     <header class="w-full px-8 pt-8 shrink-0">
       <div class="mtga-card">
         <div class="mtga-card-body">
