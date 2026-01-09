@@ -35,14 +35,14 @@ onMounted(async () => {
 <template>
   <AppShell>
     <template #left>
-      <div class="flex items-stretch bg-white/50 backdrop-blur-md rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden h-full min-h-0">
+      <div class="flex items-stretch h-full min-h-0">
         <!-- 垂直菜单栏 -->
-        <div class="w-41 border-r border-slate-200/50 flex flex-col p-3 bg-slate-50/30 shrink-0">
+        <div class="w-38 border-r border-slate-200/50 flex flex-col p-3 bg-slate-50/30 shrink-0">
           <ul class="menu p-0 gap-1">
             <li v-for="item in navigation" :key="item.id">
               <a 
                 :class="[
-                  'flex flex-row items-center justify-start gap-2.5 px-3 py-2.5 rounded-2xl transition-all duration-200 group border',
+                  'flex flex-row items-center justify-start gap-2.5 px-3 py-2.5 rounded-xl transition-all duration-200 group border',
                   activeTab === item.id 
                     ? 'bg-amber-50/80 text-amber-600 border-amber-500/50 shadow-sm shadow-amber-500/10' 
                     : 'text-slate-500 border-transparent hover:bg-slate-200/50'
@@ -66,7 +66,7 @@ onMounted(async () => {
             enter-to-class="translate-x-0 opacity-100"
             mode="out-in"
           >
-            <div :key="activeTab" class="flex-1 overflow-y-auto overflow-x-hidden pr-2 custom-scrollbar">
+            <div :key="activeTab" class="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
               <ConfigGroupPanel v-if="activeTab === 'config-group'" />
               <GlobalConfigPanel v-if="activeTab === 'global-config'" />
               <RuntimeOptionsPanel v-if="activeTab === 'runtime-options'" />
@@ -78,7 +78,7 @@ onMounted(async () => {
     </template>
 
     <template #right>
-      <div class="h-full flex flex-col">
+      <div class="h-full flex flex-col p-6">
         <LogPanel :logs="logs" class="flex-1" />
       </div>
     </template>
