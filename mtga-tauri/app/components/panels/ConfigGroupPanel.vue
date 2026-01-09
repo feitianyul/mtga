@@ -400,7 +400,7 @@ const moveDown = async () => {
           <span class="mtga-chip">配置编辑</span>
         </div>
       </div>
-      <div class="mt-2 space-y-3 px-5 pb-5">
+      <div class="mt-2 px-5 pb-5">
         <label class="form-control">
           <div class="label pb-1">
             <span class="label-text text-xs text-slate-500">配置组名称（可选）</span>
@@ -413,6 +413,22 @@ const moveDown = async () => {
           </div>
           <input v-model="form.api_url" class="input input-bordered w-full bg-white/80" />
         </label>
+        <div class="flex items-center gap-3 pt-2">
+          <label class="flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap">
+            <input
+              v-model="middleRouteEnabled"
+              type="checkbox"
+              class="checkbox checkbox-sm"
+            />
+            <span class="label-text text-xs text-slate-500">修改中间路由</span>
+          </label>
+          <input
+            v-model="form.middle_route"
+            class="input input-bordered w-full bg-white/80"
+            :disabled="!middleRouteEnabled"
+            :placeholder="DEFAULT_MIDDLE_ROUTE"
+          />
+        </div>
         <label class="form-control">
           <div class="label pb-1">
             <span class="label-text text-xs text-slate-500">* 实际模型ID</span>
@@ -429,24 +445,8 @@ const moveDown = async () => {
             type="password"
           />
         </label>
-        <div class="flex items-center gap-3">
-          <label class="flex items-center gap-2">
-            <input
-              v-model="middleRouteEnabled"
-              type="checkbox"
-              class="checkbox checkbox-sm"
-            />
-            <span>修改中间路由</span>
-          </label>
-          <input
-            v-model="form.middle_route"
-            class="input input-bordered w-full bg-white/80"
-            :disabled="!middleRouteEnabled"
-            :placeholder="DEFAULT_MIDDLE_ROUTE"
-          />
-        </div>
         <p v-if="formError" class="text-sm text-error">{{ formError }}</p>      
-        <p class="text-xs text-slate-400">* 为必填项</p>
+        <p class="text-xs text-slate-400 pt-4">* 为必填项</p>
       </div>
       <div class="modal-action px-5 pb-5">
         <button class="btn btn-ghost" @click="closeEditor">取消</button>
