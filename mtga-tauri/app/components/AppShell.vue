@@ -26,7 +26,7 @@
       </div>
     </header>
 
-    <main class="mx-auto max-w-[1400px] px-6 py-6">
+    <main class="mx-auto max-w-[1400px] px-6 pt-6 pb-24">
       <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <section class="relative z-10 space-y-6">
           <slot name="left" />
@@ -37,10 +37,12 @@
       </div>
     </main>
 
-    <footer class="mx-auto max-w-[1400px] px-6 pb-8">
-      <div class="mtga-card">
-        <div class="mtga-card-body">
-          <slot name="footer" />
+    <footer class="sticky bottom-0 z-50 mt-auto w-full">
+      <div class="mx-auto max-w-[1400px] px-6 pb-8">
+        <div class="mtga-card shadow-[0_-12px_30px_-10px_rgba(0,0,0,0.05)] backdrop-blur-lg bg-white/80">
+          <div class="mtga-card-body">
+            <slot name="footer" />
+          </div>
         </div>
       </div>
     </footer>
