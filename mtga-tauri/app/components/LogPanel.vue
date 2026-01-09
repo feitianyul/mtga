@@ -31,9 +31,9 @@ watch(
 </script>
 
 <template>
-  <div class="mtga-card">
-    <div class="mtga-card-body">
-      <div class="flex items-center justify-between gap-3">
+  <div class="mtga-card h-full flex flex-col">
+    <div class="mtga-card-body flex-1 flex flex-col">
+      <div class="flex items-center justify-between gap-3 shrink-0">
         <div>
           <h2 class="mtga-card-title">运行日志</h2>
           <p class="mtga-card-subtitle">实时记录后端与操作状态</p>
@@ -45,7 +45,7 @@ watch(
       </div>
       <div
         ref="logBox"
-        class="mt-4 h-80 overflow-auto rounded-xl border border-slate-200/80 bg-[linear-gradient(135deg,rgba(15,23,42,0.04),rgba(14,165,164,0.06))] p-4 text-sm font-mono text-slate-700"
+        class="mt-4 flex-1 overflow-auto rounded-xl border border-slate-200/80 bg-[linear-gradient(135deg,rgba(15,23,42,0.04),rgba(14,165,164,0.06))] p-4 text-sm font-mono text-slate-700"
       >
         <pre class="whitespace-pre-wrap leading-relaxed">{{ formattedLogs }}</pre>
       </div>

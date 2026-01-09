@@ -318,59 +318,57 @@ const moveDown = async () => {
 
       <div class="mt-4 grid gap-4 lg:grid-cols-[1fr,180px]">
         <div 
-          class="rounded-xl border border-slate-200/70 bg-white/80 overflow-hidden" 
+          class="min-w-0 rounded-xl border border-slate-200/70 bg-white/80 overflow-hidden flex flex-col" 
           style="--row-h: 36px; --head-h: 38px;"
         >
-          <table class="table table-sm text-sm border-separate border-spacing-0">
-            <thead class="block bg-slate-50/50">
-              <tr class="table w-full table-fixed" style="height: var(--head-h)">
-                <th class="w-16 text-center">序号</th>
-                <th class="w-[40%]">API URL</th>
-                <th class="w-[30%]">实际模型ID</th>
-                <th>API Key</th>
-              </tr>
-            </thead>
-            <tbody 
-              v-if="configGroups.length" 
-              class="block overflow-y-auto" 
-              style="max-height: calc(var(--row-h) * 4); scrollbar-gutter: stable;"
-            >
-              <tr
-                v-for="(group, index) in configGroups"
-                :key="index"
-                class="table w-full table-fixed cursor-pointer transition-colors"
-                :class="selectedIndex === index ? 'bg-amber-50/80' : 'hover:bg-slate-50'"
-                :style="{ height: 'var(--row-h)' }"
-                :title="group.name || ''"
-                @click="selectedIndex = index"
-              >
-                <td
-                  class="w-16 border-l-4 text-center"
-                  :class="
-                    selectedIndex === index
-                      ? 'border-amber-400 text-slate-900'
-                      : 'border-transparent text-slate-600'
-                  "
+          <div class="overflow-auto custom-scrollbar flex-1 max-h-[182px]">
+            <table class="table table-sm w-full text-sm border-separate border-spacing-0">
+              <thead class="sticky top-0 z-10 bg-slate-50/90 backdrop-blur-sm">
+                <tr style="height: var(--head-h)">
+                  <th class="w-16 text-center border-b border-slate-200/60">序号</th>
+                  <th class="min-w-[140px] border-b border-slate-200/60">API URL</th>
+                  <th class="min-w-[120px] border-b border-slate-200/60">实际模型ID</th>
+                  <th class="min-w-[160px] border-b border-slate-200/60">API Key</th>
+                </tr>
+              </thead>
+              <tbody v-if="configGroups.length">
+                <tr
+                  v-for="(group, index) in configGroups"
+                  :key="index"
+                  class="cursor-pointer transition-colors hover:bg-slate-50"
+                  :class="selectedIndex === index ? 'bg-amber-50/80' : ''"
+                  :style="{ height: 'var(--row-h)' }"
+                  :title="group.name || ''"
+                  @click="selectedIndex = index"
                 >
-                  {{ index + 1 }}
-                </td>
-                <td class="w-[40%] truncate text-slate-700">
-                  {{ group.api_url || "(未填写)" }}
-                </td>
-                <td class="w-[30%] truncate text-slate-700">
-                  {{ group.model_id || "(未填写)" }}
-                </td>
-                <td class="truncate text-slate-700">{{ getApiKeyDisplay(group) }}</td>
-              </tr>
-            </tbody>
-            <tbody v-else class="block">
-              <tr class="table w-full">
-                <td colspan="4" class="py-6 text-center text-sm text-slate-400">
-                  暂无配置组
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                  <td
+                    class="w-16 border-l-4 text-center"
+                    :class="
+                      selectedIndex === index
+                        ? 'border-amber-400 text-slate-900'
+                        : 'border-transparent text-slate-600'
+                    "
+                  >
+                    {{ index + 1 }}
+                  </td>
+                  <td class="truncate max-w-[200px] text-slate-700">
+                    {{ group.api_url || "(未填写)" }}
+                  </td>
+                  <td class="truncate max-w-[150px] text-slate-700">
+                    {{ group.model_id || "(未填写)" }}
+                  </td>
+                  <td class="truncate max-w-[200px] text-slate-700">{{ getApiKeyDisplay(group) }}</td>
+                </tr>
+              </tbody>
+              <tbody v-else>
+                <tr>
+                  <td colspan="4" class="py-6 text-center text-sm text-slate-400">
+                    暂无配置组
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div class="space-y-2">

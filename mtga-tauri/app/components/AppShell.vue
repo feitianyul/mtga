@@ -1,6 +1,6 @@
 <template>
-  <div class="min-h-screen">
-    <header class="mx-auto max-w-[1400px] px-6 pt-8">
+  <div class="h-screen flex flex-col overflow-hidden bg-slate-50">
+    <header class="w-full px-8 pt-8 shrink-0">
       <div class="mtga-card">
         <div class="mtga-card-body">
           <div class="flex flex-wrap items-start justify-between gap-4">
@@ -26,25 +26,33 @@
       </div>
     </header>
 
-    <main class="mx-auto max-w-[1400px] px-6 pt-6 pb-24">
-      <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <section class="relative z-10 space-y-6">
-          <slot name="left" />
+    <main class="w-full px-8 pt-6 pb-8 flex-1 min-h-0">
+      <div class="grid grid-cols-12 gap-6 h-full">
+        <!-- 左侧内容区 -->
+        <section class="relative z-10 flex flex-col col-span-7 h-full min-h-0">
+          <div class="flex-1 min-h-0">
+            <slot name="left" />
+          </div>
+          
+          <!-- 固定在左侧区域底部的操作栏，与上方保持固定间距 -->
+          <div class="pt-6 shrink-0">
+            <div class="mtga-card shadow-[0_-12px_30px_-10px_rgba(0,0,0,0.05)] backdrop-blur-lg bg-white/80">
+              <div class="mtga-card-body py-4">
+                <slot name="footer" />
+              </div>
+            </div>
+          </div>
         </section>
-        <section class="relative z-0 space-y-6 xl:sticky xl:top-6">
-          <slot name="right" />
+
+        <!-- 右侧固定日志区 -->
+        <section class="relative z-0 col-span-5 h-full min-h-0">
+          <div class="h-full">
+            <slot name="right" />
+          </div>
         </section>
       </div>
     </main>
 
-    <footer class="sticky bottom-0 z-50 mt-auto w-full">
-      <div class="mx-auto max-w-[1400px] px-6 pb-8">
-        <div class="mtga-card shadow-[0_-12px_30px_-10px_rgba(0,0,0,0.05)] backdrop-blur-lg bg-white/80">
-          <div class="mtga-card-body">
-            <slot name="footer" />
-          </div>
-        </div>
-      </div>
-    </footer>
+    <!-- 移除原有的全局 footer -->
   </div>
 </template>
