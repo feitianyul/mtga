@@ -42,7 +42,7 @@ onMounted(async () => {
             <li v-for="item in navigation" :key="item.id">
               <a 
                 :class="[
-                  'flex flex-row items-center justify-start gap-3 px-4 py-3 rounded-2xl transition-all duration-200 group border',
+                  'flex flex-row items-center justify-start gap-2.5 px-3 py-2.5 rounded-2xl transition-all duration-200 group border',
                   activeTab === item.id 
                     ? 'bg-amber-50/80 text-amber-600 border-amber-500/50 shadow-sm shadow-amber-500/10' 
                     : 'text-slate-500 border-transparent hover:bg-slate-200/50'

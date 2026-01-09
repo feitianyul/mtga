@@ -17,47 +17,43 @@ const selectTab = (key: TabKey) => {
 </script>
 
 <template>
-  <div class="mtga-card">
-    <div class="mtga-card-body">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 class="mtga-card-title">功能操作</h2>
-          <p class="mtga-card-subtitle">证书 / hosts / 代理 / 数据 / 关于</p>
-        </div>
-        <span class="mtga-chip">工具集</span>
-      </div>
-      <div role="tablist" class="mt-4 flex flex-wrap gap-3 border-b border-slate-200/70 pb-2">
-        <button
-          v-for="tab in tabs"
-          :key="tab.key"
-          role="tab"
-          type="button"
-          class="cursor-pointer px-3 py-2 text-sm font-medium text-slate-500 transition-colors duration-150"
-          :class="activeTab === tab.key ? 'border-b-2 border-amber-500 text-slate-900' : 'border-b-2 border-transparent hover:text-slate-800'"
-          :aria-selected="activeTab === tab.key"
-          @click="selectTab(tab.key)"
-        >
-          {{ tab.label }}
-        </button>
-      </div>
-
-      <div class="mt-4 space-y-4">
-        <section v-show="activeTab === 'cert'">
-          <CertTab />
-        </section>
-        <section v-show="activeTab === 'hosts'">
-          <HostsTab />
-        </section>
-        <section v-show="activeTab === 'proxy'">
-          <ProxyTab />
-        </section>
-        <section v-show="activeTab === 'data'">
-          <DataManagementTab />
-        </section>
-        <section v-show="activeTab === 'about'">
-          <AboutTab />
-        </section>
-      </div>
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h2 class="mtga-card-title">功能操作</h2>
+      <p class="mtga-card-subtitle">证书 / hosts / 代理 / 数据 / 关于</p>
     </div>
+    <span class="mtga-chip">工具集</span>
+  </div>
+  <div role="tablist" class="mt-4 flex flex-wrap gap-3 border-b border-slate-200/70 pb-2">
+    <button
+      v-for="tab in tabs"
+      :key="tab.key"
+      role="tab"
+      type="button"
+      class="cursor-pointer px-3 py-2 text-sm font-medium text-slate-500 transition-colors duration-150"
+      :class="activeTab === tab.key ? 'border-b-2 border-amber-500 text-slate-900' : 'border-b-2 border-transparent hover:text-slate-800'"
+      :aria-selected="activeTab === tab.key"
+      @click="selectTab(tab.key)"
+    >
+      {{ tab.label }}
+    </button>
+  </div>
+
+  <div class="mt-4 space-y-4">
+    <section v-show="activeTab === 'cert'">
+      <CertTab />
+    </section>
+    <section v-show="activeTab === 'hosts'">
+      <HostsTab />
+    </section>
+    <section v-show="activeTab === 'proxy'">
+      <ProxyTab />
+    </section>
+    <section v-show="activeTab === 'data'">
+      <DataManagementTab />
+    </section>
+    <section v-show="activeTab === 'about'">
+      <AboutTab />
+    </section>
   </div>
 </template>

@@ -46,64 +46,60 @@ const handleSave = async () => {
 </script>
 
 <template>
-  <div class="mtga-card">
-    <div class="mtga-card-body">
-      <div class="flex items-center justify-between gap-3">
-        <div>
-          <h2 class="mtga-card-title">全局配置</h2>
-          <p class="mtga-card-subtitle">管理映射模型与鉴权信息</p>
+  <div class="flex items-center justify-between gap-3">
+    <div>
+      <h2 class="mtga-card-title">全局配置</h2>
+      <p class="mtga-card-subtitle">管理映射模型与鉴权信息</p>
+    </div>
+    <span class="mtga-chip">全局参数</span>
+  </div>
+  <div class="mt-4 space-y-4">
+    <div class="mtga-soft-panel space-y-3">
+      <label class="form-control">
+        <div class="label pb-1">
+          <span class="label-text text-xs text-slate-500">映射模型ID</span> 
         </div>
-        <span class="mtga-chip">全局参数</span>
-      </div>
-      <div class="mt-4 space-y-4">
-        <div class="mtga-soft-panel space-y-3">
-          <label class="form-control">
-            <div class="label pb-1">
-              <span class="label-text text-xs text-slate-500">映射模型ID</span> 
-            </div>
-            <div
-              class="tooltip mtga-tooltip w-full"
-              :data-tip="mappedModelTooltip"
-              style="--mtga-tooltip-max: 360px;"
-            >
-              <input
-                v-model="mappedModelId"
-                class="input input-bordered w-full bg-white/80"
-                placeholder="例如：gpt-5"
-              />
-            </div>
-          </label>
+        <div
+          class="tooltip mtga-tooltip w-full"
+          :data-tip="mappedModelTooltip"
+          style="--mtga-tooltip-max: 360px;"
+        >
+          <input
+            v-model="mappedModelId"
+            class="input input-bordered w-full bg-white/80"
+            placeholder="例如：gpt-5"
+          />
+        </div>
+      </label>
 
-          <label class="form-control">
-            <div class="label pb-1">
-              <span class="label-text text-xs text-slate-500">MTGA鉴权Key</span>
-            </div>
-            <div
-              class="tooltip mtga-tooltip w-full"
-              :data-tip="mtgaAuthTooltip"
-              style="--mtga-tooltip-max: 360px;"
-            >
-              <input
-                v-model="mtgaAuthKey"
-                class="input input-bordered w-full bg-white/80"
-                placeholder="例如：111"
-                type="password"
-              />
-            </div>
-          </label>
+      <label class="form-control">
+        <div class="label pb-1">
+          <span class="label-text text-xs text-slate-500">MTGA鉴权Key</span>
         </div>
+        <div
+          class="tooltip mtga-tooltip w-full"
+          :data-tip="mtgaAuthTooltip"
+          style="--mtga-tooltip-max: 360px;"
+        >
+          <input
+            v-model="mtgaAuthKey"
+            class="input input-bordered w-full bg-white/80"
+            placeholder="例如：111"
+            type="password"
+          />
+        </div>
+      </label>
+    </div>
 
-        <div class="flex items-center justify-between gap-3">
-          <span class="text-xs text-slate-500">保存后会同步所有配置组</span>
-          <button
-            class="btn btn-primary btn-sm px-4 rounded-xl"
-            :disabled="saving"
-            @click="handleSave"
-          >
-            保存全局配置
-          </button>
-        </div>
-      </div>
+    <div class="flex items-center justify-between gap-3">
+      <span class="text-xs text-slate-500">保存后会同步所有配置组</span>
+      <button
+        class="btn btn-primary btn-sm px-4 rounded-xl"
+        :disabled="saving"
+        @click="handleSave"
+      >
+        保存全局配置
+      </button>
     </div>
   </div>
 </template>
