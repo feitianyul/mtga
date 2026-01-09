@@ -25,6 +25,17 @@ const form = reactive({
   middle_route: "",
 })
 
+const testTooltip = [
+  "测试选中配置组的实际对话功能",
+  "会发送最小请求并消耗少量tokens",
+  "请确保配置正确后使用",
+].join("\n")
+
+const refreshTooltip = [
+  "重新加载配置文件中的配置组",
+  "用于同步外部修改或恢复意外更改",
+].join("\n")
+
 const selectedIndex = computed({
   get: () => (configGroups.value.length ? currentIndex.value : -1),
   set: (value) => {
@@ -286,8 +297,22 @@ const moveDown = async () => {
           <p class="mtga-card-subtitle">管理模型路由与鉴权组合</p>
         </div>
         <div class="flex items-center gap-2">
-          <button class="btn btn-xs btn-outline" @click="requestTest">测活</button>
-          <button class="btn btn-xs btn-outline" @click="refreshList">刷新</button>
+          <button
+            class="btn btn-xs btn-outline tooltip mtga-tooltip"
+            :data-tip="testTooltip"
+            style="--mtga-tooltip-max: 250px;"
+            @click="requestTest"
+          >
+            测活
+          </button>
+          <button
+            class="btn btn-xs btn-outline tooltip mtga-tooltip"
+            :data-tip="refreshTooltip"
+            style="--mtga-tooltip-max: 250px;"
+            @click="refreshList"
+          >
+            刷新
+          </button>
         </div>
       </div>
 

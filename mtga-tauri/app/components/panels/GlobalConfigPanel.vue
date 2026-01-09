@@ -14,6 +14,21 @@ const mtgaAuthKey = computed({
   },
 })
 
+const mappedModelTooltip = [
+  "必填：映射模型ID",
+  "对应 Trae 端填写的模型名，自定义，",
+  "与实际模型ID是互相独立的概念。",
+  "示例：gpt-5",
+].join("\n")
+
+const mtgaAuthTooltip = [
+  "必填：MTGA鉴权Key",
+  "对应 Trae 端填写的 API 密钥，自定义，",
+  "与实际 API Key 是互相独立的概念。",
+  "作为 MTGA 代理服务的全局密钥。",
+  "示例：111",
+].join("\n")
+
 const handleSave = async () => {
   if (!store.mappedModelId.value || !store.mtgaAuthKey.value) {
     store.appendLog("错误: 映射模型ID和MTGA鉴权Key都是必填项")
@@ -44,25 +59,37 @@ const handleSave = async () => {
         <div class="mtga-soft-panel space-y-3">
           <label class="form-control">
             <div class="label pb-1">
-              <span class="label-text text-xs text-slate-500">映射模型ID</span>
+              <span class="label-text text-xs text-slate-500">映射模型ID</span> 
             </div>
-            <input
-              v-model="mappedModelId"
-              class="input input-bordered w-full bg-white/80"
-              placeholder="例如：gpt-5"
-            />
+            <div
+              class="tooltip mtga-tooltip w-full"
+              :data-tip="mappedModelTooltip"
+              style="--mtga-tooltip-max: 360px;"
+            >
+              <input
+                v-model="mappedModelId"
+                class="input input-bordered w-full bg-white/80"
+                placeholder="例如：gpt-5"
+              />
+            </div>
           </label>
 
           <label class="form-control">
             <div class="label pb-1">
               <span class="label-text text-xs text-slate-500">MTGA鉴权Key</span>
             </div>
-            <input
-              v-model="mtgaAuthKey"
-              class="input input-bordered w-full bg-white/80"
-              placeholder="例如：111"
-              type="password"
-            />
+            <div
+              class="tooltip mtga-tooltip w-full"
+              :data-tip="mtgaAuthTooltip"
+              style="--mtga-tooltip-max: 360px;"
+            >
+              <input
+                v-model="mtgaAuthKey"
+                class="input input-bordered w-full bg-white/80"
+                placeholder="例如：111"
+                type="password"
+              />
+            </div>
           </label>
         </div>
 

@@ -53,4 +53,24 @@
   .mtga-soft-panel {
     @apply rounded-xl border border-slate-200/80 bg-slate-50/80 p-3;
   }
+
+  .mtga-tooltip {
+    position: relative;
+    z-index: 30;
+  }
+
+  .mtga-tooltip::before,
+  .mtga-tooltip::after {
+    z-index: 40;
+  }
+
+  /* 强制所有 mtga-tooltip 支持换行 */
+  .mtga-tooltip::before {
+    display: inline-block !important;
+    white-space: pre-line !important;
+    text-align: left !important;
+    max-width: var(--mtga-tooltip-max, 280px) !important;
+    word-break: break-all;
+    content: attr(data-tip) !important;
+  }
 }

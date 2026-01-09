@@ -28,10 +28,10 @@
 
     <main class="mx-auto max-w-[1400px] px-6 py-6">
       <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <section class="space-y-6">
+        <section class="relative z-10 space-y-6">
           <slot name="left" />
         </section>
-        <section class="space-y-6 xl:sticky xl:top-6">
+        <section class="relative z-0 space-y-6 xl:sticky xl:top-6">
           <slot name="right" />
         </section>
       </div>

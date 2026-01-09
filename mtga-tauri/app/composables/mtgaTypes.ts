@@ -21,6 +21,8 @@ export type AppInfo = {
   github_repo: string
   ca_common_name: string
   api_key_visible_chars: number
+  user_data_dir?: string
+  default_user_data_dir?: string
 }
 
 export type InvokeResult = {

@@ -1,6 +1,14 @@
 <script setup lang="ts">
 const store = useMtgaStore()
 const options = store.runtimeOptions
+
+const debugModeTooltip = [
+  "开启后：",
+  "1) 代理服务器输出更详细的调试日志，便于排查问题；",
+  "2) 启动代理服务器前会额外检查系统/环境变量的显式代理配置",
+  "并提示其可能绕过 hosts 导流。",
+  "（默认不做第 2 项检查，仅在调试模式下启用）",
+].join("\n")
 </script>
 
 <template>
@@ -15,7 +23,11 @@ const options = store.runtimeOptions
       </div>
       <div class="mt-4 space-y-3">
         <div class="mtga-soft-panel space-y-3">
-          <label class="flex items-center gap-3 text-sm text-slate-700">
+          <label
+            class="flex items-center gap-3 text-sm text-slate-700 tooltip mtga-tooltip"
+            :data-tip="debugModeTooltip"
+            style="--mtga-tooltip-max: 500px;"
+          >
             <input v-model="options.debugMode" type="checkbox" class="checkbox checkbox-sm" />
             <span>开启调试模式</span>
           </label>

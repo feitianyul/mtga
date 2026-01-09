@@ -14,6 +14,8 @@ const DEFAULT_APP_INFO: AppInfo = {
   github_repo: "",
   ca_common_name: "MTGA_CA",
   api_key_visible_chars: 4,
+  user_data_dir: "",
+  default_user_data_dir: "",
 }
 
 const DEFAULT_RUNTIME_OPTIONS: RuntimeOptions = {

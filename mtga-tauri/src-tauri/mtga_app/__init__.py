@@ -269,12 +269,20 @@ async def save_config(body: SaveConfigPayload) -> bool:
 async def get_app_info() -> dict[str, Any]:
     metadata = DEFAULT_METADATA
     version = resolve_app_version(project_root=REPO_ROOT)
+    resource_manager = _get_resource_manager()
+    default_user_data_dir = user_data_dir(
+        "MTGA",
+        appauthor=False,
+        roaming=os.name == "nt",
+    )
     return {
         "display_name": metadata.display_name,
         "version": version,
         "github_repo": metadata.github_repo,
         "ca_common_name": metadata.ca_common_name,
         "api_key_visible_chars": metadata.api_key_visible_chars,
+        "user_data_dir": resource_manager.user_data_dir,
+        "default_user_data_dir": default_user_data_dir,
     }
 
 
