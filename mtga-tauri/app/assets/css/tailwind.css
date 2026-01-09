@@ -23,6 +23,36 @@
     --color-primary-content: #1e293b;
   }
 
+  /* 自定义全局滚动条样式 */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--mtga-border); /* 使用定义的边框颜色作为默认色 */
+    border-radius: 10px;
+    border: 1px solid transparent; /* 增加一点内边距效果 */
+    background-clip: padding-box;
+    transition: background 0.2s ease;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--mtga-accent); /* 悬停时使用品牌色 */
+    border: 1px solid transparent;
+    background-clip: padding-box;
+  }
+
+  /* 针对 Firefox 的兼容性 */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--mtga-border) transparent;
+  }
+
   body {
     background-color: var(--mtga-bg);
     background-image:
