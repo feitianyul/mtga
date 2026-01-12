@@ -37,6 +37,7 @@
   - `./.venv/bin/python -m pyright` 或 `.\.venv\Scripts\python -m pyright`
   - etc.
 - 任何 Rust 变更：必须运行 `cargo fmt` 与 `cargo check -p app`。
+- 任何 JS/TS/Vue 变更：必须运行 `pnpm lint` 与 `pnpm typecheck`。
 
 ## 提交与 PR 指南
 - 提交信息采用 Conventional Commits：`feat: ...`、`feat(tauri): ...`、`chore: ...`。

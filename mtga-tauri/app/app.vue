@@ -38,9 +38,11 @@ let lastAnchorTarget: HTMLElement | null = null
  * 监听全局鼠标悬停，捕获 mtga-tooltip 元素
  */
 const handleGlobalMouseOver = (e: MouseEvent) => {
-  const target = (e.target as HTMLElement).closest('.mtga-tooltip') as HTMLElement
+  const eventTarget = e.target
+  const target =
+    eventTarget instanceof HTMLElement ? eventTarget.closest('.mtga-tooltip') : null
   
-  if (target) {
+  if (target instanceof HTMLElement) {
     // 如果目标换了，先清理旧目标的锚点
     if (lastAnchorTarget && lastAnchorTarget !== target) {
       lastAnchorTarget.style.removeProperty('anchor-name')

@@ -25,6 +25,9 @@ const DEFAULT_RUNTIME_OPTIONS: RuntimeOptions = {
   streamMode: "true",
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+
 const coerceText = (value: unknown) => {
   if (typeof value === "string") {
     return value
@@ -32,9 +35,8 @@ const coerceText = (value: unknown) => {
   if (typeof value === "number") {
     return String(value)
   }
-  if (value && typeof value === "object") {
-    const record = value as Record<string, unknown>
-    const candidates = [record["id"], record["value"], record["model_id"]]
+  if (isRecord(value)) {
+    const candidates = [value["id"], value["value"], value["model_id"]]
     for (const candidate of candidates) {
       if (typeof candidate === "string") {
         return candidate
@@ -231,8 +233,8 @@ export const useMtgaStore = () => {
       appendLog("启动日志加载失败：无法连接后端")
       return false
     }
-    if (result.details && typeof result.details === "object") {
-      buildStartupLogs(result.details as Record<string, unknown>)
+    if (isRecord(result.details)) {
+      buildStartupLogs(result.details)
     }
     return result.ok
   }
@@ -328,14 +330,12 @@ export const useMtgaStore = () => {
   const runCheckUpdates = async () => {
     const result = await api.checkUpdates()
     const ok = applyInvokeResult(result, "检查更新")
-    if (!result || !result.details || typeof result.details !== "object") {
+    if (!result || !isRecord(result.details)) {
       return ok
     }
-    const details = result.details as Record<string, unknown>
-    const updateResult =
-      typeof details["update_result"] === "object" && details["update_result"]
-        ? (details["update_result"] as Record<string, unknown>)
-        : details
+    const updateResult = isRecord(result.details["update_result"])
+      ? result.details["update_result"]
+      : result.details
     const status = coerceText(updateResult["status"])
     if (status === "new_version") {
       updateVersionLabel.value = coerceText(updateResult["latest_version"])

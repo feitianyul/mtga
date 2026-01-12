@@ -2,6 +2,30 @@ import withNuxt from "./.nuxt/eslint.config.mjs"
 import betterTailwind from "eslint-plugin-better-tailwindcss"
 
 export default withNuxt(
+  {
+    ignores: [
+      "node_modules",
+      ".nuxt",
+      ".output",
+      "dist",
+      "src-tauri/.venv",
+      "src-tauri/pyembed",
+      "src-tauri/target",
+    ],
+  },
+  {
+    files: ["**/*.{ts,tsx,vue}"],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: process.cwd(),
+      },
+    },
+    rules: {
+      "@typescript-eslint/no-unsafe-type-assertion": "warn",
+      "@typescript-eslint/no-unnecessary-type-assertion": "warn",
+    },
+  },
   // 添加 Better Tailwind CSS 支持
   {
     plugins: {

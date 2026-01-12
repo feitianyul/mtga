@@ -90,9 +90,12 @@ const openExternalUrl = async (href: string) => {
 }
 
 const handleNotesClick = async (event: MouseEvent) => {
-  const target = event.target as HTMLElement | null
-  const anchor = target?.closest("a") as HTMLAnchorElement | null
-  if (!anchor) {
+  const eventTarget = event.target
+  if (!(eventTarget instanceof HTMLElement)) {
+    return
+  }
+  const anchor = eventTarget.closest("a")
+  if (!(anchor instanceof HTMLAnchorElement)) {
     return
   }
   const href = anchor.getAttribute("href") ?? ""
