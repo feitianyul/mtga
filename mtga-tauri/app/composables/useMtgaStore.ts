@@ -1,4 +1,5 @@
 import { useMtgaApi } from "./useMtgaApi"
+import { isTauriRuntime } from "./runtime"
 import type { AppInfo, ConfigGroup, ConfigPayload, InvokeResult } from "./mtgaTypes"
 
 type RuntimeOptions = {
@@ -368,9 +369,7 @@ export const useMtgaStore = () => {
     if (!url || typeof window === "undefined") {
       return
     }
-    const isTauri =
-      typeof navigator !== "undefined" && /tauri/i.test(navigator.userAgent)
-    if (isTauri) {
+    if (isTauriRuntime()) {
       try {
         const { open } = await import("@tauri-apps/plugin-shell")
         await open(url)

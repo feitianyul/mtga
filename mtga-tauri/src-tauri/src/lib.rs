@@ -159,6 +159,22 @@ fn spawn_shutdown(app_handle: tauri::AppHandle) {
     });
 }
 
+fn resolve_runtime_tag() -> String {
+    std::env::var("MTGA_RUNTIME")
+        .unwrap_or_else(|_| "dev".to_string())
+        .trim()
+        .to_lowercase()
+}
+
+fn inject_runtime_tag(window: &tauri::WebviewWindow) {
+    let runtime = resolve_runtime_tag();
+    let payload = serde_json::to_string(&runtime).unwrap_or_else(|_| "\"dev\"".to_string());
+    let script = format!("window.__MTGA_RUNTIME__ = {payload};");
+    if let Err(error) = window.eval(&script) {
+        log::warn!("failed to inject MTGA runtime tag: {error}");
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     if !cfg!(debug_assertions) && std::env::var("MTGA_RUNTIME").is_err() {
@@ -182,6 +198,9 @@ pub fn run() {
                         .level(log::LevelFilter::Info)
                         .build(),
                 )?;
+            }
+            if let Some(window) = app.get_webview_window("main") {
+                inject_runtime_tag(&window);
             }
             Ok(())
         })
