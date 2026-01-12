@@ -14,6 +14,7 @@ from modules.hosts.hosts_state import (
     is_hosts_modify_blocked,
 )
 from modules.network.network_environment import check_network_environment
+from modules.platform.system import is_windows
 
 
 @dataclass(frozen=True)
@@ -24,6 +25,8 @@ class StartupReport:
 
 def run_hosts_preflight():
     """程序启动时预检 hosts 文件，必要时启用受限 hosts 模式。"""
+    if not is_windows():
+        return None
     logger = logging.getLogger("mtga_gui")
 
     def warn(message: str) -> None:
