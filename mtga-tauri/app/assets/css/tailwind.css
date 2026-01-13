@@ -56,16 +56,19 @@
   body {
     background-color: var(--mtga-bg);
     background-image:
-      radial-gradient(circle at 15% 20%, rgba(240, 187, 50, 0.1), transparent 40%),
-      radial-gradient(circle at 85% 0%, rgba(217, 163, 7, 0.08), transparent 38%),
-      linear-gradient(120deg, #f8fafc 0%, #fffbeb 55%, #f1f5f9 100%);
+      /* 左上角：琥珀金光晕，增强温暖感 */
+      radial-gradient(circle at 15% 15%, rgba(251, 191, 36, 0.15), transparent 50%),
+      /* 右下角：极淡的夕阳粉，增加层次感 */
+      radial-gradient(circle at 85% 85%, rgba(251, 113, 133, 0.05), transparent 40%),
+      /* 基础线性渐变：以 #fffbeb 为核心的暖色调过渡 */
+      linear-gradient(135deg, #fffbeb 0%, #fff9e6 45%, #fff2e0 100%);
     color: var(--mtga-text);
   }
 }
 
 @layer components {
   .mtga-card {
-    @apply rounded-2xl border border-slate-200/70 bg-white/85 shadow-[0_18px_45px_-32px_rgba(15,23,42,0.4)];
+    @apply rounded-2xl border border-slate-200/70 bg-white/40 backdrop-blur-sm shadow-[0_18px_45px_-32px_rgba(15,23,42,0.2)];
   }
 
   .mtga-card-body {
@@ -81,7 +84,7 @@
   }
 
   .mtga-chip {
-    @apply inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/90 px-3 py-1 text-xs text-slate-600 shadow-sm;
+    @apply inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/30 px-3 py-1 text-xs text-slate-600 shadow-sm;
   }
 
   .mtga-soft-panel {

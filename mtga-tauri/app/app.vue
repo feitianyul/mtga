@@ -101,15 +101,15 @@ onMounted(async () => {
     <template #left>
       <div class="flex items-stretch h-full min-h-0">
         <!-- 垂直菜单栏 -->
-        <div class="w-38 border-r border-slate-200/50 flex flex-col p-3 bg-slate-50/30 shrink-0">
+        <div class="w-38 border-r border-slate-200/50 flex flex-col p-3 shrink-0">
           <ul class="menu p-0 gap-1">
             <li v-for="item in navigation" :key="item.id">
               <a 
                 :class="[
                   'flex flex-row items-center justify-start gap-2.5 px-3 py-2.5 rounded-xl transition-all duration-200 group border',
                   activeTab === item.id 
-                    ? 'bg-amber-50/80 text-amber-600 border-amber-500/50 shadow-sm shadow-amber-500/10' 
-                    : 'text-slate-500 border-transparent hover:bg-slate-200/50'
+                    ? 'bg-amber-500/15 text-amber-600 border-amber-500/40 shadow-sm shadow-amber-500/10' 
+                    : 'text-slate-500 border-transparent hover:bg-slate-200/40'
                 ]"
                 @click="activeTab = item.id"
               >

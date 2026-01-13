@@ -1,7 +1,7 @@
 <template>
   <div class="h-screen flex flex-col overflow-hidden">
     <!-- 统一的毛玻璃容器，现在充满整个窗口 -->
-    <div class="flex-1 flex flex-col bg-white/50 backdrop-blur-md overflow-hidden">
+    <div class="flex-1 flex flex-col bg-white/20 backdrop-blur-md overflow-hidden">
       <!-- 顶部标题区域 -->
       <header class="w-full px-8 py-6 shrink-0 border-b border-slate-200/60">
         <div class="flex flex-wrap items-start justify-between gap-4">
@@ -36,7 +36,7 @@
       </main>
 
       <!-- 底部操作区域 -->
-      <footer class="p-5 shrink-0 border-t border-slate-200/60 bg-white/30">
+      <footer class="p-5 shrink-0 border-t border-slate-200/60">
         <slot name="footer" />
       </footer>
     </div>
