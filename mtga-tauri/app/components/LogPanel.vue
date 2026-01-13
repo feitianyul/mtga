@@ -43,7 +43,7 @@ watch(
   </div>
   <div
     ref="logBox"
-    class="mt-4 flex-1 overflow-auto rounded-xl border border-slate-200/80 bg-[linear-gradient(135deg,rgba(15,23,42,0.04),rgba(14,165,164,0.06))] p-4 text-sm font-mono text-slate-700"
+    class="mt-4 flex-1 overflow-auto rounded-xl border border-slate-200/50 bg-slate-500/10 backdrop-blur-md p-4 text-sm font-mono text-slate-700"
   >
     <pre class="whitespace-pre-wrap leading-relaxed">{{ formattedLogs }}</pre>
   </div>
