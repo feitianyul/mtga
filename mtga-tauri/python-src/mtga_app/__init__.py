@@ -106,11 +106,11 @@ _load_env_file(ENV_FILE)
 
 # 模块来源控制（显眼开关）
 # - MTGA_MODULES_SOURCE=auto|local|root
-#   auto(默认): 优先 src-tauri/modules，找不到再回退仓库根
-#   local: 强制使用 src-tauri/modules
+#   auto(默认): 优先 python-src/modules，找不到再回退仓库根
+#   local: 强制使用 python-src/modules
 #   root: 强制使用仓库根 modules
 # - MTGA_PATH_STRICT=1
-#   仅在 local/auto 时生效：要求 src-tauri/modules 必须存在，否则直接报错
+#   仅在 local/auto 时生效：要求 python-src/modules 必须存在，否则直接报错
 MODULES_SOURCE = os.environ.get("MTGA_MODULES_SOURCE", "").strip().lower()
 if not MODULES_SOURCE:
     raise RuntimeError("MTGA_MODULES_SOURCE 未设置（请在 .env 中配置）")
@@ -126,9 +126,9 @@ LOCAL_MODULES = LOCAL_ROOT / "modules"
 
 
 def _resolve_modules_root() -> Path:
-    if MODULES_SOURCE in {"local", "src-tauri", "tauri"}:
+    if MODULES_SOURCE in {"local", "python-src"}:
         if not LOCAL_MODULES.exists():
-            raise RuntimeError("MTGA_MODULES_SOURCE=local 但未找到 src-tauri/modules")
+            raise RuntimeError("MTGA_MODULES_SOURCE=local 但未找到 python-src/modules")
         return LOCAL_ROOT
 
     if MODULES_SOURCE in {"root", "repo", "repo-root"}:
@@ -138,7 +138,7 @@ def _resolve_modules_root() -> Path:
         return LOCAL_ROOT
 
     if STRICT_MODE:
-        raise RuntimeError("MTGA_PATH_STRICT=1 但未找到 src-tauri/modules")
+        raise RuntimeError("MTGA_PATH_STRICT=1 但未找到 python-src/modules")
     return find_repo_root(Path(__file__).resolve())
 
 
