@@ -170,8 +170,6 @@ const handleOpenRelease = () => {
         </div>
       </div>
     </div>
-    <form method="dialog" class="modal-backdrop bg-slate-900/20 backdrop-blur-[2px]" @click="handleClose">
-      <button>close</button>
-    </form>
+    <div class="modal-backdrop bg-slate-900/20 backdrop-blur-[2px]"></div>
   </dialog>
 </template>
