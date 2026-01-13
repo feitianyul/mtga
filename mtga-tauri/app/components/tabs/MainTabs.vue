@@ -1,12 +1,11 @@
 <script setup lang="ts">
 
-type TabKey = "cert" | "hosts" | "proxy" | "data" | "about";
+type TabKey = "cert" | "hosts" | "proxy" | "data";
 const tabs: { key: TabKey; label: string }[] = [
   { key: "cert", label: "证书管理" },
   { key: "hosts", label: "hosts文件管理" },
   { key: "proxy", label: "代理服务器操作" },
   { key: "data", label: "用户数据管理" },
-  { key: "about", label: "关于" },
 ];
 
 const activeTab = ref<TabKey>("cert");
@@ -20,7 +19,7 @@ const selectTab = (key: TabKey) => {
   <div class="flex flex-wrap items-center justify-between gap-3">
     <div>
       <h2 class="mtga-card-title">功能操作</h2>
-      <p class="mtga-card-subtitle">证书 / hosts / 代理 / 数据 / 关于</p>
+      <p class="mtga-card-subtitle">证书 / hosts / 代理 / 数据</p>
     </div>
     <span class="mtga-chip">工具集</span>
   </div>
@@ -51,9 +50,6 @@ const selectTab = (key: TabKey) => {
     </section>
     <section v-show="activeTab === 'data'">
       <DataManagementTab />
-    </section>
-    <section v-show="activeTab === 'about'">
-      <AboutTab />
     </section>
   </div>
 </template>
