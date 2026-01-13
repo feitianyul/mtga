@@ -300,9 +300,15 @@ def main() -> int:
 
     with start_blocking_portal("asyncio") as portal:
         context_factory_any = cast(Any, context_factory)
+        src_tauri_dir = os.environ.get("MTGA_SRC_TAURI_DIR")
+        src_tauri_path = (
+            Path(src_tauri_dir).expanduser().resolve()
+            if src_tauri_dir
+            else Path(__file__).resolve().parent.parent
+        )
         context = context_factory_any(
             # ✅ v2：context 根通常用 src-tauri 目录
-            Path(__file__).resolve().parent.parent,
+            src_tauri_path,
             tauri_config=tauri_config,
         )
         app = builder_factory().build(
