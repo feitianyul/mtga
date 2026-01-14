@@ -62,16 +62,14 @@ exclude = [
     ".uv_cache",
     "**/node_modules",
     "**/__pycache__",
+    "mtga-tauri",
     # 👇 necessary, because when `tauri-cli bundles python,
-    # it will copy `pyembed` to the target directory (i.e., rust output dir).
+    # it will copy `pyembed` to the target directory (i.e., rust output dir).   
     "**/target",
     # 👆
     "**/dist",
     "**/.venv",
     "**/.*",
-    "mtga-tauri/src-tauri/pyembed/",
-    "mtga-tauri/src-tauri/app/",
-    "mtga-tauri/src-tauri/build/",
 ]
 
 [tool.ruff]

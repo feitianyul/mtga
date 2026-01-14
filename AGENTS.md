@@ -6,9 +6,12 @@
 - 文档位于 `docs/`；打包资源在 `mac/`、`helper-tool/`、`icons/`，诊断脚本（`test_*.py`、`debug_test.py`）放在仓库根目录。
 
 ## 构建、测试与开发命令
-- linux 中使用 `uv run` 调用依赖；macOS/Windows 中不要使用uv，而是 `./.venv/bin/python -m` 或 `.\.venv\Scripts\python -m`。
-  - 在任何 `uv` 命令前先设置 `UV_CACHE_DIR="$PWD/.uv_cache"`，然后执行原命令，确保缓存路径可控。
-  - 在交付任何代码修改前必须运行 `pyright/ruff check .`；交付 yaml 文件前必须运行 `yamllint <filename>`；并确认无报错后才能交付。
+- 任何 Python 变更：必须运行 `pyright` 与 `ruff check .`。
+- 修改 YAML：必须运行 `yamllint <filename>`。
+- Linux：先设置 `UV_CACHE_DIR="$PWD/.uv_cache"`，再用 `uv run` 调用。
+- macOS/Windows：不要用 `uv`，改用虚拟环境：
+  - `./.venv/bin/python -m pyright` 或 `.\.venv\Scripts\python -m pyright`
+  - etc.
 - `uv sync --project .` 安装运行时依赖；在调用 Nuitka 打包脚本前附加 `--group win-build` 或 `--group mac-build`。
 - `python mtga_gui.py --debug` 以详细日志启动 GUI；`./run_mtga_gui.sh`（macOS）与 `run_mtga_gui.bat`（Windows）封装了依赖同步与提权步骤。
 - `./build_mac_app.sh` 生成位于 `dist-onefile/` 的 `.app` 包；`build_onefile.bat` 生成 Windows 可分发包。

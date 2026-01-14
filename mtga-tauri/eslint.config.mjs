@@ -8,9 +8,8 @@ export default withNuxt(
       ".nuxt",
       ".output",
       "dist",
-      "src-tauri/.venv",
-      "src-tauri/pyembed",
-      "src-tauri/target",
+      "src-tauri",
+      "python-src",
     ],
   },
   {
