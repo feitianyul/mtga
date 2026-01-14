@@ -22,8 +22,9 @@ include-package-data = false
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["mtga_app", "mtga_app.*", "modules", "modules.*"]
-exclude = ["build", "build.*", "target", "target.*", "pyembed", "pyembed.*"]
+include = ["mtga_app*", "modules*"]
+exclude = ["build*", "target*", "pyembed*"]
+namespaces = false
 
 [tool.setuptools.package-data]
 modules = ["resources/ca/**", "resources/openssl/**"]
