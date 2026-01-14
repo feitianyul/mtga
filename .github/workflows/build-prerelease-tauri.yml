@@ -466,7 +466,8 @@ jobs:
 
           FEAT_TEMP=$(mktemp)
           FIX_TEMP=$(mktemp)
-          trap 'rm -f "$FEAT_TEMP" "$FIX_TEMP"' EXIT
+          STYLE_TEMP=$(mktemp)
+          trap 'rm -f "$FEAT_TEMP" "$FIX_TEMP" "$STYLE_TEMP"' EXIT
 
           append_release_entry() {
             local subject="$1"
@@ -478,6 +479,8 @@ jobs:
               echo "- $subject ($hash)" >> "$FEAT_TEMP"
             elif echo "$subject" | grep -Eq '^fix\b'; then
               echo "- $subject ($hash)" >> "$FIX_TEMP"
+            elif echo "$subject" | grep -Eq '^style\b'; then
+              echo "- $subject ($hash)" >> "$STYLE_TEMP"
             fi
           }
 
@@ -530,6 +533,13 @@ jobs:
               cat "$FIX_TEMP"
             else
               echo "- 暂无修复"
+            fi
+            echo
+            echo "## :art: 界面样式"
+            if [ -s "$STYLE_TEMP" ]; then
+              cat "$STYLE_TEMP"
+            else
+              echo "- 暂无界面样式"
             fi
           } > release_notes.md
 
