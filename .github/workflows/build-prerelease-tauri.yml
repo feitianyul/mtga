@@ -442,7 +442,7 @@ jobs:
           fetch-depth: 0
 
       - name: 📥 下载所有构建产物
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v6
         with:
           path: artifacts
 
