@@ -269,7 +269,7 @@ jobs:
         with:
           name: macos-${{ matrix.arch }}-artifacts
           path: |
-            mtga-tauri/src-tauri/target/release/bundle-release/dmg/*.dmg
+            mtga-tauri/src-tauri/target/bundle-release/bundle/dmg/*.dmg
           retention-days: 7
 
   build-windows:
@@ -427,7 +427,7 @@ jobs:
         with:
           name: windows-artifacts
           path: |
-            mtga-tauri/src-tauri/target/release/bundle-release/nsis/*.exe
+            mtga-tauri/src-tauri/target/bundle-release/bundle/nsis/*.exe
           retention-days: 7
 
   create-release:
