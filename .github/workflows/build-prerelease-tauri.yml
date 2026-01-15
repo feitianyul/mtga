@@ -132,11 +132,23 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version-file: mtga-tauri/package.json
-          cache: "pnpm"
-          cache-dependency-path: mtga-tauri/pnpm-lock.yaml
 
       - name: 🔧 启用 Corepack
-        run: corepack enable
+        id: pnpm-store
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+        run: |
+          corepack enable
+          pnpm --version
+          echo "pnpm_store_path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: 💾 缓存 pnpm store
+        uses: actions/cache@v5
+        with:
+          path: ${{ steps.pnpm-store.outputs.pnpm_store_path }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('mtga-tauri/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
 
       - name: 🦀 设置 Rust
         uses: dtolnay/rust-toolchain@stable
@@ -284,11 +296,24 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version-file: mtga-tauri/package.json
-          cache: "pnpm"
-          cache-dependency-path: mtga-tauri/pnpm-lock.yaml
 
       - name: 🔧 启用 Corepack
-        run: corepack enable
+        id: pnpm-store
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+        run: |
+          corepack enable
+          pnpm --version
+          $store = pnpm store path --silent
+          "pnpm_store_path=$store" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: 💾 缓存 pnpm store
+        uses: actions/cache@v5
+        with:
+          path: ${{ steps.pnpm-store.outputs.pnpm_store_path }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('mtga-tauri/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
 
       - name: 🦀 设置 Rust
         uses: dtolnay/rust-toolchain@stable
