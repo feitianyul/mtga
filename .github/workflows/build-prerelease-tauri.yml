@@ -230,7 +230,7 @@ jobs:
           ASSET_URL=$(gh api /repos/astral-sh/python-build-standalone/releases/latest \
             -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
-            --jq '.assets[] | select(.name | test("cpython-3\\.13\\..*\\+.*-x86_64-apple-darwin-install_only_stripped\\.tar\\.gz")) | .browser_download_url' \
+            --jq '.assets[] | select(.name | test("cpython-3\\.13\\..*\\+.*-aarch64-apple-darwin-install_only_stripped\\.tar\\.gz")) | .browser_download_url' \
             | head -n 1)
           if [ -z "$ASSET_URL" ]; then
             echo "❌ 未找到匹配的 Python 构建产物"
@@ -269,7 +269,7 @@ jobs:
         with:
           name: macos-${{ matrix.arch }}-artifacts
           path: |
-            mtga-tauri/src-tauri/target/release/bundle/dmg/*.dmg
+            mtga-tauri/src-tauri/target/release/bundle-release/dmg/*.dmg
           retention-days: 7
 
   build-windows:
