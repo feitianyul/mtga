@@ -225,20 +225,22 @@ jobs:
           set -euo pipefail
           PYEMBED_DIR="mtga-tauri/src-tauri/pyembed"
           mkdir -p "$PYEMBED_DIR"
-          PY_ASSET_SCRIPT=$'import json\n'\
-            $'import re\n'\
-            $'import sys\n'\
-            $'\n'\
-            $'data = json.load(sys.stdin)\n'\
-            $'pattern = re.compile(r\"cpython-3\\.13\\..*\\+.*-x86_64-apple-darwin-install_only_stripped\\.tar\\.gz\")\n'\
-            $'for asset in data.get(\"assets\", []):\n'\
-            $'    name = asset.get(\"name\", \"\")\n'\
-            $'    if pattern.match(name):\n'\
-            $'        print(asset[\"browser_download_url\"])\n'\
-            $'        break\n'\
-            $'else:\n'\
-            $'    raise SystemExit(\"No matching Python build asset found\")\n'
-          ASSET_URL=$(curl -sL https://api.github.com/repos/astral-sh/python-build-standalone/releases/latest | python3 -c "$PY_ASSET_SCRIPT")
+          ASSET_URL=$(curl -sL https://api.github.com/repos/astral-sh/python-build-standalone/releases/latest | python3 - <<'PY'
+          import json
+          import re
+          import sys
+
+          data = json.load(sys.stdin)
+          pattern = re.compile(r"cpython-3\.13\..*\+.*-x86_64-apple-darwin-install_only_stripped\.tar\.gz")
+          for asset in data.get("assets", []):
+              name = asset.get("name", "")
+              if pattern.match(name):
+                  print(asset["browser_download_url"])
+                  break
+          else:
+              raise SystemExit("No matching Python build asset found")
+          PY
+          )
           echo "⬇️ 下载: $ASSET_URL"
           curl -L "$ASSET_URL" -o /tmp/python-standalone.tar.gz
           tar -xzf /tmp/python-standalone.tar.gz -C "$PYEMBED_DIR"
@@ -264,7 +266,7 @@ jobs:
         working-directory: mtga-tauri
 
       - name: 🧱 打包 Tauri
-        run: pnpm tauri:bundle:mac
+        run: pnpm tauri:bundle:mac:ci
         working-directory: mtga-tauri
 
       - name: 📤 上传构建产物
@@ -419,7 +421,7 @@ jobs:
         working-directory: mtga-tauri
 
       - name: 🧱 打包 Tauri
-        run: pnpm tauri:bundle:win
+        run: pnpm tauri:bundle:win:ci
         working-directory: mtga-tauri
 
       - name: 📤 上传构建产物
