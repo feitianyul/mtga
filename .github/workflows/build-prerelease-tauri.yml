@@ -103,6 +103,8 @@ jobs:
     runs-on: macos-latest
     env:
       UV_CACHE_DIR: ${{ github.workspace }}/.uv_cache
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     strategy:
       matrix:
         arch:
@@ -225,22 +227,15 @@ jobs:
           set -euo pipefail
           PYEMBED_DIR="mtga-tauri/src-tauri/pyembed"
           mkdir -p "$PYEMBED_DIR"
-          ASSET_URL=$(curl -sL https://api.github.com/repos/astral-sh/python-build-standalone/releases/latest | python3 - <<'PY'
-          import json
-          import re
-          import sys
-
-          data = json.load(sys.stdin)
-          pattern = re.compile(r"cpython-3\.13\..*\+.*-x86_64-apple-darwin-install_only_stripped\.tar\.gz")
-          for asset in data.get("assets", []):
-              name = asset.get("name", "")
-              if pattern.match(name):
-                  print(asset["browser_download_url"])
-                  break
-          else:
-              raise SystemExit("No matching Python build asset found")
-          PY
-          )
+          ASSET_URL=$(gh api /repos/astral-sh/python-build-standalone/releases/latest \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            --jq '.assets[] | select(.name | test("cpython-3\\.13\\..*\\+.*-x86_64-apple-darwin-install_only_stripped\\.tar\\.gz")) | .browser_download_url' \
+            | head -n 1)
+          if [ -z "$ASSET_URL" ]; then
+            echo "❌ 未找到匹配的 Python 构建产物"
+            exit 1
+          fi
           echo "⬇️ 下载: $ASSET_URL"
           curl -L "$ASSET_URL" -o /tmp/python-standalone.tar.gz
           tar -xzf /tmp/python-standalone.tar.gz -C "$PYEMBED_DIR"
@@ -283,6 +278,8 @@ jobs:
     runs-on: windows-latest
     env:
       UV_CACHE_DIR: "${{ github.workspace }}\\.uv_cache"
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: 📥 检出代码
@@ -400,14 +397,15 @@ jobs:
           $ErrorActionPreference = "Stop"
           $pyembedDir = "mtga-tauri/src-tauri/pyembed"
           New-Item -ItemType Directory -Path $pyembedDir -Force | Out-Null
-          $apiUrl = "https://api.github.com/repos/astral-sh/python-build-standalone/releases/latest"
-          $data = Invoke-RestMethod -Uri $apiUrl
-          $pattern = '^cpython-3\.13\..*\+.*-x86_64-pc-windows-msvc-install_only_stripped\.tar\.gz$'
-          $asset = $data.assets | Where-Object { $_.name -match $pattern } | Select-Object -First 1
-          if (-not $asset) { throw "No matching Python build asset found" }
+          $assetUrl = gh api /repos/astral-sh/python-build-standalone/releases/latest `
+            -H "Accept: application/vnd.github+json" `
+            -H "X-GitHub-Api-Version: 2022-11-28" `
+            --jq '.assets[] | select(.name | test("cpython-3\\.13\\..*\\+.*-x86_64-pc-windows-msvc-install_only_stripped\\.tar\\.gz")) | .browser_download_url' |
+            Select-Object -First 1
+          if (-not $assetUrl) { throw "❌ 未找到匹配的 Python 构建产物" }
           $archivePath = Join-Path $pyembedDir "python-standalone.tar.gz"
-          Write-Host "⬇️ 下载: $($asset.browser_download_url)"
-          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $archivePath
+          Write-Host "⬇️ 下载: $assetUrl"
+          Invoke-WebRequest -Uri $assetUrl -OutFile $archivePath
           tar -xzf $archivePath -C $pyembedDir
 
       - name: 🧾 写入 pyembed .env
@@ -429,7 +427,7 @@ jobs:
         with:
           name: windows-artifacts
           path: |
-            mtga-tauri/src-tauri/target/release/bundle/nsis/*.exe
+            mtga-tauri/src-tauri/target/release/bundle-release/nsis/*.exe
           retention-days: 7
 
   create-release:
