@@ -266,6 +266,20 @@ jobs:
           echo "$DEV_DIR/usr/bin" >> "$GITHUB_PATH"
           which SetFile || true
 
+      - name: 🧾 写入内嵌版本号
+        run: |
+          set -euo pipefail
+          APP_VERSION="${{ needs.prepare-version.outputs.version }}"
+          if [ -z "$APP_VERSION" ]; then
+            echo "❌ version 为空"
+            exit 1
+          fi
+          if [[ "$APP_VERSION" != v* ]]; then
+            APP_VERSION="v$APP_VERSION"
+          fi
+          printf 'BUILT_APP_VERSION = "%s"\n' "$APP_VERSION" > mtga-tauri/python-src/modules/runtime/_build_version.py
+          echo "已写入版本号到 mtga-tauri/python-src/modules/runtime/_build_version.py: $APP_VERSION"
+
       - name: 🧩 安装 pytauri 依赖
         run: pnpm pytauri:install:mac
         working-directory: mtga-tauri
@@ -423,6 +437,15 @@ jobs:
           $envDir = "mtga-tauri/src-tauri/pyembed/python/Lib"
           New-Item -ItemType Directory -Path $envDir -Force | Out-Null
           Copy-Item -Path "mtga-tauri/.env.example" -Destination (Join-Path $envDir ".env") -Force
+
+      - name: 🧾 写入内嵌版本号
+        run: |
+          $version = "${{ needs.prepare-version.outputs.version }}"
+          if (-not $version) { throw "❌ version 为空" }
+          if ($version[0] -ne 'v') { $version = "v$version" }
+          $line = "BUILT_APP_VERSION = `"$version`""
+          Set-Content -Path "mtga-tauri/python-src/modules/runtime/_build_version.py" -Value $line -Encoding utf8
+          Write-Host "已写入版本号到 mtga-tauri/python-src/modules/runtime/_build_version.py: $version"
 
       - name: 🧩 安装 pytauri 依赖
         run: pnpm pytauri:install:win
