@@ -105,6 +105,8 @@ jobs:
       UV_CACHE_DIR: ${{ github.workspace }}/.uv_cache
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAURI_BUNDLER_DEBUG: "true"
+      RUST_LOG: tauri_bundler=debug
     strategy:
       matrix:
         arch:
@@ -255,6 +257,14 @@ jobs:
             echo "等待 Xcode Command Line Tools 安装..."
             sleep 10
           done
+
+      - name: 🧰 设置 Xcode 工具路径
+        run: |
+          set -euo pipefail
+          DEV_DIR=$(xcode-select -p)
+          echo "DEV_DIR=$DEV_DIR"
+          echo "$DEV_DIR/usr/bin" >> "$GITHUB_PATH"
+          which SetFile || true
 
       - name: 🧩 安装 pytauri 依赖
         run: pnpm pytauri:install:mac
