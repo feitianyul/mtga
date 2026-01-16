@@ -8,7 +8,7 @@ export default defineNuxtConfig({
   components: {
     dirs: [{ path: '~/components', pathPrefix: false }],
   },
-  // 启用 SSG
+  // 禁用 SSR，因为 Tauri 不支持
   ssr: false,
   // 使开发服务器能够被其他设备发现，以便在 iOS 物理机运行。
   devServer: { host: process.env.TAURI_DEV_HOST || 'localhost' },
