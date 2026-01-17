@@ -30,12 +30,8 @@
 - 如新增 Rust 测试，可在 `src-tauri/` 运行 `cargo test` 并在 PR 中说明覆盖范围。
 
 ## 交付前质量检查
-- 任何 Python 变更：必须运行 `pyright` 与 `ruff check .`。
-- 修改 YAML：必须运行 `yamllint <filename>`。
-- Linux：先设置 `UV_CACHE_DIR="$PWD/.uv_cache"`，再用 `uv run` 调用。
-- macOS/Windows：不要用 `uv`，改用虚拟环境：
-  - `./.venv/bin/python -m pyright` 或 `.\.venv\Scripts\python -m pyright`
-  - etc.
+- 任何 Python 变更：必须运行 `pnpm py:check`。
+- 任何 YAML 变更：必须运行 `yamllint <filename>`。
 - 任何 Rust 变更：必须运行 `pnpm rs:check`。
 - 任何 JS/TS/Vue 变更：必须运行 `pnpm app:check`。
 
