@@ -1,12 +1,15 @@
+use std::ffi::CString;
 use std::path::{Path, PathBuf};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
-    Arc,
+    Arc, OnceLock,
 };
 use std::time::Duration;
 
 use pyo3::prelude::*;
-use tauri::{Manager, RunEvent, WindowEvent};
+use tauri::{
+    webview::PageLoadEvent, AppHandle, Emitter, Listener, Manager, RunEvent, Url, WindowEvent,
+};
 
 fn resolve_python_home() -> Option<PathBuf> {
     if let Some(home) = std::env::var_os("PYTHONHOME") {
@@ -34,6 +37,71 @@ fn resolve_python_home() -> Option<PathBuf> {
     }
 
     None
+}
+
+static PY_WARMUP: OnceLock<PyObject> = OnceLock::new();
+static BACKEND_READY: AtomicBool = AtomicBool::new(false);
+static MAIN_PAGE_READY: AtomicBool = AtomicBool::new(false);
+static MAIN_WINDOW_SHOWN: AtomicBool = AtomicBool::new(false);
+
+fn is_splash_url(url: &Url) -> bool {
+    url.path().ends_with("/splashscreen.html")
+}
+
+fn try_show_main(app_handle: &AppHandle) {
+    if !BACKEND_READY.load(Ordering::SeqCst) || !MAIN_PAGE_READY.load(Ordering::SeqCst) {
+        return;
+    }
+    let Some(main) = app_handle.get_webview_window("main") else {
+        log::warn!(target: "boot", "label=main_window_missing");
+        return;
+    };
+    if MAIN_WINDOW_SHOWN.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    if let Some(splash) = app_handle.get_webview_window("splash") {
+        if let Ok(pos) = splash.outer_position() {
+            let _ = main.set_position(pos);
+        }
+        if let Ok(size) = splash.outer_size() {
+            let _ = main.set_size(size);
+        }
+    }
+    if let Err(error) = main.show() {
+        log::warn!(
+            target: "boot",
+            "label=main_show_failed error={}",
+            error
+        );
+    }
+    let _ = main.set_focus();
+    if let Err(error) = main.eval("window.__MTGA_BACKEND_READY__ = true;") {
+        log::warn!(
+            target: "boot",
+            "label=backend_ready_eval_failed error={}",
+            error
+        );
+    }
+    let _ = main.emit("mtga:backend-ready", ());
+    if let Some(splash) = app_handle.get_webview_window("splash") {
+        if let Err(error) = splash.close() {
+            log::warn!(
+                target: "boot",
+                "label=splash_close_failed error={}",
+                error
+            );
+        }
+    }
+}
+
+fn schedule_try_show_main(app_handle: AppHandle) {
+    let app_handle_clone = app_handle.clone();
+    if let Err(error) = app_handle.run_on_main_thread(move || {
+        try_show_main(&app_handle_clone);
+    }) {
+        log::warn!(target: "boot", "label=run_on_main_thread_failed error={}", error);
+        try_show_main(&app_handle);
+    }
 }
 
 fn resolve_python_paths(python_home: &Path) -> Vec<PathBuf> {
@@ -133,12 +201,72 @@ fn ensure_python_env() -> Option<PathBuf> {
     Some(home_path.clone())
 }
 
+fn init_python_runtime() -> Option<PathBuf> {
+    let home = ensure_python_env();
+    pyo3::prepare_freethreaded_python();
+    if home.is_none() {
+        log::warn!(target: "boot", "label=python_home_missing");
+    }
+    home
+}
+
 fn build_py_invoke_handler() -> PyResult<PyObject> {
     Python::with_gil(|py| {
-        let module = PyModule::import(py, "mtga_app")?;
-        let handler = module.getattr("get_py_invoke_handler")?.call0()?;
-        Ok(handler.unbind())
+        let bootstrap = r#"
+import importlib
+
+_handler = None
+
+def _ensure_handler():
+    global _handler
+    if _handler is None:
+        module = importlib.import_module("mtga_app")
+        _handler = module.get_py_invoke_handler()
+    return _handler
+
+def py_invoke_handler(invoke):
+    handler = _ensure_handler()
+    return handler(invoke)
+
+def warmup():
+    _ensure_handler()
+"#;
+        let code = CString::new(bootstrap).expect("bootstrap contains null bytes");
+        let filename = CString::new("mtga_lazy.py").expect("filename contains null bytes");
+        let module_name = CString::new("mtga_lazy").expect("module name contains null bytes");
+        let module = PyModule::from_code(py, &code, &filename, &module_name)?;
+        let handler = module.getattr("py_invoke_handler")?.unbind();
+        let warmup = module.getattr("warmup")?.unbind();
+        let _ = PY_WARMUP.set(warmup);
+        Ok(handler)
     })
+}
+
+fn warmup_py_invoke_handler() -> PyResult<()> {
+    if let Some(warmup) = PY_WARMUP.get() {
+        Python::with_gil(|py| -> PyResult<()> {
+            warmup.bind(py).call0()?;
+            Ok(())
+        })?;
+    }
+    Ok(())
+}
+
+fn run_backend_warmup(app_handle: &AppHandle) {
+    if let Err(error) = warmup_py_invoke_handler() {
+        log::error!(target: "boot", "label=backend_init_error error={}", error);
+    }
+    BACKEND_READY.store(true, Ordering::SeqCst);
+    schedule_try_show_main(app_handle.clone());
+}
+
+fn start_backend_init(app_handle: AppHandle, init_started: Arc<AtomicBool>) {
+    if init_started.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    std::thread::spawn(move || {
+        run_backend_warmup(&app_handle);
+    });
 }
 
 fn stop_proxy_on_close() {
@@ -181,33 +309,67 @@ pub fn run() {
         std::env::set_var("MTGA_RUNTIME", "tauri");
     }
 
-    ensure_python_env();
-    pyo3::prepare_freethreaded_python();
+    init_python_runtime();
     let py_invoke_handler =
         build_py_invoke_handler().expect("Failed to initialize Python invoke handler");
     let shutdown_started = Arc::new(AtomicBool::new(false));
+
+    let backend_init_started = Arc::new(AtomicBool::new(false));
 
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_pytauri::init(py_invoke_handler))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
-        .setup(|app| {
-            if cfg!(debug_assertions) {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
+        .on_page_load({
+            let backend_init_started = Arc::clone(&backend_init_started);
+            move |webview, payload| {
+                if payload.event() == PageLoadEvent::Finished {
+                    if !is_splash_url(payload.url()) {
+                        MAIN_PAGE_READY.store(true, Ordering::SeqCst);
+                        let app_handle = webview.app_handle().clone();
+                        try_show_main(&app_handle);
+                    }
+                    let app_handle = webview.app_handle().clone();
+                    let backend_init_started = Arc::clone(&backend_init_started);
+                    std::thread::spawn(move || {
+                        std::thread::sleep(Duration::from_millis(1200));
+                        start_backend_init(app_handle, backend_init_started);
+                    });
+                }
             }
-            if let Some(window) = app.get_webview_window("main") {
-                inject_runtime_tag(&window);
+        })
+        .setup({
+            let backend_init_started = Arc::clone(&backend_init_started);
+            move |app| {
+                if cfg!(debug_assertions) {
+                    app.handle().plugin(
+                        tauri_plugin_log::Builder::default()
+                            .level(log::LevelFilter::Info)
+                            .build(),
+                    )?;
+                }
+                if let Some(window) = app.get_webview_window("main") {
+                    inject_runtime_tag(&window);
+                }
+                if let Some(splash) = app.get_webview_window("splash") {
+                    let listener_handle = app.handle().clone();
+                    splash.listen("mtga:overlay-ready", move |_event| {
+                        start_backend_init(
+                            listener_handle.clone(),
+                            Arc::clone(&backend_init_started),
+                        );
+                    });
+                }
+                Ok(())
             }
-            Ok(())
         })
         .on_window_event({
             let shutdown_started = Arc::clone(&shutdown_started);
             move |window, event| {
                 if let WindowEvent::CloseRequested { api, .. } = event {
+                    if window.label() == "splash" && MAIN_WINDOW_SHOWN.load(Ordering::SeqCst) {
+                        return;
+                    }
                     if shutdown_started.swap(true, Ordering::SeqCst) {
                         return;
                     }
@@ -221,13 +383,18 @@ pub fn run() {
         .expect("error while building tauri application");
 
     let shutdown_started = Arc::clone(&shutdown_started);
-    app.run(move |app_handle, event| {
-        if let RunEvent::ExitRequested { api, .. } = event {
+    app.run(move |app_handle, event| match event {
+        RunEvent::ExitRequested { api, .. } => {
+            if !MAIN_WINDOW_SHOWN.load(Ordering::SeqCst) {
+                api.prevent_exit();
+                return;
+            }
             if shutdown_started.swap(true, Ordering::SeqCst) {
                 return;
             }
             api.prevent_exit();
             spawn_shutdown(app_handle.clone());
         }
+        _ => {}
     });
 }

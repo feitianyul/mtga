@@ -9,6 +9,7 @@ from contextlib import suppress
 from functools import lru_cache
 from importlib import import_module
 from pathlib import Path
+from threading import Lock
 from typing import Any, cast
 
 from platformdirs import user_data_dir
@@ -38,6 +39,7 @@ def _resolve_boot_log_path() -> Path:
 
 
 _BOOT_LOG_PATH = _resolve_boot_log_path()
+_INVOKE_LOCK = Lock()
 
 
 def _boot_log(message: str) -> None:
@@ -205,13 +207,17 @@ def get_py_invoke_handler() -> Any:
     handler = _invoke_state["handler"]
     if handler is not None:
         return handler
-    portal_context = start_blocking_portal("asyncio")
-    portal = portal_context.__enter__()
-    _invoke_state["portal_context"] = portal_context
-    _invoke_state["portal"] = portal
-    handler = command_registry.generate_handler(portal)
-    _invoke_state["handler"] = handler
-    return handler
+    with _INVOKE_LOCK:
+        handler = _invoke_state["handler"]
+        if handler is not None:
+            return handler
+        portal_context = start_blocking_portal("asyncio")
+        portal = portal_context.__enter__()
+        _invoke_state["portal_context"] = portal_context
+        _invoke_state["portal"] = portal
+        handler = command_registry.generate_handler(portal)
+        _invoke_state["handler"] = handler
+        return handler
 
 
 class GreetPayload(BaseModel):

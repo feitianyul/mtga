@@ -18,8 +18,20 @@
         "title": "MTGA",
         "width": 1200,
         "height": 800,
+        "visible": false,
+        "backgroundColor": "#fffbeb",
         "resizable": true,
         "fullscreen": false
+      },
+      {
+        "label": "splash",
+        "title": "MTGA",
+        "width": 1200,
+        "height": 800,
+        "url": "splashscreen.html",
+        "resizable": true,
+        "fullscreen": false,
+        "backgroundColor": "#fffbeb"
       }
     ],
     "security": {
