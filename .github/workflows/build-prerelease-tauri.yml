@@ -60,16 +60,16 @@ jobs:
             elif command -v python3 >/dev/null 2>&1; then
               PY_VERSION_SCRIPT=$'import json\n'\
                 $'from pathlib import Path\n\n'\
-                $'tauri_conf = Path("mtga-tauri/src-tauri/tauri.conf.json")\n'\
+                $'tauri_conf = Path("src-tauri/tauri.conf.json")\n'\
                 $'data = json.loads(tauri_conf.read_text(encoding="utf-8"))\n'\
                 $'version = data.get("version")\n'\
                 $'if not version:\n'\
                 $'    raise SystemExit("Missing version in tauri.conf.json")\n'\
                 $'print(version)'
               VERSION=$(python3 -c "$PY_VERSION_SCRIPT")
-              echo "ℹ️ 未提供版本号，回退到 mtga-tauri/src-tauri/tauri.conf.json 中的 $VERSION"
+              echo "ℹ️ 未提供版本号，回退到 src-tauri/tauri.conf.json 中的 $VERSION"
             else
-              echo "❌ 无法解析 mtga-tauri/src-tauri/tauri.conf.json，请在 workflow_dispatch 中提供版本号"
+              echo "❌ 无法解析 src-tauri/tauri.conf.json，请在 workflow_dispatch 中提供版本号"
               exit 1
             fi
             TAG_NAME="v$VERSION"
@@ -100,7 +100,7 @@ jobs:
   build-macos:
     name: 🍎 构建 macOS
     needs: prepare-version
-    runs-on: macos-latest
+    runs-on: ${{ matrix.runner }}
     env:
       UV_CACHE_DIR: ${{ github.workspace }}/.uv_cache
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -109,16 +109,17 @@ jobs:
       RUST_LOG: tauri_bundler=debug
     strategy:
       matrix:
-        arch:
-          # - x64
-          - arm64
         include:
-          # - arch: x64
-          #   runner_arch: x86_64
-          #   nuitka_arch: x86_64
+          - arch: x64
+            runner: macos-15-intel
+            runner_arch: x86_64
+            nuitka_arch: x86_64
+            python_asset_regex: x86_64-apple-darwin
           - arch: arm64
+            runner: macos-latest
             runner_arch: arm64
             nuitka_arch: arm64
+            python_asset_regex: aarch64-apple-darwin
 
     steps:
       - name: 📥 检出代码
@@ -135,7 +136,7 @@ jobs:
       - name: 🟢 设置 Node
         uses: actions/setup-node@v6
         with:
-          node-version-file: mtga-tauri/package.json
+          node-version-file: package.json
 
       - name: 🔧 启用 Corepack
         id: pnpm-store
@@ -150,7 +151,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ steps.pnpm-store.outputs.pnpm_store_path }}
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('mtga-tauri/pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-
 
@@ -161,20 +162,20 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
-            mtga-tauri/src-tauri
+            src-tauri
           shared-key: tauri-${{ runner.os }}-${{ matrix.arch }}
 
       - name: 🔍 调试 uv.lock
         run: |
           pwd
-          ls -l mtga-tauri/python-src/uv.lock || echo "mtga-tauri/python-src/uv.lock 不存在"
-          head -5 mtga-tauri/python-src/uv.lock || true
+          ls -l python-src/uv.lock || echo "python-src/uv.lock 不存在"
+          head -5 python-src/uv.lock || true
 
       - name: 🧮 计算 uv.lock 哈希
         id: uv-lock-hash
         run: |
-          if [ -f mtga-tauri/python-src/uv.lock ]; then
-            echo "hash=$(shasum -a 256 mtga-tauri/python-src/uv.lock | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
+          if [ -f python-src/uv.lock ]; then
+            echo "hash=$(shasum -a 256 python-src/uv.lock | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
           else
             echo "hash=missing" >> "$GITHUB_OUTPUT"
             echo "⚠️ uv.lock 不存在，缓存 key 使用 missing"
@@ -184,7 +185,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: |
-            mtga-tauri/python-src/.venv
+            python-src/.venv
             .uv_cache
             ~/.local/bin/uv
             ~/.local/bin/uvx
@@ -218,21 +219,21 @@ jobs:
 
       - name: 🔧 同步 Python 依赖
         run: uv sync --project .
-        working-directory: mtga-tauri/python-src
+        working-directory: python-src
 
       - name: 📦 安装前端依赖
         run: pnpm install --frozen-lockfile
-        working-directory: mtga-tauri
+        working-directory: .
 
       - name: 📥 准备 pyembed Python
         run: |
           set -euo pipefail
-          PYEMBED_DIR="mtga-tauri/src-tauri/pyembed"
+          PYEMBED_DIR="src-tauri/pyembed"
           mkdir -p "$PYEMBED_DIR"
           ASSET_URL=$(gh api /repos/astral-sh/python-build-standalone/releases/latest \
             -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
-            --jq '.assets[] | select(.name | test("cpython-3\\.13\\..*\\+.*-aarch64-apple-darwin-install_only_stripped\\.tar\\.gz")) | .browser_download_url' \
+            --jq '.assets[] | select(.name | test("cpython-3\\.13\\..*\\+.*-'${{ matrix.python_asset_regex }}'-install_only_stripped\\.tar\\.gz")) | .browser_download_url' \
             | head -n 1)
           if [ -z "$ASSET_URL" ]; then
             echo "❌ 未找到匹配的 Python 构建产物"
@@ -245,9 +246,9 @@ jobs:
       - name: 🧾 写入 pyembed .env
         run: |
           set -euo pipefail
-          ENV_DIR="mtga-tauri/src-tauri/pyembed/python/lib/python3.13"
+          ENV_DIR="src-tauri/pyembed/python/lib/python3.13"
           mkdir -p "$ENV_DIR"
-          cp mtga-tauri/.env.example "$ENV_DIR/.env"
+          cp .env.example "$ENV_DIR/.env"
 
       - name: 🛠️ 安装 Xcode Command Line Tools
         run: |
@@ -277,23 +278,23 @@ jobs:
           if [[ "$APP_VERSION" != v* ]]; then
             APP_VERSION="v$APP_VERSION"
           fi
-          printf 'BUILT_APP_VERSION = "%s"\n' "$APP_VERSION" > mtga-tauri/python-src/modules/runtime/_build_version.py
-          echo "已写入版本号到 mtga-tauri/python-src/modules/runtime/_build_version.py: $APP_VERSION"
+          printf 'BUILT_APP_VERSION = "%s"\n' "$APP_VERSION" > python-src/modules/runtime/_build_version.py
+          echo "已写入版本号到 python-src/modules/runtime/_build_version.py: $APP_VERSION"
 
       - name: 🧩 安装 pytauri 依赖
         run: pnpm pytauri:install:mac
-        working-directory: mtga-tauri
+        working-directory: .
 
       - name: 🧱 打包 Tauri
         run: pnpm tauri:bundle:mac:ci
-        working-directory: mtga-tauri
+        working-directory: .
 
       - name: 📤 上传构建产物
         uses: actions/upload-artifact@v6
         with:
           name: macos-${{ matrix.arch }}-artifacts
           path: |
-            mtga-tauri/src-tauri/target/bundle-release/bundle/dmg/*.dmg
+            src-tauri/target/bundle-release/bundle/dmg/*.dmg
           retention-days: 7
 
   build-windows:
@@ -318,7 +319,7 @@ jobs:
       - name: 🟢 设置 Node
         uses: actions/setup-node@v6
         with:
-          node-version-file: mtga-tauri/package.json
+          node-version-file: package.json
 
       - name: 🔧 启用 Corepack
         id: pnpm-store
@@ -334,7 +335,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ steps.pnpm-store.outputs.pnpm_store_path }}
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('mtga-tauri/pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-
 
@@ -345,24 +346,24 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
-            mtga-tauri/src-tauri
+            src-tauri
           shared-key: tauri-${{ runner.os }}-x64
 
       - name: 🔍 调试 uv.lock
         run: |
           Get-Location
-          if (Test-Path mtga-tauri/python-src/uv.lock) {
-            Get-Item mtga-tauri/python-src/uv.lock | Format-List FullName,Length
-            Get-Content mtga-tauri/python-src/uv.lock -TotalCount 5
+          if (Test-Path python-src/uv.lock) {
+            Get-Item python-src/uv.lock | Format-List FullName,Length
+            Get-Content python-src/uv.lock -TotalCount 5
           } else {
-            Write-Host "mtga-tauri/python-src/uv.lock 不存在"
+            Write-Host "python-src/uv.lock 不存在"
           }
 
       - name: 🧮 计算 uv.lock 哈希
         id: uv-lock-hash
         run: |
-          if (Test-Path mtga-tauri/python-src/uv.lock) {
-            $hash = (Get-FileHash mtga-tauri/python-src/uv.lock -Algorithm SHA256).Hash
+          if (Test-Path python-src/uv.lock) {
+            $hash = (Get-FileHash python-src/uv.lock -Algorithm SHA256).Hash
           } else {
             $hash = "missing"
             Write-Host "⚠️ uv.lock 不存在，缓存 key 使用 missing"
@@ -373,7 +374,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: |
-            mtga-tauri/python-src/.venv
+            python-src/.venv
             .uv_cache
             ${{ env.USERPROFILE }}\.local\bin\uv.exe
             ${{ env.USERPROFILE }}\.local\bin\uvx.exe
@@ -410,16 +411,16 @@ jobs:
 
       - name: 🔧 同步 Python 依赖
         run: uv sync --project .
-        working-directory: mtga-tauri/python-src
+        working-directory: python-src
 
       - name: 📦 安装前端依赖
         run: pnpm install --frozen-lockfile
-        working-directory: mtga-tauri
+        working-directory: .
 
       - name: 📥 准备 pyembed Python
         run: |
           $ErrorActionPreference = "Stop"
-          $pyembedDir = "mtga-tauri/src-tauri/pyembed"
+          $pyembedDir = "src-tauri/pyembed"
           New-Item -ItemType Directory -Path $pyembedDir -Force | Out-Null
           $assetUrl = gh api /repos/astral-sh/python-build-standalone/releases/latest `
             -H "Accept: application/vnd.github+json" `
@@ -434,9 +435,9 @@ jobs:
 
       - name: 🧾 写入 pyembed .env
         run: |
-          $envDir = "mtga-tauri/src-tauri/pyembed/python/Lib"
+          $envDir = "src-tauri/pyembed/python/Lib"
           New-Item -ItemType Directory -Path $envDir -Force | Out-Null
-          Copy-Item -Path "mtga-tauri/.env.example" -Destination (Join-Path $envDir ".env") -Force
+          Copy-Item -Path ".env.example" -Destination (Join-Path $envDir ".env") -Force
 
       - name: 🧾 写入内嵌版本号
         run: |
@@ -444,23 +445,23 @@ jobs:
           if (-not $version) { throw "❌ version 为空" }
           if ($version[0] -ne 'v') { $version = "v$version" }
           $line = "BUILT_APP_VERSION = `"$version`""
-          Set-Content -Path "mtga-tauri/python-src/modules/runtime/_build_version.py" -Value $line -Encoding utf8
-          Write-Host "已写入版本号到 mtga-tauri/python-src/modules/runtime/_build_version.py: $version"
+          Set-Content -Path "python-src/modules/runtime/_build_version.py" -Value $line -Encoding utf8
+          Write-Host "已写入版本号到 python-src/modules/runtime/_build_version.py: $version"
 
       - name: 🧩 安装 pytauri 依赖
         run: pnpm pytauri:install:win
-        working-directory: mtga-tauri
+        working-directory: .
 
       - name: 🧱 打包 Tauri
         run: pnpm tauri:bundle:win:ci
-        working-directory: mtga-tauri
+        working-directory: .
 
       - name: 📤 上传构建产物
         uses: actions/upload-artifact@v6
         with:
           name: windows-artifacts
           path: |
-            mtga-tauri/src-tauri/target/bundle-release/bundle/nsis/*.exe
+            src-tauri/target/bundle-release/bundle/nsis/*.exe
           retention-days: 7
 
   create-release:
@@ -615,6 +616,7 @@ jobs:
           draft: false
           artifacts: |
             artifacts/windows-artifacts/*.exe
+            artifacts/macos-x64-artifacts/*.dmg
             artifacts/macos-arm64-artifacts/*.dmg
           token: ${{ secrets.GITHUB_TOKEN }}
 
