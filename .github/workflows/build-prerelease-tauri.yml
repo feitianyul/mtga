@@ -112,13 +112,9 @@ jobs:
         include:
           - arch: x64
             runner: macos-15-intel
-            runner_arch: x86_64
-            nuitka_arch: x86_64
             python_asset_regex: x86_64-apple-darwin
           - arch: arm64
             runner: macos-latest
-            runner_arch: arm64
-            nuitka_arch: arm64
             python_asset_regex: aarch64-apple-darwin
 
     steps:
