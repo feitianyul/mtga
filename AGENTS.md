@@ -10,13 +10,11 @@
 - `nuxt.config.ts`、`tsconfig.json`：前端构建与类型配置。
 
 ## 构建、测试与开发命令
-优先使用 `pnpm`（已有 `pnpm-lock.yaml`），常用命令如下：
-- `pnpm install`：安装依赖并触发 `nuxt prepare`。
-- `pnpm dev`：启动前端开发服务器（默认 `http://localhost:3000`）。
-- `pnpm build`：构建生产包；`pnpm preview` 本地预览。
-- `pnpm generate`：生成静态站点输出。
-- `pnpm tauri dev` / `pnpm tauri build`：启动或打包桌面端（依赖 `src-tauri/` 配置）。
+- `pnpm i`：安装依赖并触发 `nuxt prepare`。
 - `uv sync --project .`：在 `python-src/` 安装 Python 运行时依赖（依赖由 uv 管理）。
+- `pnpm dev:all`：启动前后端开发服务器（默认 `http://localhost:3000`）。
+- `pnpm pytauri:install:<平台：win/mac>`：安装后端到 tauri。
+- `pnpm tauri:bundle:<平台：win/mac> -- --profile bundle-release`：打包桌面端（依赖 `src-tauri/` 配置）。
 
 ## 编码风格与命名约定
 - Vue 单文件组件保持 2 空格缩进，遵循 Nuxt/Vue 默认结构。
