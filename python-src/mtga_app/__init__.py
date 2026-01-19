@@ -1,6 +1,7 @@
 # ruff: noqa: E402
 from __future__ import annotations
 
+import json
 import os
 import sys
 import time
@@ -104,6 +105,19 @@ def _load_env_file(path: Path) -> None:
 
 
 _load_env_file(ENV_FILE)
+
+
+def _load_tauri_config(path: Path) -> dict[str, Any] | None:
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except Exception as exc:
+        _boot_log(f"tauri_config read failed: {exc}")
+        return None
+    try:
+        return cast(dict[str, Any], json.loads(raw))
+    except Exception as exc:
+        _boot_log(f"tauri_config parse failed: {exc}")
+        return None
 
 
 # 模块来源控制（显眼开关）
@@ -295,23 +309,41 @@ async def get_app_info() -> dict[str, Any]:
 def main() -> int:
     # 开发期：让 Tauri 加载 Nuxt dev server
     dev_server = os.environ.get("DEV_SERVER")
+    src_tauri_dir = os.environ.get("MTGA_SRC_TAURI_DIR")
+    src_tauri_path = (
+        Path(src_tauri_dir).expanduser().resolve()
+        if src_tauri_dir
+        else Path(__file__).resolve().parent.parent
+    )
     tauri_config: dict[str, Any] | None = None
     if dev_server:
-        tauri_config = {
-            "build": {
-                "devUrl": dev_server,
-                "frontendDist": dev_server,
-            }
-        }
+        base_config = _load_tauri_config(src_tauri_path / "tauri.conf.json") or {}
+        build_config = dict(base_config.get("build", {}))
+        build_config["devUrl"] = dev_server
+        build_config["frontendDist"] = dev_server
+        base_config["build"] = build_config
+
+        app_config = dict(base_config.get("app", {}))
+        windows = app_config.get("windows")
+        if isinstance(windows, list):
+            new_windows: list[dict[str, Any]] = []
+            for window in windows:
+                if not isinstance(window, dict):
+                    continue
+                label = window.get("label")
+                if label == "splash":
+                    continue
+                updated_window = (
+                    {**window, "visible": True} if label == "main" else window
+                )
+                new_windows.append(updated_window)
+            if new_windows:
+                app_config["windows"] = new_windows
+        base_config["app"] = app_config
+        tauri_config = base_config
 
     with start_blocking_portal("asyncio") as portal:
         context_factory_any = cast(Any, context_factory)
-        src_tauri_dir = os.environ.get("MTGA_SRC_TAURI_DIR")
-        src_tauri_path = (
-            Path(src_tauri_dir).expanduser().resolve()
-            if src_tauri_dir
-            else Path(__file__).resolve().parent.parent
-        )
         context = context_factory_any(
             # ✅ v2：context 根通常用 src-tauri 目录
             src_tauri_path,
