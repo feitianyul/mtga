@@ -1,37 +1,44 @@
-# 仓库指南
+# Repository Guidelines
 
 ## 项目结构与模块组织
-- `mtga_gui.py` 负责环境初始化、启动装配与 GUI 入口协调，调用 `modules/ui` 构建界面。
-- `modules/` 采用分层结构：`ui/` 负责界面与布局，`actions/` 编排用户操作，`services/` 作为副作用边界，领域模块落在 `cert/hosts/network/proxy/update`，基础设施在 `runtime/` 与 `platform/`。
-- 文档位于 `docs/`；打包资源在 `mac/`、`helper-tool/`、`icons/`，诊断脚本（`test_*.py`、`debug_test.py`）放在仓库根目录。
+- `app/`：Nuxt 前端入口，当前从 `app/app.vue` 渲染页面。
+- `public/`：静态资源目录（图标、图片等）。
+- `src-tauri/`：Tauri 后端与桌面打包配置，关键文件包括 `src-tauri/src/main.rs`、`src-tauri/src/lib.rs`、`src-tauri/Cargo.toml` 与 `src-tauri/tauri.conf.json`。
+- `python-src/mtga_app/`：Python 后端源码（`__init__.py`、`__main__.py`），通过 `pytauri-wheel` 绑定 Tauri，无需手写 Rust glue 代码。
+- `python-src/pyproject.toml`、`python-src/uv.lock`、`python-src/.venv/`：Python 依赖与虚拟环境配置。
+- `src-tauri/icons/` 与 `src-tauri/capabilities/`：桌面图标与权限能力定义。
+- `nuxt.config.ts`、`tsconfig.json`：前端构建与类型配置。
 
 ## 构建、测试与开发命令
-- 任何 Python 变更：必须运行 `pyright` 与 `ruff check .`。
-- 修改 YAML：必须运行 `yamllint <filename>`。
-- Linux：先设置 `UV_CACHE_DIR="$PWD/.uv_cache"`，再用 `uv run` 调用。
-- macOS/Windows：不要用 `uv`，改用虚拟环境：
-  - `./.venv/bin/python -m pyright` 或 `.\.venv\Scripts\python -m pyright`
-  - etc.
-- `uv sync --project .` 安装运行时依赖；在调用 Nuitka 打包脚本前附加 `--group win-build` 或 `--group mac-build`。
-- `python mtga_gui.py --debug` 以详细日志启动 GUI；`./run_mtga_gui.sh`（macOS）与 `run_mtga_gui.bat`（Windows）封装了依赖同步与提权步骤。
-- `./build_mac_app.sh` 生成位于 `dist-onefile/` 的 `.app` 包；`build_onefile.bat` 生成 Windows 可分发包。
+优先使用 `pnpm`（已有 `pnpm-lock.yaml`），常用命令如下：
+- `pnpm install`：安装依赖并触发 `nuxt prepare`。
+- `pnpm dev`：启动前端开发服务器（默认 `http://localhost:3000`）。
+- `pnpm build`：构建生产包；`pnpm preview` 本地预览。
+- `pnpm generate`：生成静态站点输出。
+- `pnpm tauri dev` / `pnpm tauri build`：启动或打包桌面端（依赖 `src-tauri/` 配置）。
+- `uv sync --project .`：在 `python-src/` 安装 Python 运行时依赖（依赖由 uv 管理）。
 
 ## 编码风格与命名约定
-- 目标 Python 3.13，使用四空格缩进，并遵循 PEP 8 命名（函数 `snake_case`、类 `CamelCase`、常量全大写）。
-- 保持模块导入位于文件顶部，并按照 `setup_environment()` 的方式保护平台相关逻辑，避免启动回归。
-- 更新 YAML schema 时同步到本地化文档，并保证现有 `config_groups` 的向后兼容。
+- Vue 单文件组件保持 2 空格缩进，遵循 Nuxt/Vue 默认结构。
+- `package.json` 为 ESM（`"type": "module"`），使用 `import` 语法。
+- Python 目标版本为 3.13（见 `python-src/pyproject.toml`），使用 4 空格缩进与 PEP 8 命名。
+- Rust 代码位于 `src-tauri/src/`，沿用 `rustfmt` 默认风格与 `snake_case` 命名。
+- daisyUI 针对LLMs优化的prompt：https://daisyui.com/llms.txt
 
 ## 测试指引
-- `uv run python test_target_api.py` 用于验证远程 API 兼容性；请在本地替换占位符，勿提交任何机密信息。
-- GUI 检查在 `test_clipboard.py` 与 `test_tkinter_gui.py`；在你修改的操作系统上运行，并在 PR 中总结异常。
-- 发布安装包前，启动生成的 `.exe` 或 `.app`，确认打包资源、TLS 资料与 hosts 修改仍能生效。
+- `package.json` 未配置 `test` 脚本，当前无固定前端测试框架。
+- 如新增 Rust 测试，可在 `src-tauri/` 运行 `cargo test` 并在 PR 中说明覆盖范围。
+
+## 交付前质量检查
+- 任何 Python 变更：必须运行 `pnpm py:check`。
+- 任何 YAML 变更：必须运行 `yamllint <filename>`。
+- 任何 Rust 变更：必须运行 `pnpm rs:check`。
+- 任何 JS/TS/Vue 变更：必须运行 `pnpm app:check`。
 
 ## 提交与 PR 指南
-- 遵循历史中的 `type(scope): summary` 提交风格（如 `feat(mac):`、`ci(workflow):`、`docs:`）；每个提交聚焦单一主题，除非正式发布否则不要提交生成的二进制文件。
-- PR 需说明用户影响、列出手动或自动测试、关联相关问题，并在 GUI 或安装流程更新时附上截图。
-- 涉及安全敏感内容（证书处理、代理路由、entitlements）时请标注并描述缓解措施，方便评审快速评估风险。
+- 提交信息采用 Conventional Commits：`feat: ...`、`feat(tauri): ...`、`chore: ...`。
+- PR 需说明变更目的、影响范围与验证方式；涉及 UI 或 Tauri 配置时附截图与说明。
 
 ## 安全与配置提示
-- 不要提交 CA 私钥、用户证书或 `~/.mtga/` 产物；使用辅助脚本完成每台机器的配置。
-- 示例配置应放在 `docs/` 且遮蔽令牌。鼓励贡献者通过代理设置映射模型，而不是硬编码 ID。
-- 变更端口或沙箱 entitlements 时，记得同步更新 shell 启动脚本与 `mac/entitlements.plist`，以保持公证一致。
+- 变更 `src-tauri/tauri.conf.json` 或 `src-tauri/capabilities/` 时需明确权限影响。
+- 避免提交生成产物：`node_modules/`、`src-tauri/target/`、`dist/`、本地 `.venv/`。

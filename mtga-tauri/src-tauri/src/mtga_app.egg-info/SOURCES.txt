@@ -1,7 +1,0 @@
-README.md
-pyproject.toml
-src/mtga_app.egg-info/PKG-INFO
-src/mtga_app.egg-info/SOURCES.txt
-src/mtga_app.egg-info/dependency_links.txt
-src/mtga_app.egg-info/requires.txt
-src/mtga_app.egg-info/top_level.txt
