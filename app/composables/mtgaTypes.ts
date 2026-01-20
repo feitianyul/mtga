@@ -37,3 +37,8 @@ export type LogPullResult = {
   items?: string[]
   next_id?: number
 }
+
+export type LogEventPayload = {
+  items: string[]
+  next_id: number
+}

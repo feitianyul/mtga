@@ -1,6 +1,14 @@
 import { useMtgaApi } from "./useMtgaApi"
+import { listen } from "@tauri-apps/api/event"
 import { isTauriRuntime } from "./runtime"
-import type { AppInfo, ConfigGroup, ConfigPayload, InvokeResult } from "./mtgaTypes"
+import type {
+  AppInfo,
+  ConfigGroup,
+  ConfigPayload,
+  InvokeResult,
+  LogEventPayload,
+  LogPullResult,
+} from "./mtgaTypes"
 
 type RuntimeOptions = {
   debugMode: boolean
@@ -110,30 +118,70 @@ export const useMtgaStore = () => {
     }
     logStreamActive.value = true
 
-    const loop = async () => {
-      if (!logStreamActive.value) {
+    const applyLogResult = (result: LogPullResult | null) => {
+      if (!result) {
         return
       }
-      const result = await api.pullLogs({
+      if (Array.isArray(result.items) && result.items.length) {
+        appendLogs(result.items)
+      }
+      if (typeof result.next_id === "number") {
+        logCursor.value = result.next_id
+      }
+    }
+
+    const startPolling = () => {
+      const loop = async () => {
+        if (!logStreamActive.value) {
+          return
+        }
+        const result = await api.pullLogs({
+          after_id: logCursor.value || null,
+          timeout_ms: 0,
+          max_items: 200,
+        })
+        if (!logStreamActive.value) {
+          return
+        }
+        applyLogResult(result)
+        setTimeout(loop, 200)
+      }
+      void loop()
+    }
+
+    const startEventStream = async () => {
+      if (!isTauriRuntime()) {
+        startPolling()
+        return
+      }
+
+      const initial = await api.pullLogs({
         after_id: logCursor.value || null,
         timeout_ms: 0,
         max_items: 200,
       })
-      if (!logStreamActive.value) {
-        return
+      applyLogResult(initial)
+
+      try {
+        await listen<LogEventPayload>("mtga:logs", (event) => {
+          const payload = event.payload
+          if (!payload) {
+            return
+          }
+          if (Array.isArray(payload.items) && payload.items.length) {
+            appendLogs(payload.items)
+          }
+          if (typeof payload.next_id === "number") {
+            logCursor.value = payload.next_id
+          }
+        })
+      } catch (error) {
+        console.warn("[mtga] log event listen failed", error)
+        startPolling()
       }
-      if (result) {
-        if (Array.isArray(result.items) && result.items.length) {
-          appendLogs(result.items)
-        }
-        if (typeof result.next_id === "number") {
-          logCursor.value = result.next_id
-        }
-      }
-      setTimeout(loop, 200)
     }
 
-    void loop()
+    void startEventStream()
   }
 
   const loadConfig = async () => {

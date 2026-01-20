@@ -10,7 +10,7 @@ from contextlib import suppress
 from functools import lru_cache
 from importlib import import_module
 from pathlib import Path
-from threading import Lock
+from threading import Lock, Thread
 from typing import Any, cast
 
 from platformdirs import user_data_dir
@@ -181,9 +181,10 @@ except RuntimeError:
 
 from anyio.from_thread import start_blocking_portal
 from pydantic import BaseModel
-from pytauri import Commands
+from pytauri import AppHandle, Commands, Emitter
 from pytauri_wheel.lib import builder_factory, context_factory
 
+from modules.runtime.log_bus import pull_logs
 from modules.runtime.resource_manager import ResourceManager
 from modules.services.app_metadata import DEFAULT_METADATA
 from modules.services.app_version import resolve_app_version
@@ -236,6 +237,11 @@ def get_py_invoke_handler() -> Any:
 
 class GreetPayload(BaseModel):
     name: str
+
+
+class LogEventPayload(BaseModel):
+    items: list[str]
+    next_id: int
 
 
 class SaveConfigPayload(BaseModel):
@@ -306,6 +312,43 @@ async def get_app_info() -> dict[str, Any]:
     }
 
 
+def _start_log_event_stream(app_handle: AppHandle) -> None:
+    def run() -> None:
+        after_id: int | None = None
+        while True:
+            try:
+                result = pull_logs(
+                    after_id=after_id,
+                    timeout_ms=1000,
+                    max_items=200,
+                )
+            except Exception as exc:
+                _boot_log(f"log stream pull failed: {exc}")
+                time.sleep(0.2)
+                continue
+
+            if not isinstance(result, dict):
+                time.sleep(0.2)
+                continue
+
+            items = result.get("items")
+            next_id = result.get("next_id")
+            if isinstance(next_id, int):
+                after_id = next_id
+            if isinstance(items, list) and items:
+                try:
+                    payload = LogEventPayload(
+                        items=[str(item) for item in items],
+                        next_id=after_id or 0,
+                    )
+                    Emitter.emit(app_handle, "mtga:logs", payload)
+                except Exception as exc:
+                    _boot_log(f"log stream emit failed: {exc}")
+                    time.sleep(0.2)
+
+    Thread(target=run, name="mtga-log-stream", daemon=True).start()
+
+
 def main() -> int:
     # 开发期：让 Tauri 加载 Nuxt dev server
     dev_server = os.environ.get("DEV_SERVER")
@@ -353,4 +396,5 @@ def main() -> int:
             context=context,
             invoke_handler=command_registry.generate_handler(portal),
         )
+        _start_log_event_stream(app.handle())
         return app.run_return()

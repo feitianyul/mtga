@@ -7,6 +7,8 @@ use std::sync::{
 use std::time::Duration;
 
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
+use serde::Serialize;
 use tauri::{
     webview::PageLoadEvent, AppHandle, Emitter, Listener, Manager, RunEvent, Url, WindowEvent,
 };
@@ -43,6 +45,13 @@ static PY_WARMUP: OnceLock<PyObject> = OnceLock::new();
 static BACKEND_READY: AtomicBool = AtomicBool::new(false);
 static MAIN_PAGE_READY: AtomicBool = AtomicBool::new(false);
 static MAIN_WINDOW_SHOWN: AtomicBool = AtomicBool::new(false);
+static LOG_STREAM_STARTED: AtomicBool = AtomicBool::new(false);
+
+#[derive(Clone, Serialize)]
+struct LogEventPayload {
+    items: Vec<String>,
+    next_id: i64,
+}
 
 fn is_splash_url(url: &Url) -> bool {
     url.path().ends_with("/splashscreen.html")
@@ -256,6 +265,7 @@ fn run_backend_warmup(app_handle: &AppHandle) {
     if let Err(error) = warmup_py_invoke_handler() {
         log::error!(target: "boot", "label=backend_init_error error={}", error);
     }
+    start_log_event_stream(app_handle.clone());
     BACKEND_READY.store(true, Ordering::SeqCst);
     schedule_try_show_main(app_handle.clone());
 }
@@ -266,6 +276,65 @@ fn start_backend_init(app_handle: AppHandle, init_started: Arc<AtomicBool>) {
     }
     std::thread::spawn(move || {
         run_backend_warmup(&app_handle);
+    });
+}
+
+fn start_log_event_stream(app_handle: AppHandle) {
+    if LOG_STREAM_STARTED.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    std::thread::spawn(move || {
+        let mut after_id: Option<i64> = None;
+        loop {
+            let result = Python::with_gil(|py| -> PyResult<(Vec<String>, Option<i64>)> {
+                let module = PyModule::import(py, "modules.runtime.log_bus")?;
+                let pull_logs = module.getattr("pull_logs")?;
+                let kwargs = PyDict::new(py);
+                kwargs.set_item("after_id", after_id)?;
+                kwargs.set_item("timeout_ms", 1000)?;
+                kwargs.set_item("max_items", 200)?;
+                let result = pull_logs.call((), Some(&kwargs))?;
+                let dict = result.downcast::<PyDict>()?;
+                let items = match dict.get_item("items")? {
+                    Some(value) => value.extract::<Vec<String>>()?,
+                    None => Vec::new(),
+                };
+                let next_id = match dict.get_item("next_id")? {
+                    Some(value) => value.extract::<Option<i64>>()?,
+                    None => None,
+                };
+                Ok((items, next_id))
+            });
+
+            match result {
+                Ok((items, next_id)) => {
+                    if let Some(value) = next_id {
+                        after_id = Some(value);
+                    }
+                    if !items.is_empty() {
+                        let payload = LogEventPayload {
+                            items,
+                            next_id: after_id.unwrap_or(0),
+                        };
+                        if let Err(error) = app_handle.emit("mtga:logs", payload) {
+                            log::warn!(
+                                target: "boot",
+                                "label=log_stream_emit_failed error={}",
+                                error
+                            );
+                        }
+                    }
+                }
+                Err(error) => {
+                    log::warn!(
+                        target: "boot",
+                        "label=log_stream_pull_failed error={}",
+                        error
+                    );
+                    std::thread::sleep(Duration::from_millis(200));
+                }
+            }
+        }
     });
 }
 

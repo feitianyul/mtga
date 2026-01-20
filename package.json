@@ -26,6 +26,7 @@
     "tauri:bundle:mac:ci": "export PYO3_PYTHON=$(realpath ./src-tauri/pyembed/python/bin/python3) && export RUSTFLAGS=\"-C link-arg=-Wl,-rpath,@executable_path/../Resources/lib -L $(realpath ./src-tauri/pyembed/python/lib)\" && install_name_tool -id '@rpath/libpython3.13.dylib' ./src-tauri/pyembed/python/lib/libpython3.13.dylib && pnpm -- tauri build -- --profile bundle-release"
   },
   "dependencies": {
+    "@tauri-apps/api": "^2.4.0",
     "@tauri-apps/plugin-dialog": "~2.4.2",
     "@tauri-apps/plugin-shell": "^2.3.3",
     "dompurify": "^3.3.1",
