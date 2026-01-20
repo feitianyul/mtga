@@ -38,18 +38,28 @@ const selectTab = (key: TabKey) => {
     </button>
   </div>
 
-  <div class="mt-4 space-y-4">
-    <section v-show="activeTab === 'cert'">
-      <CertTab />
-    </section>
-    <section v-show="activeTab === 'hosts'">
-      <HostsTab />
-    </section>
-    <section v-show="activeTab === 'proxy'">
-      <ProxyTab />
-    </section>
-    <section v-show="activeTab === 'data'">
-      <DataManagementTab />
-    </section>
-  </div>
+  <Transition
+    enter-active-class="transition duration-100 ease-out"
+    enter-from-class="opacity-0 translate-y-3"
+    enter-to-class="opacity-100 translate-y-0"
+    leave-active-class="transition duration-100 ease-in"
+    leave-from-class="opacity-100 translate-y-0"
+    leave-to-class="opacity-0 -translate-y-1"
+    mode="out-in"
+  >
+    <div :key="activeTab" class="mt-4 space-y-4">
+      <section v-if="activeTab === 'cert'">
+        <CertTab />
+      </section>
+      <section v-else-if="activeTab === 'hosts'">
+        <HostsTab />
+      </section>
+      <section v-else-if="activeTab === 'proxy'">
+        <ProxyTab />
+      </section>
+      <section v-else-if="activeTab === 'data'">
+        <DataManagementTab />
+      </section>
+    </div>
+  </Transition>
 </template>
