@@ -29,7 +29,7 @@
 
 ## 交付前质量检查
 - 任何 Python 变更：必须运行 `pnpm py:check`。
-- 任何 YAML 变更：必须运行 `yamllint <filename>`。
+- 任何 YAML 变更：必须运行 `pnpm eslint . --fix`。
 - 任何 Rust 变更：必须运行 `pnpm rs:check`。
 - 任何 JS/TS/Vue 变更：必须运行 `pnpm app:check`。
 

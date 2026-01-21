@@ -1,5 +1,5 @@
 {
-  "packageManager": "pnpm@10.28.0+sha512.05df71d1421f21399e053fde567cea34d446fa02c76571441bfc1c7956e98e363088982d940465fd34480d4d90a0668bc12362f8aa88000a64e83d0b0e47be48",
+  "packageManager": "pnpm@10.28.1",
   "engines": {
     "node": ">=24 <25"
   },
@@ -45,8 +45,10 @@
     "daisyui": "^5.5.14",
     "eslint": "^9.21.0",
     "eslint-plugin-better-tailwindcss": "^3.8.0",
+    "eslint-plugin-yml": "^3.0.0",
     "tailwindcss": "^4.1.18",
     "typescript": "^5.7.3",
-    "vue-tsc": "^2.2.8"
+    "vue-tsc": "^2.2.8",
+    "yaml-eslint-parser": "^2.0.0"
   }
 }

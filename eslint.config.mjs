@@ -1,5 +1,7 @@
 import withNuxt from "./.nuxt/eslint.config.mjs"
 import betterTailwind from "eslint-plugin-better-tailwindcss"
+import * as yamlParser from "yaml-eslint-parser"
+import * as eslintPluginYml from "eslint-plugin-yml"
 
 export default withNuxt(
   {
@@ -10,6 +12,7 @@ export default withNuxt(
       "dist",
       "src-tauri",
       "python-src",
+      "pnpm-lock.yaml",
     ],
   },
   {
@@ -23,6 +26,32 @@ export default withNuxt(
     rules: {
       "@typescript-eslint/no-unsafe-type-assertion": "warn",
       "@typescript-eslint/no-unnecessary-type-assertion": "warn",
+    },
+  },
+  // 添加 YAML 支持
+  {
+    files: ["**/*.{yaml,yml}"],
+    languageOptions: {
+      parser: yamlParser,
+    },
+    plugins: {
+      yml: eslintPluginYml.default || eslintPluginYml,
+    },
+    rules: {
+      // 对应 document-start: present: false
+      "yml/file-header": "off",
+
+      // 对应 indentation: spaces: 2, indent-sequences: true
+      "yml/indent": ["error", 2, { indentBlockSequences: true }],
+
+      // YAML 插件本身没有 line-length，使用 ESLint 通用规则或关闭
+      "max-len": ["warn", { code: 175, ignoreUrls: true }],
+
+      // 对应 trailing-spaces: level: warning
+      "no-trailing-spaces": "warn",
+
+      // 对应 comments: min-spaces-from-content: 1
+      "yml/spaced-comment": ["error", "always"],
     },
   },
   // 添加 Better Tailwind CSS 支持
