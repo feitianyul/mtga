@@ -285,6 +285,22 @@ jobs:
         run: pnpm tauri:bundle:mac:ci
         working-directory: .
 
+      - name: 🏷️ 重命名 macOS 安装包
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.prepare-version.outputs.version }}"
+          PLATFORM_TAG="apple"
+          for file in src-tauri/target/bundle-release/bundle/dmg/*.dmg; do
+            [ -e "$file" ] || continue
+            base=$(basename "$file")
+            if [[ "$base" == *"_${VERSION}_"* ]]; then
+              new="${base/_${VERSION}_/_${VERSION}_${PLATFORM_TAG}_}"
+              if [ "$new" != "$base" ]; then
+                mv "$file" "$(dirname "$file")/$new"
+              fi
+            fi
+          done
+
       - name: 📤 上传构建产物
         uses: actions/upload-artifact@v6
         with:
@@ -451,6 +467,21 @@ jobs:
       - name: 🧱 打包 Tauri
         run: pnpm tauri:bundle:win:ci
         working-directory: .
+
+      - name: 🏷️ 重命名 Windows 安装包
+        run: |
+          $version = "${{ needs.prepare-version.outputs.version }}"
+          $tag = "windows"
+          $escaped = [regex]::Escape("_$version_")
+          Get-ChildItem "src-tauri/target/bundle-release/bundle/nsis" -Filter *.exe | ForEach-Object {
+            $name = $_.Name
+            if ($name -match $escaped) {
+              $newName = $name -replace $escaped, "_${version}_${tag}_"
+              if ($newName -ne $name) {
+                Rename-Item -Path $_.FullName -NewName $newName
+              }
+            }
+          }
 
       - name: 📤 上传构建产物
         uses: actions/upload-artifact@v6
