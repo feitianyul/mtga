@@ -22,6 +22,12 @@ export default defineNuxtConfig({
     server: {
       // Tauri需要一个确定的端口
       strictPort: true,
+      // 开发期禁用缓存，避免 Tauri WebView 读取到损坏缓存
+      headers: {
+        'Cache-Control': 'no-store',
+        Pragma: 'no-cache',
+        Expires: '0',
+      },
     },
     plugins: [tailwindcss()],
   },
