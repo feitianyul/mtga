@@ -1,25 +1,35 @@
 <script setup lang="ts">
 
-type TabKey = "cert" | "hosts" | "proxy" | "data";
+type TabKey = "cert" | "hosts" | "proxy";
 const tabs: { key: TabKey; label: string }[] = [
   { key: "cert", label: "证书管理" },
   { key: "hosts", label: "hosts文件管理" },
   { key: "proxy", label: "代理服务器操作" },
-  { key: "data", label: "用户数据管理" },
 ];
 
 const activeTab = ref<TabKey>("cert");
+const direction = ref<"right" | "left">("right");
 
+/**
+ * 处理标签页切换
+ * @param key 目标标签页的键名
+ */
 const selectTab = (key: TabKey) => {
-  activeTab.value = key;
+  const oldIndex = tabs.findIndex((t) => t.key === activeTab.value);
+  const newIndex = tabs.findIndex((t) => t.key === key);
+
+  if (newIndex !== oldIndex) {
+    direction.value = newIndex > oldIndex ? "right" : "left";
+    activeTab.value = key;
+  }
 };
 </script>
 
 <template>
   <div class="flex flex-wrap items-center justify-between gap-3">
     <div>
-      <h2 class="mtga-card-title">功能操作</h2>
-      <p class="mtga-card-subtitle">证书 / hosts / 代理 / 数据</p>
+      <h2 class="mtga-card-title">主要流程</h2>
+      <p class="mtga-card-subtitle">证书 / hosts / 代理</p>
     </div>
     <span class="mtga-chip">工具集</span>
   </div>
@@ -39,12 +49,12 @@ const selectTab = (key: TabKey) => {
   </div>
 
   <Transition
-    enter-active-class="transition duration-100 ease-out"
-    enter-from-class="opacity-0 translate-y-3"
-    enter-to-class="opacity-100 translate-y-0"
-    leave-active-class="transition duration-100 ease-in"
-    leave-from-class="opacity-100 translate-y-0"
-    leave-to-class="opacity-0 -translate-y-1"
+    enter-active-class="transition duration-200 ease-out"
+    :enter-from-class="direction === 'right' ? 'opacity-0 translate-x-8' : 'opacity-0 -translate-x-8'"
+    enter-to-class="opacity-100 translate-x-0"
+    leave-active-class="transition duration-150 ease-in"
+    leave-from-class="opacity-100 translate-x-0"
+    :leave-to-class="direction === 'right' ? 'opacity-0 -translate-x-8' : 'opacity-0 translate-x-8'"
     mode="out-in"
   >
     <div :key="activeTab" class="mt-4 space-y-4">
@@ -56,9 +66,6 @@ const selectTab = (key: TabKey) => {
       </section>
       <section v-else-if="activeTab === 'proxy'">
         <ProxyTab />
-      </section>
-      <section v-else-if="activeTab === 'data'">
-        <DataManagementTab />
       </section>
     </div>
   </Transition>

@@ -19,6 +19,21 @@ const {
  * 当前选中的左侧面板 ID
  */
 const activeTab = ref('config-group')
+const direction = ref<'down' | 'up'>('down')
+
+/**
+ * 处理导航切换
+ * @param id 目标面板 ID
+ */
+const selectTab = (id: string) => {
+  const oldIndex = navigation.findIndex((item) => item.id === activeTab.value)
+  const newIndex = navigation.findIndex((item) => item.id === id)
+
+  if (newIndex !== oldIndex) {
+    direction.value = newIndex > oldIndex ? 'down' : 'up'
+    activeTab.value = id
+  }
+}
 
 /**
  * 全局 Tooltip 代理状态
@@ -85,8 +100,8 @@ const handleGlobalMouseOver = (e: MouseEvent) => {
 const navigation = [
   { id: 'config-group', name: '代理配置组', icon: ICONS.CONFIG_GROUP },
   { id: 'global-config', name: '全局配置', icon: ICONS.GLOBAL_CONFIG },
-  { id: 'runtime-options', name: '运行时选项', icon: ICONS.RUNTIME_OPTIONS },
-  { id: 'main-tabs', name: '功能操作', icon: ICONS.MAIN_TABS },
+  { id: 'main-tabs', name: '主要流程', icon: ICONS.MAIN_TABS },
+  { id: 'settings', name: '设置', icon: ICONS.SETTINGS },
 ]
 
 onMounted(async () => {
@@ -111,7 +126,7 @@ onMounted(async () => {
                     ? 'bg-amber-500/15 text-amber-600 border-amber-500/40 shadow-sm shadow-amber-500/10' 
                     : 'text-slate-500 border-transparent hover:bg-slate-200/40'
                 ]"
-                @click="activeTab = item.id"
+                @click="selectTab(item.id)"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 opacity-80 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="item.icon" />
@@ -149,15 +164,18 @@ onMounted(async () => {
         <div class="flex-1 min-w-0 p-6 overflow-hidden flex flex-col">
           <Transition
             enter-active-class="transition duration-200 ease-out"
-            enter-from-class="translate-x-4 opacity-0"
-            enter-to-class="translate-x-0 opacity-100"
+            :enter-from-class="direction === 'down' ? 'translate-y-4 opacity-0' : '-translate-y-4 opacity-0'"
+            enter-to-class="translate-y-0 opacity-100"
+            leave-active-class="transition duration-150 ease-in"
+            leave-from-class="translate-y-0 opacity-100"
+            :leave-to-class="direction === 'down' ? '-translate-y-4 opacity-0' : 'translate-y-4 opacity-0'"
             mode="out-in"
           >
             <div :key="activeTab" class="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
               <ConfigGroupPanel v-if="activeTab === 'config-group'" />
               <GlobalConfigPanel v-if="activeTab === 'global-config'" />
-              <RuntimeOptionsPanel v-if="activeTab === 'runtime-options'" />
               <MainTabs v-if="activeTab === 'main-tabs'" />
+              <SettingsPanel v-if="activeTab === 'settings'" />
             </div>
           </Transition>
         </div>

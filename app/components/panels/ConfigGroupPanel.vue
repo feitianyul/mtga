@@ -387,8 +387,8 @@ const moveDown = async () => {
         删除
       </button>
       <div class="h-px bg-slate-200/70 mx-1"></div>
-      <button class="btn btn-outline btn-sm w-full rounded-xl border-slate-200 hover:border-slate-300 hover:bg-slate-50" @click="moveUp">上移</button>
-      <button class="btn btn-outline btn-sm w-full rounded-xl border-slate-200 hover:border-slate-300 hover:bg-slate-50" @click="moveDown">下移</button>
+      <button class="btn btn-outline btn-sm w-full rounded-xl border-slate-200 hover:border-amber-500 hover:bg-amber-50/50 hover:text-amber-600" @click="moveUp">上移</button>
+      <button class="btn btn-outline btn-sm w-full rounded-xl border-slate-200 hover:border-amber-500 hover:bg-amber-50/50 hover:text-amber-600" @click="moveDown">下移</button>
     </div>
   </div>
 
