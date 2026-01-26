@@ -219,6 +219,22 @@ fn init_python_runtime() -> Option<PathBuf> {
     home
 }
 
+fn inject_app_version(version: &str) {
+    let result = Python::with_gil(|py| -> PyResult<()> {
+        let module = PyModule::import(py, "modules.services.app_version")?;
+        let setter = module.getattr("set_app_version")?;
+        setter.call1((version,))?;
+        Ok(())
+    });
+    if let Err(error) = result {
+        log::warn!(
+            target: "boot",
+            "label=app_version_inject_failed error={}",
+            error
+        );
+    }
+}
+
 fn build_py_invoke_handler() -> PyResult<PyObject> {
     Python::with_gil(|py| {
         let bootstrap = r#"
@@ -410,6 +426,8 @@ pub fn run() {
         .setup({
             let backend_init_started = Arc::clone(&backend_init_started);
             move |app| {
+                let version = app.package_info().version.to_string();
+                inject_app_version(&version);
                 if cfg!(debug_assertions) {
                     app.handle().plugin(
                         tauri_plugin_log::Builder::default()

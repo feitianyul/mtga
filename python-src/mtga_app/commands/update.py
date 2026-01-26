@@ -15,7 +15,11 @@ from .common import build_result_payload, collect_logs
 
 @lru_cache(maxsize=1)
 def _get_project_root() -> Path:
-    return Path(__file__).resolve().parents[2]
+    p = Path(__file__).resolve()
+    for parent in p.parents:
+        if (parent / "modules").exists() and (parent / "mtga-tauri").exists():
+            return parent
+    return p.parents[3]
 
 
 def register_update_commands(commands: Commands) -> None:

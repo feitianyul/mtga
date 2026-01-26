@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
@@ -9,8 +10,11 @@ except ModuleNotFoundError:  # pragma: no cover
     tomllib = None
 
 
-def resolve_app_version(*, project_root: Path) -> str:
-    """从构建期注入的版本信息或 pyproject.toml 解析应用版本。"""
+_APP_STATE: dict[str, str | None] = {"version": None}
+
+
+def set_app_version(value: str | None) -> None:
+    """由宿主（Tauri）注入版本号，避免读取构建期文件。"""
 
     def normalize_version(raw_value: str | None) -> str | None:
         if not raw_value:
@@ -20,33 +24,40 @@ def resolve_app_version(*, project_root: Path) -> str:
             return None
         return raw_value if raw_value.startswith("v") else f"v{raw_value}"
 
-    env_version = normalize_version(os.getenv("MTGA_VERSION"))
-    if env_version:
-        return env_version
+    _APP_STATE["version"] = normalize_version(value)
 
-    baked_version: str | None = None
-    try:
-        from modules.runtime import _build_version as build_version_module  # type: ignore  # noqa: PLC0415,I001
 
-        baked_version = normalize_version(
-            getattr(build_version_module, "BUILT_APP_VERSION", None)
-        )
-    except Exception:
-        baked_version = None
+def resolve_app_version(*, project_root: Path) -> str:
+    """从宿主注入/环境变量/pyproject.toml 解析应用版本。"""
 
-    if baked_version:
-        return baked_version
+    def normalize_version(raw_value: str | None) -> str | None:
+        if not raw_value:
+            return None
+        raw_value = raw_value.strip()
+        if not raw_value:
+            return None
+        return raw_value if raw_value.startswith("v") else f"v{raw_value}"
 
-    if tomllib is None:
-        return "v0.0.0"
+    version = normalize_version(os.getenv("MTGA_VERSION"))
+    if not version:
+        version = normalize_version(_APP_STATE.get("version"))
 
-    pyproject_path = project_root / "pyproject.toml"
-    try:
-        with pyproject_path.open("rb") as f:
-            data = tomllib.load(f)
-        version = normalize_version(data.get("project", {}).get("version"))
-        if not version:
-            return "v0.0.0"
-        return version
-    except Exception:
-        return "v0.0.0"
+    if not version:
+        tauri_conf_path = project_root / "src-tauri" / "tauri.conf.json"
+        try:
+            with tauri_conf_path.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+            version = normalize_version(data.get("version"))
+        except Exception:
+            version = None
+
+    if not version and tomllib is not None:
+        pyproject_path = project_root / "python-src" / "pyproject.toml"
+        try:
+            with pyproject_path.open("rb") as f:
+                data = tomllib.load(f)
+            version = normalize_version(data.get("project", {}).get("version"))
+        except Exception:
+            version = None
+
+    return version or "v0.0.0"
