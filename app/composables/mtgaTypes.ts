@@ -42,3 +42,11 @@ export type LogEventPayload = {
   items: string[]
   next_id: number
 }
+
+export type MainTabKey = "cert" | "hosts" | "proxy"
+
+export type ProxyStartStepEvent = {
+  step: MainTabKey
+  status: "ok" | "skipped" | "failed"
+  message?: string | null
+}

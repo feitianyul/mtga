@@ -1,3 +1,4 @@
+import { Channel, invoke } from "@tauri-apps/api/core"
 import { pyInvoke } from "tauri-plugin-pytauri-api"
 
 import type { AppInfo, ConfigPayload, InvokeResult, LogPullResult } from "./mtgaTypes"
@@ -23,6 +24,11 @@ const safeInvoke = async <T>(
 }
 
 export const useMtgaApi = () => {
+  let proxyStepChannel: Channel<string> | null = null
+  type ProxyStepChannelOptions = {
+    reset?: boolean
+    startFromLatest?: boolean
+  }
   const loadConfig = () => safeInvoke<ConfigPayload>("load_config")
   const saveConfig = (payload: ConfigPayload) =>
     safeInvoke<boolean>("save_config", payload, false)
@@ -69,6 +75,36 @@ export const useMtgaApi = () => {
     max_items?: number
   }) => safeInvoke<LogPullResult>("pull_logs_command", payload)
 
+  const startProxyStepChannel = async (
+    onMessage: (payload: unknown) => void,
+    options?: ProxyStepChannelOptions
+  ): Promise<boolean> => {
+    if (!canInvoke()) {
+      return false
+    }
+    try {
+      if (proxyStepChannel && options?.reset) {
+        proxyStepChannel.onmessage = () => {}
+        proxyStepChannel = null
+      }
+      if (proxyStepChannel) {
+        proxyStepChannel.onmessage = onMessage
+        return true
+      }
+      proxyStepChannel = new Channel<string>()
+      proxyStepChannel.onmessage = onMessage
+      await invoke("proxy_step_channel", {
+        channel: proxyStepChannel,
+        start_from_latest: options?.startFromLatest ?? false,
+      })
+      return true
+    } catch (error) {
+      proxyStepChannel = null
+      console.warn("[mtga] proxy step channel failed", error)
+      return false
+    }
+  }
+
   return {
     loadConfig,
     saveConfig,
@@ -90,5 +126,6 @@ export const useMtgaApi = () => {
     userDataClear,
     checkUpdates,
     pullLogs,
+    startProxyStepChannel,
   }
 }

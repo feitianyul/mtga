@@ -185,6 +185,7 @@ from pytauri import AppHandle, Commands, Emitter
 from pytauri_wheel.lib import builder_factory, context_factory
 
 from modules.runtime.log_bus import pull_logs
+from modules.runtime.proxy_step_bus import pull_steps
 from modules.runtime.resource_manager import ResourceManager
 from modules.services.app_metadata import DEFAULT_METADATA
 from modules.services.app_version import resolve_app_version
@@ -349,6 +350,40 @@ def _start_log_event_stream(app_handle: AppHandle) -> None:
     Thread(target=run, name="mtga-log-stream", daemon=True).start()
 
 
+def _start_proxy_step_event_stream(app_handle: AppHandle) -> None:
+    def run() -> None:
+        after_id: int | None = None
+        while True:
+            try:
+                result = pull_steps(
+                    after_id=after_id,
+                    timeout_ms=1000,
+                    max_items=200,
+                )
+            except Exception as exc:
+                _boot_log(f"proxy step pull failed: {exc}")
+                time.sleep(0.2)
+                continue
+
+            if not isinstance(result, dict):
+                time.sleep(0.2)
+                continue
+
+            items = result.get("items")
+            next_id = result.get("next_id")
+            if isinstance(next_id, int):
+                after_id = next_id
+            if isinstance(items, list) and items:
+                for item in items:
+                    try:
+                        Emitter.emit_str(app_handle, "mtga:proxy-step", str(item))
+                    except Exception as exc:
+                        _boot_log(f"proxy step emit failed: {exc}")
+                        time.sleep(0.2)
+
+    Thread(target=run, name="mtga-proxy-step-stream", daemon=True).start()
+
+
 def main() -> int:
     # 开发期：让 Tauri 加载 Nuxt dev server
     dev_server = os.environ.get("DEV_SERVER")
@@ -397,4 +432,5 @@ def main() -> int:
             invoke_handler=command_registry.generate_handler(portal),
         )
         _start_log_event_stream(app.handle())
+        _start_proxy_step_event_stream(app.handle())
         return app.run_return()

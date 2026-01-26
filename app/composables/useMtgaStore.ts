@@ -1,6 +1,6 @@
 import { useMtgaApi } from "./useMtgaApi"
 import { listen } from "@tauri-apps/api/event"
-import { isTauriRuntime } from "./runtime"
+import { isBundledRuntime, isTauriRuntime } from "./runtime"
 import type {
   AppInfo,
   ConfigGroup,
@@ -8,6 +8,8 @@ import type {
   InvokeResult,
   LogEventPayload,
   LogPullResult,
+  MainTabKey,
+  ProxyStartStepEvent,
 } from "./mtgaTypes"
 
 type RuntimeOptions = {
@@ -36,6 +38,42 @@ const DEFAULT_RUNTIME_OPTIONS: RuntimeOptions = {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
+
+const isMainTabKey = (value: unknown): value is MainTabKey =>
+  value === "cert" || value === "hosts" || value === "proxy"
+
+const isProxyStepStatus = (
+  value: unknown
+): value is ProxyStartStepEvent["status"] =>
+  value === "ok" || value === "skipped" || value === "failed"
+
+const isProxyStartStepEvent = (
+  value: unknown
+): value is ProxyStartStepEvent => {
+  if (!isRecord(value)) {
+    return false
+  }
+  return isMainTabKey(value.step) && isProxyStepStatus(value.status)
+}
+
+const normalizeProxyStepPayload = (
+  payload: unknown
+): ProxyStartStepEvent | null => {
+  if (isProxyStartStepEvent(payload)) {
+    return payload
+  }
+  if (typeof payload === "string") {
+    try {
+      const parsed = JSON.parse(payload)
+      if (isProxyStartStepEvent(parsed)) {
+        return parsed
+      }
+    } catch {
+      return null
+    }
+  }
+  return null
+}
 
 const coerceText = (value: unknown) => {
   if (typeof value === "string") {
@@ -86,9 +124,67 @@ export const useMtgaStore = () => {
     "mtga-update-auto-checked",
     () => false
   )
+  const panelNavTarget = useState<string | null>(
+    "mtga-panel-nav-target",
+    () => null
+  )
+  const panelNavSignal = useState<number>("mtga-panel-nav-signal", () => 0)
+  const mainTabTarget = useState<MainTabKey | null>(
+    "mtga-main-tab-target",
+    () => null
+  )
+  const mainTabSignal = useState<number>("mtga-main-tab-signal", () => 0)
+  const proxyStepListenerActive = useState<boolean>(
+    "mtga-proxy-step-listener-active",
+    () => false
+  )
+  const proxyStepQueue = useState<MainTabKey[]>(
+    "mtga-proxy-step-queue",
+    () => []
+  )
+  const proxyStepProcessing = useState<boolean>(
+    "mtga-proxy-step-processing",
+    () => false
+  )
+
+  const drainProxyStepQueue = async () => {
+    if (proxyStepProcessing.value) {
+      return
+    }
+    proxyStepProcessing.value = true
+    while (proxyStepQueue.value.length) {
+      const step = proxyStepQueue.value.shift()
+      if (!step) {
+        continue
+      }
+      panelNavTarget.value = "main-tabs"
+      panelNavSignal.value += 1
+      mainTabTarget.value = step
+      mainTabSignal.value += 1
+      await nextTick()
+      await new Promise((resolve) => setTimeout(resolve, 240))
+    }
+    proxyStepProcessing.value = false
+  }
+
+  const enqueueProxyStep = (step: MainTabKey) => {
+    proxyStepQueue.value.push(step)
+    void drainProxyStepQueue()
+  }
 
   const appendLog = (message: string) => {
     logs.value.push(message)
+  }
+
+  const handleProxyStep = (payload: unknown) => {
+    const normalized = normalizeProxyStepPayload(payload)
+    if (!normalized || !isMainTabKey(normalized.step)) {
+      return
+    }
+    appendLog(
+      `[proxy-step] step=${normalized.step} status=${normalized.status}${normalized.message ? ` message=${normalized.message}` : ""}`
+    )
+    enqueueProxyStep(normalized.step)
   }
 
   const appendLogs = (entries?: string[]) => {
@@ -182,6 +278,29 @@ export const useMtgaStore = () => {
     }
 
     void startEventStream()
+  }
+
+  const startProxyStepListener = () => {
+    if (proxyStepListenerActive.value) {
+      return
+    }
+    proxyStepListenerActive.value = true
+
+    if (isBundledRuntime()) {
+      return
+    }
+
+    const listenProxySteps = async () => {
+      try {
+        await listen<ProxyStartStepEvent>("mtga:proxy-step", (event) => {
+          handleProxyStep(event.payload)
+        })
+      } catch (error) {
+        console.warn("[mtga] proxy step listen failed", error)
+      }
+    }
+
+    void listenProxySteps()
   }
 
   const loadConfig = async () => {
@@ -294,6 +413,7 @@ export const useMtgaStore = () => {
     }
     initialized.value = true
     startLogStream()
+    startProxyStepListener()
     await Promise.all([loadAppInfo(), loadConfig(), loadStartupStatus()])
   }
 
@@ -347,6 +467,15 @@ export const useMtgaStore = () => {
   }
 
   const runProxyStartAll = async () => {
+    if (isBundledRuntime()) {
+      const ok = await api.startProxyStepChannel(handleProxyStep, {
+        reset: true,
+        startFromLatest: true,
+      })
+      if (!ok) {
+        appendLog("⚠️ proxy-step channel 启动失败，自动导航不可用")
+      }
+    }
     const result = await api.proxyStartAll(buildProxyPayload())
     return applyInvokeResult(result, "一键启动全部服务")
   }
@@ -451,8 +580,13 @@ export const useMtgaStore = () => {
     updateVersionLabel,
     updateNotesHtml,
     updateReleaseUrl,
+    panelNavTarget,
+    panelNavSignal,
+    mainTabTarget,
+    mainTabSignal,
     appendLog,
     startLogStream,
+    startProxyStepListener,
     loadConfig,
     saveConfig,
     init,

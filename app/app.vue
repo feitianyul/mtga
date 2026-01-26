@@ -13,6 +13,8 @@ const {
   runCheckUpdatesOnce,
   closeUpdateDialog,
   openUpdateRelease,
+  panelNavTarget,
+  panelNavSignal,
 } = useMtgaStore()
 
 /**
@@ -103,6 +105,25 @@ const navigation = [
   { id: 'main-tabs', name: '主要流程', icon: ICONS.MAIN_TABS },
   { id: 'settings', name: '设置', icon: ICONS.SETTINGS },
 ]
+
+const resolvePanelTarget = (value: string | null) => {
+  if (!value) {
+    return null
+  }
+  return navigation.some((item) => item.id === value) ? value : null
+}
+
+watch(
+  panelNavSignal,
+  () => {
+    const resolved = resolvePanelTarget(panelNavTarget.value)
+    if (!resolved) {
+      return
+    }
+    selectTab(resolved)
+  },
+  { immediate: true }
+)
 
 onMounted(async () => {
   await init()

@@ -8,9 +8,10 @@ use std::time::Duration;
 
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{
-    webview::PageLoadEvent, AppHandle, Emitter, Listener, Manager, RunEvent, Url, WindowEvent,
+    ipc::Channel, webview::PageLoadEvent, AppHandle, Emitter, Listener, Manager, RunEvent, Url,
+    WindowEvent,
 };
 
 fn resolve_python_home() -> Option<PathBuf> {
@@ -51,6 +52,12 @@ static LOG_STREAM_STARTED: AtomicBool = AtomicBool::new(false);
 struct LogEventPayload {
     items: Vec<String>,
     next_id: i64,
+}
+
+#[derive(Deserialize)]
+struct ProxyStepEvent {
+    step: String,
+    status: String,
 }
 
 fn is_splash_url(url: &Url) -> bool {
@@ -295,6 +302,85 @@ fn start_backend_init(app_handle: AppHandle, init_started: Arc<AtomicBool>) {
     });
 }
 
+fn should_stop_proxy_step(payload: &str) -> bool {
+    let Ok(event) = serde_json::from_str::<ProxyStepEvent>(payload) else {
+        return false;
+    };
+    if event.status == "failed" {
+        return true;
+    }
+    event.step == "proxy"
+}
+
+fn pull_proxy_steps(
+    after_id: Option<i64>,
+    timeout_ms: i64,
+    max_items: i64,
+) -> PyResult<(Vec<String>, Option<i64>)> {
+    Python::with_gil(|py| {
+        let module = PyModule::import(py, "modules.runtime.proxy_step_bus")?;
+        let pull_steps = module.getattr("pull_steps")?;
+        let kwargs = PyDict::new(py);
+        kwargs.set_item("after_id", after_id)?;
+        kwargs.set_item("timeout_ms", timeout_ms)?;
+        kwargs.set_item("max_items", max_items)?;
+        let result = pull_steps.call((), Some(&kwargs))?;
+        let dict = result.downcast::<PyDict>()?;
+        let items = match dict.get_item("items")? {
+            Some(value) => value.extract::<Vec<String>>()?,
+            None => Vec::new(),
+        };
+        let next_id = match dict.get_item("next_id")? {
+            Some(value) => value.extract::<Option<i64>>()?,
+            None => None,
+        };
+        Ok((items, next_id))
+    })
+}
+
+#[tauri::command]
+fn proxy_step_channel(channel: Channel<String>, start_from_latest: Option<bool>) {
+    let start_from_latest = start_from_latest.unwrap_or(false);
+    std::thread::spawn(move || {
+        let mut after_id: Option<i64> = None;
+        if start_from_latest {
+            if let Ok((_, next_id)) = pull_proxy_steps(None, 0, 1) {
+                after_id = next_id;
+            }
+        }
+        loop {
+            let result = pull_proxy_steps(after_id, 1000, 200);
+
+            match result {
+                Ok((items, next_id)) => {
+                    if let Some(value) = next_id {
+                        after_id = Some(value);
+                    }
+                    if items.is_empty() {
+                        continue;
+                    }
+                    for item in items {
+                        if channel.send(item.clone()).is_err() {
+                            return;
+                        }
+                        if should_stop_proxy_step(&item) {
+                            return;
+                        }
+                    }
+                }
+                Err(error) => {
+                    log::warn!(
+                        target: "boot",
+                        "label=proxy_step_pull_failed error={}",
+                        error
+                    );
+                    std::thread::sleep(Duration::from_millis(200));
+                }
+            }
+        }
+    });
+}
+
 fn start_log_event_stream(app_handle: AppHandle) {
     if LOG_STREAM_STARTED.swap(true, Ordering::SeqCst) {
         return;
@@ -402,6 +488,7 @@ pub fn run() {
     let backend_init_started = Arc::new(AtomicBool::new(false));
 
     let app = tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![proxy_step_channel])
         .plugin(tauri_plugin_pytauri::init(py_invoke_handler))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())

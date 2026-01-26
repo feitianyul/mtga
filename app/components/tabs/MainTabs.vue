@@ -1,20 +1,21 @@
 <script setup lang="ts">
+import type { MainTabKey } from "~/composables/mtgaTypes"
 
-type TabKey = "cert" | "hosts" | "proxy";
-const tabs: { key: TabKey; label: string }[] = [
+const tabs: { key: MainTabKey; label: string }[] = [
   { key: "cert", label: "证书管理" },
   { key: "hosts", label: "hosts文件管理" },
   { key: "proxy", label: "代理服务器操作" },
 ];
 
-const activeTab = ref<TabKey>("cert");
+const activeTab = ref<MainTabKey>("cert");
 const direction = ref<"right" | "left">("right");
+const { mainTabTarget, mainTabSignal } = useMtgaStore()
 
 /**
  * 处理标签页切换
  * @param key 目标标签页的键名
  */
-const selectTab = (key: TabKey) => {
+const selectTab = (key: MainTabKey) => {
   const oldIndex = tabs.findIndex((t) => t.key === activeTab.value);
   const newIndex = tabs.findIndex((t) => t.key === key);
 
@@ -23,6 +24,17 @@ const selectTab = (key: TabKey) => {
     activeTab.value = key;
   }
 };
+
+const applyMainTabTarget = (target: MainTabKey | null) => {
+  if (!target) {
+    return
+  }
+  selectTab(target)
+}
+
+watch(mainTabSignal, () => applyMainTabTarget(mainTabTarget.value), {
+  immediate: true,
+})
 </script>
 
 <template>

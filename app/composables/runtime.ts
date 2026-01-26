@@ -11,3 +11,18 @@ export const getRuntimeTag = (): string => {
 }
 
 export const isTauriRuntime = (): boolean => getRuntimeTag() === "tauri"
+
+export const isBundledRuntime = (): boolean => {
+  if (typeof window === "undefined") {
+    return false
+  }
+  const runtime = window.__MTGA_RUNTIME__
+  if (runtime === "tauri" || runtime === "nuitka") {
+    return true
+  }
+  const protocol = window.location?.protocol?.replace(":", "")
+  if (protocol === "tauri") {
+    return true
+  }
+  return window.location?.hostname === "tauri.localhost"
+}
