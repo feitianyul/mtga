@@ -27,11 +27,12 @@
 - `package.json` 未配置 `test` 脚本，当前无固定前端测试框架。
 - 如新增 Rust 测试，可在 `src-tauri/` 运行 `cargo test` 并在 PR 中说明覆盖范围。
 
-## 交付前质量检查
-- 任何 Python 变更：必须运行 `pnpm py:check`。
-- 任何 YAML 变更：必须运行 `pnpm eslint . --fix`。
-- 任何 Rust 变更：必须运行 `pnpm rs:check`。
-- 任何 JS/TS/Vue 变更：必须运行 `pnpm app:check`。
+## 质量检查
+LLM在向user交付更改前需进行质量检查：
+  - 任何 Python 变更：必须运行 `pnpm py:check`。
+  - 任何 YAML 变更：必须运行 `pnpm eslint . --fix`。
+  - 任何 Rust 变更：必须运行 `pnpm rs:check`。
+  - 任何 JS/TS/Vue 变更：必须运行 `pnpm app:check`。
 
 ## 提交与 PR 指南
 - 提交信息采用 Conventional Commits：`feat: ...`、`feat(tauri): ...`、`chore: ...`。
