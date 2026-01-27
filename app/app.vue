@@ -13,6 +13,8 @@ const {
   runCheckUpdatesOnce,
   closeUpdateDialog,
   openUpdateRelease,
+  stopLogStream,
+  stopProxyStepListener,
   panelNavTarget,
   panelNavSignal,
 } = useMtgaStore()
@@ -128,6 +130,11 @@ watch(
 onMounted(async () => {
   await init()
   await runCheckUpdatesOnce()
+})
+
+onBeforeUnmount(() => {
+  stopLogStream()
+  stopProxyStepListener()
 })
 </script>
 

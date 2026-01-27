@@ -36,6 +36,8 @@ const DEFAULT_RUNTIME_OPTIONS: RuntimeOptions = {
   streamMode: "true",
 }
 
+const FRONTEND_LOG_LIMIT = 2000
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
 
@@ -147,6 +149,10 @@ export const useMtgaStore = () => {
     () => false
   )
 
+  let logPollTimer: ReturnType<typeof setTimeout> | null = null
+  let logEventUnlisten: (() => void) | null = null
+  let proxyStepUnlisten: (() => void) | null = null
+
   const drainProxyStepQueue = async () => {
     if (proxyStepProcessing.value) {
       return
@@ -174,6 +180,10 @@ export const useMtgaStore = () => {
 
   const appendLog = (message: string) => {
     logs.value.push(message)
+    const overflow = logs.value.length - FRONTEND_LOG_LIMIT
+    if (overflow > 0) {
+      logs.value.splice(0, overflow)
+    }
   }
 
   const handleProxyStep = (payload: unknown) => {
@@ -213,6 +223,18 @@ export const useMtgaStore = () => {
       return
     }
     logStreamActive.value = true
+    if (logEventUnlisten) {
+      try {
+        logEventUnlisten()
+      } catch {
+        // ignore cleanup errors
+      }
+      logEventUnlisten = null
+    }
+    if (logPollTimer !== null) {
+      clearTimeout(logPollTimer)
+      logPollTimer = null
+    }
 
     const applyLogResult = (result: LogPullResult | null) => {
       if (!result) {
@@ -240,7 +262,7 @@ export const useMtgaStore = () => {
           return
         }
         applyLogResult(result)
-        setTimeout(loop, 200)
+        logPollTimer = setTimeout(loop, 200)
       }
       void loop()
     }
@@ -259,7 +281,7 @@ export const useMtgaStore = () => {
       applyLogResult(initial)
 
       try {
-        await listen<LogEventPayload>("mtga:logs", (event) => {
+        const unlisten = await listen<LogEventPayload>("mtga:logs", (event) => {
           const payload = event.payload
           if (!payload) {
             return
@@ -271,6 +293,17 @@ export const useMtgaStore = () => {
             logCursor.value = payload.next_id
           }
         })
+        if (!logStreamActive.value) {
+          try {
+            unlisten()
+          } catch {
+            // ignore cleanup errors
+          }
+          return
+        }
+        logEventUnlisten = () => {
+          void unlisten()
+        }
       } catch (error) {
         console.warn("[mtga] log event listen failed", error)
         startPolling()
@@ -280,11 +313,35 @@ export const useMtgaStore = () => {
     void startEventStream()
   }
 
+  const stopLogStream = () => {
+    logStreamActive.value = false
+    if (logPollTimer !== null) {
+      clearTimeout(logPollTimer)
+      logPollTimer = null
+    }
+    if (logEventUnlisten) {
+      try {
+        logEventUnlisten()
+      } catch {
+        // ignore cleanup errors
+      }
+      logEventUnlisten = null
+    }
+  }
+
   const startProxyStepListener = () => {
     if (proxyStepListenerActive.value) {
       return
     }
     proxyStepListenerActive.value = true
+    if (proxyStepUnlisten) {
+      try {
+        proxyStepUnlisten()
+      } catch {
+        // ignore cleanup errors
+      }
+      proxyStepUnlisten = null
+    }
 
     if (isBundledRuntime()) {
       return
@@ -292,15 +349,38 @@ export const useMtgaStore = () => {
 
     const listenProxySteps = async () => {
       try {
-        await listen<ProxyStartStepEvent>("mtga:proxy-step", (event) => {
+        const unlisten = await listen<ProxyStartStepEvent>("mtga:proxy-step", (event) => {
           handleProxyStep(event.payload)
         })
+        if (!proxyStepListenerActive.value) {
+          try {
+            unlisten()
+          } catch {
+            // ignore cleanup errors
+          }
+          return
+        }
+        proxyStepUnlisten = () => {
+          void unlisten()
+        }
       } catch (error) {
         console.warn("[mtga] proxy step listen failed", error)
       }
     }
 
     void listenProxySteps()
+  }
+
+  const stopProxyStepListener = () => {
+    proxyStepListenerActive.value = false
+    if (proxyStepUnlisten) {
+      try {
+        proxyStepUnlisten()
+      } catch {
+        // ignore cleanup errors
+      }
+      proxyStepUnlisten = null
+    }
   }
 
   const loadConfig = async () => {
@@ -409,6 +489,8 @@ export const useMtgaStore = () => {
 
   const init = async () => {
     if (initialized.value) {
+      startLogStream()
+      startProxyStepListener()
       return
     }
     initialized.value = true
@@ -586,7 +668,9 @@ export const useMtgaStore = () => {
     mainTabSignal,
     appendLog,
     startLogStream,
+    stopLogStream,
     startProxyStepListener,
+    stopProxyStepListener,
     loadConfig,
     saveConfig,
     init,
