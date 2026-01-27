@@ -381,14 +381,14 @@ const moveDown = async () => {
     </div>
 
     <div class="space-y-2">
-      <button class="btn btn-primary btn-sm w-full rounded-xl shadow-sm" @click="openAdd">新增</button>
-      <button class="btn btn-outline btn-sm w-full rounded-xl border-slate-200 hover:border-amber-500 hover:bg-amber-50/50 hover:text-amber-600" @click="openEdit">修改</button>
-      <button class="btn btn-outline btn-sm w-full rounded-xl border-slate-200 text-error hover:bg-error/10 hover:border-error" @click="requestDelete">
+      <button class="mtga-btn-primary" @click="openAdd">新增</button>
+      <button class="mtga-btn-outline" @click="openEdit">修改</button>
+      <button class="mtga-btn-error" @click="requestDelete">
         删除
       </button>
       <div class="h-px bg-slate-200/70 mx-1"></div>
-      <button class="btn btn-outline btn-sm w-full rounded-xl border-slate-200 hover:border-amber-500 hover:bg-amber-50/50 hover:text-amber-600" @click="moveUp">上移</button>
-      <button class="btn btn-outline btn-sm w-full rounded-xl border-slate-200 hover:border-amber-500 hover:bg-amber-50/50 hover:text-amber-600" @click="moveDown">下移</button>
+      <button class="mtga-btn-outline" @click="moveUp">上移</button>
+      <button class="mtga-btn-outline" @click="moveDown">下移</button>
     </div>
   </div>
 

@@ -98,14 +98,14 @@ const handleClear = () => {
       </div>
       <div class="space-y-2">
         <button
-          class="btn btn-outline btn-sm w-full rounded-xl border-slate-200 hover:border-amber-500 hover:bg-amber-50/50 hover:text-amber-600 tooltip mtga-tooltip"
+          class="mtga-btn-outline tooltip mtga-tooltip"
           :data-tip="openDirTooltip"
           @click="handleOpen"
         >
           打开目录
         </button>
         <button
-          class="btn btn-primary btn-sm w-full rounded-xl shadow-sm tooltip mtga-tooltip"
+          class="mtga-btn-primary tooltip mtga-tooltip"
           :data-tip="backupTooltip"
           style="--mtga-tooltip-max: 360px;"
           @click="handleBackup"
@@ -113,7 +113,7 @@ const handleClear = () => {
           备份数据
         </button>
         <button
-          class="btn btn-outline btn-sm w-full rounded-xl border-slate-200 hover:border-amber-500 hover:bg-amber-50/50 hover:text-amber-600 tooltip mtga-tooltip"
+          class="mtga-btn-outline tooltip mtga-tooltip"
           :data-tip="restoreTooltip"
           style="--mtga-tooltip-max: 360px;"
           @click="handleRestore"
@@ -121,7 +121,7 @@ const handleClear = () => {
           还原数据
         </button>
         <button
-          class="btn btn-outline btn-sm w-full rounded-xl border-slate-200 text-error hover:bg-error/10 hover:border-error tooltip mtga-tooltip"
+          class="mtga-btn-error tooltip mtga-tooltip"
           :data-tip="clearTooltip"
           style="--mtga-tooltip-max: 360px;"
           @click="handleClear"

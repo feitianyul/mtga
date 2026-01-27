@@ -92,6 +92,26 @@
   }
 
   /* 
+     MTGA 通用按钮样式
+     封装了项目中频繁使用的三种按钮规格
+  */
+  
+  /* 1. 品牌色主按钮 (Primary) */
+  .mtga-btn-primary {
+    @apply btn btn-primary btn-sm w-full rounded-xl shadow-sm;
+  }
+
+  /* 2. 危险/停止操作按钮 (Error Outline) */
+  .mtga-btn-error {
+    @apply btn btn-outline btn-sm rounded-xl border-slate-200 text-error hover:bg-error/10 hover:border-error w-full;
+  }
+
+  /* 3. 次要/检查操作按钮 (Outline with Amber hover) */
+  .mtga-btn-outline {
+    @apply btn btn-outline btn-sm rounded-xl border-slate-200 hover:border-amber-500 hover:bg-amber-50/50 hover:text-amber-600 w-full;
+  }
+
+  /* 
      mtga-tooltip 基础定义
      我们保留原生 tooltip 类以支持 daisyUI 的基础样式（如 cursor），
      但通过全局代理元素来渲染实际的提示框，以逃逸 overflow: hidden。
