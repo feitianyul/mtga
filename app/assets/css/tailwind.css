@@ -1,13 +1,48 @@
 @import "tailwindcss";
-@plugin "daisyui";
 
-/* Optional: set default theme */
+/* 
+   合并 daisyUI 配置。
+   在 Tailwind CSS 4 中，只需调用一次 @plugin "daisyui"。
+   通过 themes: light --default 显式指定默认主题，并避免加载默认的 dark 主题颜色。
+*/
 @plugin "daisyui" {
   themes: light --default;
 }
 
+/* 
+   使用 Tailwind CSS 4 的 @theme 块定义主题变量。
+   这里的变量会自动映射为 Tailwind 的实用类（如 bg-primary, text-mtga-accent）。
+*/
+@theme {
+  /* 
+     在 Tailwind CSS 4 中定义主题颜色。
+     直接使用颜色值，确保 Tailwind 的实用类（如 bg-primary）能正确生成。
+  */
+  --color-primary: #f0bb32;
+  --color-primary-content: #1e293b;
+
+  /* 品牌色变量定义，供 Tailwind 实用类使用（如 text-mtga-accent） */
+  --color-mtga-bg: #f7f8fb;
+  --color-mtga-surface: #ffffff;
+  --color-mtga-surface-soft: #f3f6fa;
+  --color-mtga-border: #e5e7eb;
+  --color-mtga-accent: #f0bb32;
+  --color-mtga-accent-strong: #d9a307;
+  --color-mtga-warn: #f59e0b;
+  --color-mtga-text: #0f172a;
+  --color-mtga-text-muted: #64748b;
+}
+
 @layer base {
-  :root {
+  /* 
+     显式覆盖 daisyUI 注入的主题变量。
+     通过 :root 和 [data-theme] 确保在任何模式（浅色/深色）下都能强制生效。
+  */
+  :root, [data-theme] {
+    --color-primary: #f0bb32 !important;
+    --color-primary-content: #1e293b !important;
+
+    /* 同时也定义一份 CSS 变量，供非 Tailwind 样式（如 scrollbar）通过 var() 引用 */
     --mtga-bg: #f7f8fb;
     --mtga-surface: #ffffff;
     --mtga-surface-soft: #f3f6fa;
@@ -17,12 +52,7 @@
     --mtga-warn: #f59e0b;
     --mtga-text: #0f172a;
     --mtga-text-muted: #64748b;
-
-    /* 覆盖 daisyUI 的 primary 颜色 */
-    --color-primary: var(--mtga-accent);
-    --color-primary-content: #1e293b;
   }
-
   /* 自定义全局滚动条样式 */
   ::-webkit-scrollbar {
     width: 6px;
@@ -66,6 +96,26 @@
   }
 }
 
+  /* 
+     MTGA 通用按钮样式
+     封装了项目中频繁使用的三种按钮规格
+  */
+  
+  /* 1. 品牌色主按钮 (Primary) */
+  @utility mtga-btn-primary {
+    @apply btn btn-primary btn-sm w-full rounded-xl shadow-sm;
+  }
+
+  /* 2. 危险/停止操作按钮 (Error Outline) */
+  @utility mtga-btn-error {
+    @apply btn btn-outline btn-sm rounded-xl border-slate-200 text-error hover:bg-error/10 hover:border-error w-full;
+  }
+
+  /* 3. 次要/检查操作按钮 (Outline with Amber hover) */
+  @utility mtga-btn-outline {
+    @apply btn btn-outline btn-sm rounded-xl border-slate-200 hover:border-amber-500 hover:bg-amber-50/50 hover:text-amber-600 w-full;
+  }
+
 @layer components {
   .mtga-card {
     @apply rounded-2xl border border-slate-200/70 bg-white/40 backdrop-blur-sm shadow-[0_18px_45px_-32px_rgba(15,23,42,0.2)];
@@ -91,24 +141,17 @@
     @apply rounded-xl border border-slate-200/80 p-3;
   }
 
-  /* 
-     MTGA 通用按钮样式
-     封装了项目中频繁使用的三种按钮规格
-  */
-  
-  /* 1. 品牌色主按钮 (Primary) */
-  .mtga-btn-primary {
-    @apply btn btn-primary btn-sm w-full rounded-xl shadow-sm;
+  /**
+   * 用于点击的长条形子样式
+   * 继承自 mtga-soft-panel 的基础样式，具有较小的高度和全宽
+   */
+  .mtga-clickable-row {
+    @apply mtga-btn-outline flex h-auto items-center justify-between px-4 py-2 text-sm transition-all active:scale-[0.98];
   }
 
-  /* 2. 危险/停止操作按钮 (Error Outline) */
-  .mtga-btn-error {
-    @apply btn btn-outline btn-sm rounded-xl border-slate-200 text-error hover:bg-error/10 hover:border-error w-full;
-  }
-
-  /* 3. 次要/检查操作按钮 (Outline with Amber hover) */
-  .mtga-btn-outline {
-    @apply btn btn-outline btn-sm rounded-xl border-slate-200 hover:border-amber-500 hover:bg-amber-50/50 hover:text-amber-600 w-full;
+  .mtga-clickable-row::after {
+    content: "›";
+    @apply ml-2 text-slate-400 font-bold text-lg leading-none;
   }
 
   /* 
