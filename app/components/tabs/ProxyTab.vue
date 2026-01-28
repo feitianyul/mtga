@@ -46,7 +46,7 @@ const handleCheck = () => {
         />
         <span>关闭SSL严格模式</span>
       </label>
-      <div class="flex flex-wrap items-center gap-3 text-sm text-slate-700">
+      <div class="flex flex-wrap items-center gap-1 text-sm text-slate-700">
         <label class="flex items-center gap-3 cursor-pointer hover:bg-slate-100/50 rounded px-3 py-2 -my-1 transition-colors">
           <input
             v-model="options.forceStream"
@@ -55,14 +55,13 @@ const handleCheck = () => {
           />
           <span>强制流模式</span>
         </label>
-        <select
+        <MtgaSelect
           v-model="options.streamMode"
-          class="select select-bordered select-sm bg-white/50"
+          :options="['true', 'false']"
+          size="xs"
+          class="w-20"
           :disabled="!options.forceStream"
-        >
-          <option value="true">true</option>
-          <option value="false">false</option>
-        </select>
+        />
       </div>
     </div>
   </div>
