@@ -410,13 +410,19 @@ const moveDown = async () => {
           <div class="label pb-1">
             <span class="label-text text-xs text-slate-500">配置组名称（可选）</span>
           </div>
-          <input v-model="form.name" class="input input-bordered w-full bg-white/80" />
+          <div class="mtga-input-wrapper">
+            <input v-model="form.name" class="mtga-input" />
+            <button v-if="form.name" class="mtga-input-clear" type="button" @click="form.name = ''" />
+          </div>
         </label>
         <label class="form-control">
           <div class="label pb-1">
             <span class="label-text text-xs text-slate-500">* API URL</span>
           </div>
-          <input v-model="form.api_url" class="input input-bordered w-full bg-white/80" />
+          <div class="mtga-input-wrapper">
+            <input v-model="form.api_url" class="mtga-input" />
+            <button v-if="form.api_url" class="mtga-input-clear" type="button" @click="form.api_url = ''" />
+          </div>
         </label>
         <div class="flex items-center gap-3 pt-2">
           <label class="flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap">
@@ -427,28 +433,42 @@ const moveDown = async () => {
             />
             <span class="label-text text-xs text-slate-500">修改中间路由</span>
           </label>
-          <input
-            v-model="form.middle_route"
-            class="input input-bordered w-full bg-white/80"
-            :disabled="!middleRouteEnabled"
-            :placeholder="DEFAULT_MIDDLE_ROUTE"
-          />
+          <div class="mtga-input-wrapper">
+            <input
+              v-model="form.middle_route"
+              class="mtga-input"
+              :disabled="!middleRouteEnabled"
+              :placeholder="DEFAULT_MIDDLE_ROUTE"
+            />
+            <button v-if="form.middle_route" class="mtga-input-clear" type="button" @click="form.middle_route = ''" />
+          </div>
         </div>
         <label class="form-control">
           <div class="label pb-1">
             <span class="label-text text-xs text-slate-500">* 实际模型ID</span>
           </div>
-          <input v-model="form.model_id" class="input input-bordered w-full bg-white/80" />
+          <div class="mtga-input-wrapper">
+            <input v-model="form.model_id" class="mtga-input" />
+            <button v-if="form.model_id" class="mtga-input-clear" type="button" @click="form.model_id = ''" />
+          </div>
         </label>
         <label class="form-control">
           <div class="label pb-1">
             <span class="label-text text-xs text-slate-500">* API Key</span>
           </div>
-          <input
-            v-model="form.api_key"
-            class="input input-bordered w-full bg-white/80"
-            type="password"
-          />
+          <div class="mtga-input-wrapper">
+            <input
+              v-model="form.api_key"
+              class="mtga-input"
+              type="password"
+            />
+            <button
+              v-if="form.api_key"
+              class="mtga-input-clear"
+              type="button"
+              @click="form.api_key = ''"
+            />
+          </div>
         </label>
         <p v-if="formError" class="text-sm text-error">{{ formError }}</p>      
         <p class="text-xs text-slate-400 pt-4">* 为必填项</p>

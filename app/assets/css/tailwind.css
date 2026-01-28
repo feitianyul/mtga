@@ -117,6 +117,38 @@
   }
 
 @layer components {
+  /**
+   * MTGA 标准输入框组件
+   * 默认自带右侧清空按钮的空间，并支持悬停显示清空按钮
+   */
+  .mtga-input-wrapper {
+    @apply relative w-full flex items-center;
+  }
+
+  .mtga-input {
+    @apply w-full bg-white/80 rounded-xl transition-all hover:border-amber-500/30 hover:bg-amber-50/30 hover:shadow-[0_0_10px_rgba(245,158,11,0.2)] hover:shadow-amber-500/30 focus:border-amber-500/60 focus:ring-amber-500/60 border focus:bg-amber-50/60 border-slate-200 pl-4 pr-10 h-10 text-sm outline-none;
+  }
+
+  .mtga-input-clear {
+    @apply absolute right-2 flex items-center justify-center w-6 h-6 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 opacity-0 transition-all cursor-pointer;
+  }
+
+  /* 使用 mask 将 X 图标集成到 CSS 中 */
+  .mtga-input-clear::before {
+    content: "";
+    @apply w-4 h-4 bg-current;
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M6 18L18 6M6 6l12 12'/%3E%3C/svg%3E");
+    mask-size: contain;
+    mask-repeat: no-repeat;
+    mask-position: center;
+  }
+
+  /* 悬停或输入框获得焦点时显示清空按钮 */
+  .mtga-input-wrapper:hover .mtga-input-clear,
+  .mtga-input-wrapper:focus-within .mtga-input-clear {
+    @apply opacity-100;
+  }
+
   .mtga-card {
     @apply rounded-2xl border border-slate-200/70 bg-white/40 backdrop-blur-sm shadow-[0_18px_45px_-32px_rgba(15,23,42,0.2)];
   }

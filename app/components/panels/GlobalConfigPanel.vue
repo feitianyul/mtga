@@ -64,11 +64,19 @@ const handleSave = async () => {
           :data-tip="mappedModelTooltip"
           style="--mtga-tooltip-max: 360px;"
         >
-          <input
-            v-model="mappedModelId"
-            class="input input-bordered w-full bg-white/50"
-            placeholder="例如：gpt-5"
-          />
+          <div class="mtga-input-wrapper">
+            <input
+              v-model="mappedModelId"
+              class="mtga-input"
+              placeholder="例如：gpt-5"
+            />
+            <button
+              v-if="mappedModelId"
+              class="mtga-input-clear"
+              type="button"
+              @click="mappedModelId = ''"
+            />
+          </div>
         </div>
       </label>
 
@@ -81,12 +89,20 @@ const handleSave = async () => {
           :data-tip="mtgaAuthTooltip"
           style="--mtga-tooltip-max: 360px;"
         >
-          <input
-            v-model="mtgaAuthKey"
-            class="input input-bordered w-full bg-white/50"
-            placeholder="例如：111"
-            type="password"
-          />
+          <div class="mtga-input-wrapper">
+            <input
+              v-model="mtgaAuthKey"
+              class="mtga-input"
+              placeholder="例如：111"
+              type="password"
+            />
+            <button
+              v-if="mtgaAuthKey"
+              class="mtga-input-clear"
+              type="button"
+              @click="mtgaAuthKey = ''"
+            />
+          </div>
         </div>
       </label>
     </div>
