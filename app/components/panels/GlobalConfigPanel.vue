@@ -54,57 +54,33 @@ const handleSave = async () => {
     <span class="mtga-chip">全局参数</span>
   </div>
   <div class="mt-4 space-y-4">
-    <div class="mtga-soft-panel space-y-3">
-      <label class="form-control">
-        <div class="label pb-1">
-          <span class="label-text text-xs text-slate-500">映射模型ID</span> 
-        </div>
-        <div
-          class="tooltip mtga-tooltip w-full"
-          :data-tip="mappedModelTooltip"
-          style="--mtga-tooltip-max: 360px;"
-        >
-          <div class="mtga-input-wrapper">
-            <input
-              v-model="mappedModelId"
-              class="mtga-input"
-              placeholder="例如：gpt-5"
-            />
-            <button
-              v-if="mappedModelId"
-              class="mtga-input-clear"
-              type="button"
-              @click="mappedModelId = ''"
-            />
-          </div>
-        </div>
-      </label>
+    <div class="mtga-soft-panel space-y-4">
+      <div
+        class="tooltip mtga-tooltip w-full"
+        :data-tip="mappedModelTooltip"
+        style="--mtga-tooltip-max: 360px;"
+      >
+        <MtgaInput 
+          v-model="mappedModelId"
+          label="映射模型ID"
+          placeholder="例如：gpt-5"
+          required
+        />
+      </div>
 
-      <label class="form-control">
-        <div class="label pb-1">
-          <span class="label-text text-xs text-slate-500">MTGA鉴权Key</span>
-        </div>
-        <div
-          class="tooltip mtga-tooltip w-full"
-          :data-tip="mtgaAuthTooltip"
-          style="--mtga-tooltip-max: 360px;"
-        >
-          <div class="mtga-input-wrapper">
-            <input
-              v-model="mtgaAuthKey"
-              class="mtga-input"
-              placeholder="例如：111"
-              type="password"
-            />
-            <button
-              v-if="mtgaAuthKey"
-              class="mtga-input-clear"
-              type="button"
-              @click="mtgaAuthKey = ''"
-            />
-          </div>
-        </div>
-      </label>
+      <div
+        class="tooltip mtga-tooltip w-full"
+        :data-tip="mtgaAuthTooltip"
+        style="--mtga-tooltip-max: 360px;"
+      >
+        <MtgaInput 
+          v-model="mtgaAuthKey"
+          label="MTGA鉴权Key"
+          placeholder="例如：111"
+          type="password"
+          required
+        />
+      </div>
     </div>
 
     <div class="flex items-center justify-between gap-3">

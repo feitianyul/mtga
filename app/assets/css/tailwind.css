@@ -122,15 +122,31 @@
    * 默认自带右侧清空按钮的空间，并支持悬停显示清空按钮
    */
   .mtga-input-wrapper {
-    @apply relative w-full flex items-center;
+    @apply relative w-full flex items-center bg-white/80 rounded-xl transition-all border border-slate-200 overflow-hidden;
+  }
+
+  .mtga-input-wrapper:hover {
+    @apply border-amber-500/30 bg-amber-50/30 shadow-[0_0_10px_rgba(245,158,11,0.2)] shadow-amber-500/30;
+  }
+
+  .mtga-input-wrapper:focus-within {
+    @apply border-amber-500/60 ring-amber-500/60 bg-amber-50/60;
   }
 
   .mtga-input {
-    @apply w-full bg-white/80 rounded-xl transition-all hover:border-amber-500/30 hover:bg-amber-50/30 hover:shadow-[0_0_10px_rgba(245,158,11,0.2)] hover:shadow-amber-500/30 focus:border-amber-500/60 focus:ring-amber-500/60 border focus:bg-amber-50/60 border-slate-200 pl-4 pr-10 h-10 text-sm outline-none;
+    @apply flex-1 bg-transparent h-10 px-4 text-sm outline-none w-full;
+  }
+
+  .mtga-input-addon {
+    @apply flex items-center justify-center px-3 h-full text-slate-400 bg-slate-50/50 text-xs transition-colors border-slate-200;
+  }
+
+  .mtga-input-wrapper:focus-within .mtga-input-addon {
+    @apply bg-amber-50/40 text-amber-600/70 border-amber-500/20;
   }
 
   .mtga-input-clear {
-    @apply absolute right-2 flex items-center justify-center w-6 h-6 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 opacity-0 transition-all cursor-pointer;
+    @apply flex items-center justify-center w-6 h-6 rounded-full hover:bg-slate-200/50 text-slate-400 hover:text-slate-600 opacity-0 transition-all cursor-pointer mr-1;
   }
 
   /* 使用 mask 将 X 图标集成到 CSS 中 */
@@ -256,5 +272,20 @@
   @keyframes mtga-tooltip-in {
     from { opacity: 0; transform: scale(0.95) translateY(4px); }
     to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  /**
+   * 标签文本基础样式
+   */
+  .mtga-label-text {
+    @apply text-xs text-slate-500;
+  }
+
+  /**
+   * 必填项样式：在标签前添加红色星号
+   */
+  .mtga-label-required::before {
+    content: "*";
+    @apply text-error mr-1 inline-block align-middle;
   }
 }

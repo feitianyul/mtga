@@ -11,6 +11,7 @@ const editorOpen = ref(false)
 const editorMode = ref<"add" | "edit">("add")
 const formError = ref("")
 const middleRouteEnabled = ref(false)
+const availableModels = ref<string[]>([])
 
 const confirmOpen = ref(false)
 const confirmTitle = ref("确认删除")
@@ -195,6 +196,11 @@ const handleSave = async () => {
   } else {
     store.appendLog("保存配置组失败")
   }
+}
+
+const handleFetchModels = async () => {
+  store.appendLog("正在获取模型列表...")
+  // TODO: 调用后端 API 获取模型列表
 }
 
 const requestDelete = () => {
@@ -405,73 +411,66 @@ const moveDown = async () => {
           <span class="mtga-chip">配置编辑</span>
         </div>
       </div>
-      <div class="mt-2 px-5 pb-5">
-        <label class="form-control">
-          <div class="label pb-1">
-            <span class="label-text text-xs text-slate-500">配置组名称（可选）</span>
+      <div class="mt-2 px-5 pb-5 space-y-4">
+        <MtgaInput 
+          v-model="form.name" 
+          label="配置组名称" 
+          placeholder="例如：我的常用配置"
+          icon="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+        />
+        
+        <MtgaInput 
+          v-model="form.api_url" 
+          label="API URL" 
+          required 
+          placeholder="https://api.openai.com/v1"
+          icon="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+        />
+
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="flex cursor-pointer items-center gap-2">
+              <input
+                v-model="middleRouteEnabled"
+                type="checkbox"
+                class="checkbox checkbox-primary checkbox-xs"
+              />
+              <span class="label-text text-xs font-medium text-slate-500">修改中间路由</span>
+            </label>
+            <span v-if="middleRouteEnabled" class="text-[10px] text-slate-400">通常为 /v1</span>
           </div>
-          <div class="mtga-input-wrapper">
-            <input v-model="form.name" class="mtga-input" />
-            <button v-if="form.name" class="mtga-input-clear" type="button" @click="form.name = ''" />
-          </div>
-        </label>
-        <label class="form-control">
-          <div class="label pb-1">
-            <span class="label-text text-xs text-slate-500">* API URL</span>
-          </div>
-          <div class="mtga-input-wrapper">
-            <input v-model="form.api_url" class="mtga-input" />
-            <button v-if="form.api_url" class="mtga-input-clear" type="button" @click="form.api_url = ''" />
-          </div>
-        </label>
-        <div class="flex items-center gap-3 pt-2">
-          <label class="flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap">
-            <input
-              v-model="middleRouteEnabled"
-              type="checkbox"
-              class="checkbox checkbox-sm"
-            />
-            <span class="label-text text-xs text-slate-500">修改中间路由</span>
-          </label>
-          <div class="mtga-input-wrapper">
-            <input
-              v-model="form.middle_route"
-              class="mtga-input"
-              :disabled="!middleRouteEnabled"
-              :placeholder="DEFAULT_MIDDLE_ROUTE"
-            />
-            <button v-if="form.middle_route" class="mtga-input-clear" type="button" @click="form.middle_route = ''" />
-          </div>
+          <MtgaInput 
+            v-if="middleRouteEnabled"
+            v-model="form.middle_route"
+            :placeholder="DEFAULT_MIDDLE_ROUTE"
+            size="sm"
+          />
         </div>
-        <label class="form-control">
-          <div class="label pb-1">
-            <span class="label-text text-xs text-slate-500">* 实际模型ID</span>
-          </div>
-          <div class="mtga-input-wrapper">
-            <input v-model="form.model_id" class="mtga-input" />
-            <button v-if="form.model_id" class="mtga-input-clear" type="button" @click="form.model_id = ''" />
-          </div>
-        </label>
-        <label class="form-control">
-          <div class="label pb-1">
-            <span class="label-text text-xs text-slate-500">* API Key</span>
-          </div>
-          <div class="mtga-input-wrapper">
-            <input
-              v-model="form.api_key"
-              class="mtga-input"
-              type="password"
-            />
-            <button
-              v-if="form.api_key"
-              class="mtga-input-clear"
-              type="button"
-              @click="form.api_key = ''"
-            />
-          </div>
-        </label>
-        <p v-if="formError" class="text-sm text-error">{{ formError }}</p>      
-        <p class="text-xs text-slate-400 pt-4">* 为必填项</p>
+
+        <MtgaInput 
+          v-model="form.model_id" 
+          label="实际模型ID" 
+          required 
+          show-dropdown
+          :options="availableModels"
+          placeholder="例如：gpt-4-turbo"
+          icon="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"
+          @dropdown="handleFetchModels"
+        />
+
+        <MtgaInput 
+          v-model="form.api_key" 
+          label="API Key" 
+          required 
+          type="password" 
+          placeholder="sk-..."
+          icon="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+        />
+
+        <div v-if="formError" class="alert alert-error py-2 px-3 rounded-xl">
+          <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-4 w-4" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          <span class="text-xs">{{ formError }}</span>
+        </div>
       </div>
       <div class="modal-action px-5 pb-5">
         <button class="btn btn-ghost rounded-xl" @click="closeEditor">取消</button>
