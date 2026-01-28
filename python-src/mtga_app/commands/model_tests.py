@@ -28,6 +28,13 @@ class ConfigGroupTestPayload(BaseModel):
     mode: Literal["chat", "models"] = "chat"
 
 
+class ConfigGroupModelListPayload(BaseModel):
+    api_url: str = ""
+    model_id: str = ""
+    api_key: str = ""
+    middle_route: str = ""
+
+
 @lru_cache(maxsize=1)
 def _get_resource_manager() -> ResourceManager:
     return ResourceManager()
@@ -71,3 +78,19 @@ def register_model_test_commands(commands: Commands) -> None:
             )
         result = OperationResult.success()
         return build_result_payload(result, logs, "配置组测活完成")
+
+    @commands.command()
+    async def config_group_models(body: ConfigGroupModelListPayload) -> dict[str, Any]:
+        logs, log_func = collect_logs()
+        group = {
+            "api_url": body.api_url,
+            "model_id": body.model_id,
+            "api_key": body.api_key,
+            "middle_route": body.middle_route,
+        }
+        model_ids, ok = model_tests.fetch_model_list(group, log_func=log_func)
+        if not ok:
+            result = OperationResult.failure("模型列表获取失败", models=model_ids)
+            return build_result_payload(result, logs, "模型列表获取失败")
+        result = OperationResult.success(models=model_ids)
+        return build_result_payload(result, logs, "模型列表获取完成")

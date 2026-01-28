@@ -53,16 +53,9 @@ def _log_model_list(
     model_id: str,
     log_func: Callable[[str], None],
 ) -> None:
-    if isinstance(payload, dict) and payload.get("object"):
-        log_func(f"   对象类型: {payload['object']}")
-
-    model_items = _extract_model_items(payload)
-    if not model_items:
-        log_func("❌ 响应中未发现模型列表")
+    model_ids = _parse_model_ids(payload, log_func)
+    if not model_ids:
         return
-
-    log_func(f"   模型数量: {len(model_items)}")
-    model_ids = _collect_model_ids(model_items)
     if model_id in model_ids:
         log_func(f"✅ 发现模型: {model_id}")
     else:
@@ -92,49 +85,95 @@ def _parse_response_json(
         return None
 
 
+def _parse_model_ids(
+    payload: Any,
+    log_func: Callable[[str], None],
+) -> list[str]:
+    if isinstance(payload, dict) and payload.get("object"):
+        log_func(f"   对象类型: {payload['object']}")
+
+    model_items = _extract_model_items(payload)
+    if not model_items:
+        log_func("❌ 响应中未发现模型列表")
+        return []
+
+    model_ids = sorted(_collect_model_ids(model_items))
+    log_func(f"   模型数量: {len(model_ids)}")
+    return model_ids
+
+
+def _fetch_model_payload(
+    config_group: dict[str, Any],
+    log_func: Callable[[str], None],
+    *,
+    model_id: str | None = None,
+) -> Any | None:
+    api_url = config_group.get("api_url", "").rstrip("/")
+    if not api_url:
+        log_func("检查失败: API URL为空")
+        return None
+
+    route_path = _build_middle_route_path(
+        config_group.get("middle_route", ""),
+        "models",
+    )
+    test_url = f"{api_url}{route_path}"
+    headers: dict[str, str] = {}
+    api_key = config_group.get("api_key", "")
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    log_func(f"正在获取模型列表: {test_url}")
+
+    suffix = f": {model_id}" if model_id else ""
+    try:
+        response = requests.get(test_url, headers=headers, timeout=10)
+    except requests.exceptions.Timeout:
+        log_func(f"❌ 模型列表获取超时{suffix}")
+        return None
+    except requests.exceptions.RequestException as exc:
+        log_func(f"❌ 模型列表获取网络错误{suffix}: {str(exc)}")
+        return None
+    except Exception as exc:
+        log_func(f"❌ 模型列表获取意外错误{suffix}: {str(exc)}")
+        return None
+
+    if response.status_code != HTTP_OK:
+        _log_response_error(response, log_func)
+        return None
+
+    log_func("✅ 模型列表获取成功")
+    return _parse_response_json(response, log_func)
+
+
 def _run_model_connection_test(
     config_group: dict[str, Any],
     log_func: Callable[[str], None],
 ) -> None:
     model_id = "未知模型"
-    try:
-        api_url = config_group.get("api_url", "").rstrip("/")
-        model_id = config_group.get("model_id", "")
-        api_key = config_group.get("api_key", "")
+    model_id = config_group.get("model_id", "")
+    if not config_group.get("api_url") or not model_id:
+        log_func("检查失败: API URL或模型ID为空")
+        return
 
-        if not api_url or not model_id:
-            log_func("检查失败: API URL或模型ID为空")
-            return
+    payload = _fetch_model_payload(config_group, log_func, model_id=model_id)
+    if payload is None:
+        return
+    _log_model_list(payload, model_id, log_func)
 
-        route_path = _build_middle_route_path(
-            config_group.get("middle_route", ""),
-            "models",
-        )
-        test_url = f"{api_url}{route_path}"
-        headers: dict[str, str] = {}
-        if api_key:
-            headers["Authorization"] = f"Bearer {api_key}"
 
-        log_func(f"正在获取模型列表: {test_url}")
-
-        response = requests.get(test_url, headers=headers, timeout=10)
-
-        if response.status_code != HTTP_OK:
-            _log_response_error(response, log_func)
-            return
-
-        log_func("✅ 模型列表获取成功")
-        payload = _parse_response_json(response, log_func)
-        if payload is None:
-            return
-        _log_model_list(payload, model_id, log_func)
-
-    except requests.exceptions.Timeout:
-        log_func(f"❌ 模型列表获取超时: {model_id}")
-    except requests.exceptions.RequestException as exc:
-        log_func(f"❌ 模型列表获取网络错误: {str(exc)}")
-    except Exception as exc:
-        log_func(f"❌ 模型列表获取意外错误: {str(exc)}")
+def fetch_model_list(
+    config_group: dict[str, Any],
+    *,
+    log_func: Callable[[str], None] = print,
+) -> tuple[list[str], bool]:
+    payload = _fetch_model_payload(config_group, log_func)
+    if payload is None:
+        return [], False
+    model_ids = _parse_model_ids(payload, log_func)
+    if not model_ids:
+        return [], False
+    return model_ids, True
 
 
 def test_model_in_list(

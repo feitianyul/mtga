@@ -95,6 +95,20 @@ const coerceText = (value: unknown) => {
   return ""
 }
 
+const normalizeModelList = (value: unknown) => {
+  if (!Array.isArray(value)) {
+    return []
+  }
+  const unique = new Set<string>()
+  value.forEach((item) => {
+    const text = coerceText(item).trim()
+    if (text) {
+      unique.add(text)
+    }
+  })
+  return Array.from(unique).sort((a, b) => a.localeCompare(b))
+}
+
 const clampIndex = (value: number, max: number) => {
   if (max <= 0) {
     return 0
@@ -567,6 +581,20 @@ export const useMtgaStore = () => {
     return applyInvokeResult(result, "配置组测活")
   }
 
+  const fetchConfigGroupModels = async (payload: {
+    api_url: string
+    api_key?: string
+    middle_route?: string
+    model_id?: string
+  }) => {
+    const result = await api.configGroupModels(payload)
+    const ok = applyInvokeResult(result, "获取模型列表")
+    if (!ok || !result) {
+      return null
+    }
+    return normalizeModelList(result.details?.["models"])
+  }
+
   const runUserDataOpenDir = async () => {
     const result = await api.userDataOpenDir()
     return applyInvokeResult(result, "打开用户数据目录")
@@ -684,6 +712,7 @@ export const useMtgaStore = () => {
     runProxyCheckNetwork,
     runProxyStartAll,
     runConfigGroupTest,
+    fetchConfigGroupModels,
     runUserDataOpenDir,
     runUserDataBackup,
     runUserDataRestoreLatest,

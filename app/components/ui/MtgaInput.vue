@@ -55,7 +55,57 @@ const emit = defineEmits<{
 
 const dropdownOpen = ref(false)
 const dropdownRef = ref<HTMLElement | null>(null)
+const isPositioned = ref(false)
+const isFiltering = ref(false) // 标记是否正在过滤（仅在展开后有输入才为 true）
 const slots = useSlots()
+
+// 下拉菜单定位样式
+const dropdownStyle = ref<Record<string, string | number>>({})
+
+/**
+ * 更新下拉菜单的定位
+ * 通过 getBoundingClientRect 实时计算输入框位置
+ */
+const updateDropdownPosition = () => {
+  if (!dropdownRef.value || !dropdownOpen.value) return
+  
+  const rect = dropdownRef.value.getBoundingClientRect()
+  // 检查下方是否有足够空间，否则向上弹出 (简单实现)
+  const spaceBelow = window.innerHeight - rect.bottom
+  const hasSpaceBelow = spaceBelow > 250 // 下拉框最大高度约 240px
+
+  dropdownStyle.value = {
+    position: 'fixed',
+    top: hasSpaceBelow ? `${rect.bottom + 6}px` : 'auto',
+    bottom: !hasSpaceBelow ? `${window.innerHeight - rect.top + 6}px` : 'auto',
+    left: `${rect.left}px`,
+    width: `${rect.width}px`,
+    zIndex: 9999
+  }
+  
+  // 延迟一帧设置定位完成状态，确保样式已应用到 DOM
+  requestAnimationFrame(() => {
+    isPositioned.value = true
+  })
+}
+
+// 监听窗口事件以同步位置
+watch(dropdownOpen, async (val) => {
+  if (val) {
+    isPositioned.value = false
+    isFiltering.value = false // 展开时重置过滤状态，显示完整列表
+    dropdownStyle.value = {} // 重置样式
+    await nextTick()
+    updateDropdownPosition()
+    window.addEventListener('scroll', updateDropdownPosition, true)
+    window.addEventListener('resize', updateDropdownPosition)
+  } else {
+    window.removeEventListener('scroll', updateDropdownPosition, true)
+    window.removeEventListener('resize', updateDropdownPosition)
+    isPositioned.value = false
+    isFiltering.value = false
+  }
+})
 
 // 样式映射
 const inputSizeClass = computed(() => {
@@ -124,12 +174,33 @@ const handleSelect = (val: string) => {
 
 const handleInput = (e: Event) => {
   if (e.target instanceof HTMLInputElement) {
-    emit('update:modelValue', e.target.value)
+    const val = e.target.value
+    emit('update:modelValue', val)
+    
+    // 如果 Popover 已经打开，且有选项，则在输入时保持打开并允许过滤
+    if (props.showDropdown && props.options.length > 0) {
+      dropdownOpen.value = true
+      isFiltering.value = true // 标记开始过滤
+    }
   }
 }
 
-const handleClear = () => {
+// 过滤后的选项
+const filteredOptions = computed(() => {
+  if (!props.options || props.options.length === 0) return []
+  // 如果当前不是过滤模式（即刚打开），显示完整列表
+  if (!isFiltering.value) return props.options
+  
+  const search = String(props.modelValue).toLowerCase().trim()
+  if (!search) return props.options
+  return props.options.filter(opt => opt.toLowerCase().includes(search))
+})
+
+const handleClear = (e: MouseEvent) => {
+  e.stopPropagation() // 阻止冒泡，防止触发父级的点击事件导致下拉收起
   emit('update:modelValue', '')
+  isFiltering.value = true // 清空也视为一种过滤操作，显示全部
+  // 点击清空时不收起下拉菜单
 }
 </script>
 
@@ -213,9 +284,6 @@ const handleClear = () => {
         ></div>
         
         <div class="flex items-center gap-1">
-          <!-- 加载状态 -->
-          <span v-if="loading" class="loading loading-spinner loading-xs text-primary/70 mx-1"></span>
-
           <!-- 下拉按钮 (模拟 Select) -->
           <button
             v-if="showDropdown"
@@ -247,30 +315,45 @@ const handleClear = () => {
         </div>
       </div>
 
-      <!-- 下拉面板 -->
-      <div 
-        v-if="showDropdown && dropdownOpen"
-        class="absolute left-0 right-0 top-full mt-1.5 z-1000 bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in duration-300 origin-top"
-      >
-        <div v-if="!options || options.length === 0" class="px-4 py-6 text-center">
-          <p class="text-slate-400 text-xs">暂无可用数据</p>
+      <!-- 下拉面板 (使用 Teleport 实现 Portal 功能，解决父级 overflow 遮挡问题) -->
+      <Teleport to="body">
+        <div 
+          v-if="showDropdown && dropdownOpen && isPositioned"
+          :style="dropdownStyle"
+          class="bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in duration-300 origin-top"
+        >
+          <!-- Loading 遮罩层 (居中动画 + 毛玻璃) -->
+          <div 
+            v-if="loading" 
+            class="absolute inset-0 z-10 flex items-center justify-center bg-white/40 backdrop-blur-[2px] transition-all duration-300"
+          >
+            <div class="flex flex-col items-center gap-2">
+              <span class="loading loading-spinner loading-md text-primary"></span>
+              <span class="text-[10px] text-slate-500 font-medium">加载中...</span>
+            </div>
+          </div>
+
+          <div v-if="!filteredOptions || filteredOptions.length === 0" class="px-4 py-6 text-center">
+            <p class="text-slate-400 text-xs">暂无匹配数据</p>
+          </div>
+          <!-- 明确为单列布局 (flex-col) 且占满宽度 (w-full) -->
+          <ul v-else class="menu flex-col flex-nowrap p-1 max-h-[240px] overflow-auto custom-scrollbar w-full">
+            <li v-for="opt in filteredOptions" :key="opt">
+              <button 
+                type="button"
+                class="flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-primary/5 hover:text-primary transition-all duration-200 text-sm w-full"
+                :class="{ 'bg-primary/10 text-primary font-medium': modelValue === opt }"
+                @click="handleSelect(opt)"
+              >
+                <span class="truncate flex-1 text-left">{{ opt }}</span>
+                <svg v-if="modelValue === opt" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+              </button>
+            </li>
+          </ul>
         </div>
-        <ul v-else class="menu p-1 max-h-[240px] overflow-auto custom-scrollbar">
-          <li v-for="opt in options" :key="opt">
-            <button 
-              type="button"
-              class="flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-primary/5 hover:text-primary transition-all duration-200 text-sm"
-              :class="{ 'bg-primary/10 text-primary font-medium': modelValue === opt }"
-              @click="handleSelect(opt)"
-            >
-              <span class="truncate flex-1 text-left">{{ opt }}</span>
-              <svg v-if="modelValue === opt" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-              </svg>
-            </button>
-          </li>
-        </ul>
-      </div>
+      </Teleport>
     </div>
 
     <!-- 底部描述/错误信息 -->

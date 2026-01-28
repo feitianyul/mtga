@@ -12,6 +12,7 @@ const editorMode = ref<"add" | "edit">("add")
 const formError = ref("")
 const middleRouteEnabled = ref(false)
 const availableModels = ref<string[]>([])
+const modelLoading = ref(false)
 
 const confirmOpen = ref(false)
 const confirmTitle = ref("确认删除")
@@ -127,6 +128,8 @@ const resetForm = () => {
   form.middle_route = ""
   middleRouteEnabled.value = false
   formError.value = ""
+  availableModels.value = []
+  modelLoading.value = false
 }
 
 const openAdd = () => {
@@ -152,6 +155,7 @@ const openEdit = () => {
   form.middle_route = group.middle_route || ""
   middleRouteEnabled.value = Boolean(group.middle_route)
   formError.value = ""
+  availableModels.value = []
   editorOpen.value = true
 }
 
@@ -199,8 +203,27 @@ const handleSave = async () => {
 }
 
 const handleFetchModels = async () => {
-  store.appendLog("正在获取模型列表...")
-  // TODO: 调用后端 API 获取模型列表
+  if (modelLoading.value) {
+    return
+  }
+  const apiUrl = form.api_url.trim()
+  if (!apiUrl) {
+    store.appendLog("获取模型列表失败: API URL为空")
+    return
+  }
+  modelLoading.value = true
+  const models = await store.fetchConfigGroupModels({
+    api_url: apiUrl,
+    api_key: form.api_key.trim(),
+    model_id: form.model_id.trim(),
+    middle_route: middleRouteEnabled.value
+      ? normalizeMiddleRoute(form.middle_route)
+      : "",
+  })
+  if (models !== null) {
+    availableModels.value = models
+  }
+  modelLoading.value = false
 }
 
 const requestDelete = () => {
@@ -423,7 +446,7 @@ const moveDown = async () => {
           v-model="form.api_url" 
           label="API URL" 
           required 
-          placeholder="https://api.openai.com/v1"
+          placeholder="https://api.openai.com"
           icon="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
         />
 
@@ -452,8 +475,9 @@ const moveDown = async () => {
           label="实际模型ID" 
           required 
           show-dropdown
+          :loading="modelLoading"
           :options="availableModels"
-          placeholder="例如：gpt-4-turbo"
+          placeholder="例如：gpt-5"
           icon="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"
           @dropdown="handleFetchModels"
         />

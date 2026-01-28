@@ -63,6 +63,12 @@ export const useMtgaApi = () => {
     index: number
     mode?: "chat" | "models"
   }) => safeInvoke<InvokeResult>("config_group_test", payload)
+  const configGroupModels = (payload: {
+    api_url: string
+    api_key?: string
+    middle_route?: string
+    model_id?: string
+  }) => safeInvoke<InvokeResult>("config_group_models", payload)
   const userDataOpenDir = () => safeInvoke<InvokeResult>("user_data_open_dir")
   const userDataBackup = () => safeInvoke<InvokeResult>("user_data_backup")
   const userDataRestoreLatest = () =>
@@ -120,6 +126,7 @@ export const useMtgaApi = () => {
     proxyCheckNetwork,
     proxyStartAll,
     configGroupTest,
+    configGroupModels,
     userDataOpenDir,
     userDataBackup,
     userDataRestoreLatest,
