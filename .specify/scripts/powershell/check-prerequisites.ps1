@@ -1,5 +1,7 @@
 param(
-  [switch]$Json
+  [switch]$Json,
+  [switch]$RequireTasks,
+  [switch]$IncludeTasks
 )
 
 $repoRoot = Get-Location
@@ -22,6 +24,17 @@ $featureDir = Split-Path $specFile.FullName -Parent
 $available = @()
 Get-ChildItem $featureDir -File -ErrorAction SilentlyContinue | ForEach-Object {
   $available += $_.Name
+}
+
+if ($IncludeTasks -and (Test-Path (Join-Path $featureDir "tasks.md"))) {
+  if ($available -notcontains "tasks.md") {
+    $available += "tasks.md"
+  }
+}
+
+if ($RequireTasks -and -not (Test-Path (Join-Path $featureDir "tasks.md"))) {
+  Write-Error "tasks.md not found under feature dir"
+  exit 1
 }
 
 $payload = [ordered]@{

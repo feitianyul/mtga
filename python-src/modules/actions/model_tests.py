@@ -5,6 +5,7 @@ from typing import Any
 
 import requests
 
+from modules.network.outbound_proxy import create_outbound_session
 from modules.proxy.proxy_config import normalize_middle_route
 
 HTTP_OK = 200
@@ -126,8 +127,9 @@ def _fetch_model_payload(
     log_func(f"正在获取模型列表: {test_url}")
 
     suffix = f": {model_id}" if model_id else ""
+    session = create_outbound_session()
     try:
-        response = requests.get(test_url, headers=headers, timeout=10)
+        response = session.get(test_url, headers=headers, timeout=10)
     except requests.exceptions.Timeout:
         log_func(f"❌ 模型列表获取超时{suffix}")
         return None
@@ -137,6 +139,8 @@ def _fetch_model_payload(
     except Exception as exc:
         log_func(f"❌ 模型列表获取意外错误{suffix}: {str(exc)}")
         return None
+    finally:
+        session.close()
 
     if response.status_code != HTTP_OK:
         _log_response_error(response, log_func)
@@ -227,7 +231,16 @@ def test_chat_completion(
 
             log_func(f"正在测活模型: {model_id} (会消耗少量tokens)")
 
-            response = requests.post(test_url, json=test_data, headers=headers, timeout=30)
+            session = create_outbound_session()
+            try:
+                response = session.post(
+                    test_url,
+                    json=test_data,
+                    headers=headers,
+                    timeout=30,
+                )
+            finally:
+                session.close()
 
             if response.status_code == HTTP_OK:
                 log_func(f"✅ 模型测活成功: {model_id}")
