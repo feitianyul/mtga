@@ -185,3 +185,11 @@ jobs:
           Get-ChildItem "src-tauri/target/bundle-release/bundle/nsis" -Filter *.exe |
             Select-Object -ExpandProperty Name |
             ForEach-Object { Write-Host " - $_" }
+
+      - name: 📤 上传安装包 (Artifacts)
+        uses: actions/upload-artifact@v5
+        with:
+          name: mtga-${{ env.VERSION }}-windows
+          if-no-files-found: error
+          path: |
+            src-tauri/target/bundle-release/bundle/nsis/*.exe
