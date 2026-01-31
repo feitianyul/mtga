@@ -39,6 +39,6 @@
 - [X] T016 [US3] 确保代理密码不出现在日志于 python-src/modules/network/outbound_proxy.py
 
 ## Final Phase：Polish & Cross-Cutting
-- [ ] T017 执行前端检查命令并记录于 .specify/specs/1-add-network-proxy/quickstart.md
-- [ ] T018 执行 Python 检查命令并记录于 .specify/specs/1-add-network-proxy/quickstart.md
-- [ ] T019 补充手动验证结果于 .specify/specs/1-add-network-proxy/quickstart.md
+- [X] T017 执行前端检查命令并记录于 .specify/specs/1-add-network-proxy/quickstart.md
+- [X] T018 执行 Python 检查命令并记录于 .specify/specs/1-add-network-proxy/quickstart.md
+- [X] T019 补充手动验证结果于 .specify/specs/1-add-network-proxy/quickstart.md
