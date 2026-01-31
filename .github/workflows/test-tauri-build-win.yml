@@ -1,10 +1,26 @@
 name: 🚀 构建和发布版本(TAURI) - test win
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Release tag (例如：v2.0.0-beta.7-proxy.1)"
+        required: true
+        default: "v2.0.0-beta.7-proxy.1"
+      prerelease:
+        description: "是否标记为预发布版本 (true/false)"
+        required: true
+        default: "true"
+      draft:
+        description: "是否创建为草稿 (true/false)"
+        required: true
+        default: "false"
+
+permissions:
+  contents: write
 
 env:
   PYTHON_VERSION: "3.13"
-  VERSION: "v2.0.0-test-win"
+  VERSION: "${{ github.event.inputs.version }}"
 
 jobs:
   build-windows:
@@ -193,3 +209,37 @@ jobs:
           if-no-files-found: error
           path: |
             src-tauri/target/bundle-release/bundle/nsis/*.exe
+
+      - name: 🚀 创建/更新 GitHub Release 并上传安装包
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $tag = "${{ env.VERSION }}"
+          if (-not $tag) { throw "VERSION 为空，无法创建 Release" }
+
+          $isPrerelease = ("${{ github.event.inputs.prerelease }}" -eq "true")
+          $isDraft = ("${{ github.event.inputs.draft }}" -eq "true")
+
+          $files = Get-ChildItem "src-tauri/target/bundle-release/bundle/nsis" -Filter *.exe |
+            Select-Object -ExpandProperty FullName
+
+          if (-not $files) { throw "未找到安装包: src-tauri/target/bundle-release/bundle/nsis/*.exe" }
+
+          $notes = "CI build from ${{ github.sha }} (branch: ${{ github.ref_name }})"
+
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "✅ Release 已存在: $tag，更新资产..."
+            gh release upload $tag $files --clobber
+            exit 0
+          }
+
+          Write-Host "🆕 创建 Release: $tag"
+          $args = @("release", "create", $tag)
+          $args += $files
+          $args += @("--title", $tag, "--notes", $notes, "--target", "${{ github.sha }}")
+          if ($isPrerelease) { $args += "--prerelease" }
+          if ($isDraft) { $args += "--draft" }
+
+          gh @args
